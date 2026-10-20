@@ -202,10 +202,10 @@ public class PackLoaderDialog extends BaseDialog{
         cont.add(pane).grow().pad(4f).row();
 
         buttons.clear();
-        buttons.button(Core.bundle != null ? Core.bundle.get("back") : "Back", Icon.left, () -> {
+        UIUtils.pad(buttons.button(Core.bundle != null ? Core.bundle.get("back") : "Back", Icon.left, () -> {
             targetType = null;
             rebuild();
-        }).size(210f, 64f).get();
+        }).size(210f, 64f).get());
     }
 
     private Table createSourceOptionButton(Drawable icon, String title, String desc, Runnable clicked, float buttonWidth){
@@ -252,14 +252,14 @@ public class PackLoaderDialog extends BaseDialog{
             t.add(summary).color(Pal.lightishGray).ellipsis(true).growX().minWidth(0f).left();
         }).growX().left().padLeft(6f).minWidth(0f);
 
-        var changeBtn = header.button(
+        var changeBtn = UIUtils.pad(header.button(
             Core.bundle != null ? Core.bundle.get("packloader.source.change") : "Change",
             Icon.refresh, Styles.flatt, () -> {
                 entries.clear();
                 sourceName = "";
                 targetType = null;
                 rebuild();
-            }).height(40f).padRight(4f).get();
+            }).height(40f).padRight(4f).get());
         if(changeBtn != null){
             changeBtn.margin(4f, 10f, 4f, 10f);
         }
@@ -294,26 +294,26 @@ public class PackLoaderDialog extends BaseDialog{
         toolbar.add().growX(); // spacer pushes mass selection buttons to right
 
         // Mass selection buttons with proper spacing between icon and text
-        var selectAllBtn = toolbar.button(
+        var selectAllBtn = UIUtils.pad(toolbar.button(
             Core.bundle != null ? Core.bundle.get("packloader.select.all") : "All",
             Icon.ok, Styles.flatt, () -> {
                 for(PackEntry e : entries){
                     if(filterMatches(e)) e.selected = true;
                 }
                 rebuildEntriesList();
-            }).height(38f).pad(2f).get();
+            }).height(38f).pad(2f).get());
         if(selectAllBtn != null){
             selectAllBtn.margin(4f, 10f, 4f, 10f);
         }
 
-        var deselectBtn = toolbar.button(
+        var deselectBtn = UIUtils.pad(toolbar.button(
             Core.bundle != null ? Core.bundle.get("packloader.select.none") : "None",
             Icon.cancel, Styles.flatt, () -> {
                 for(PackEntry e : entries){
                     if(filterMatches(e)) e.selected = false;
                 }
                 rebuildEntriesList();
-            }).height(38f).pad(2f).get();
+            }).height(38f).pad(2f).get());
         if(deselectBtn != null){
             deselectBtn.margin(4f, 10f, 4f, 10f);
         }
@@ -350,7 +350,7 @@ public class PackLoaderDialog extends BaseDialog{
         String initialImportText = Core.bundle != null ?
             Core.bundle.format("packloader.import.action", selectedCount) :
             ("Import (" + selectedCount + ")");
-        var importBtn = buttons.button(initialImportText, Icon.download, this::executeImport).size(210f, 64f).get();
+        var importBtn = UIUtils.pad(buttons.button(initialImportText, Icon.download, this::executeImport).size(210f, 64f).get());
         importBtn.update(() -> {
             int count = entries.count(e -> e.selected);
             String text = Core.bundle != null ?
@@ -709,12 +709,12 @@ public class PackLoaderDialog extends BaseDialog{
             (Core.bundle != null ? Core.bundle.get("packloader.action.import-schem-zip", "Import .zip") : "Import .zip") :
             (Core.bundle != null ? Core.bundle.get("packloader.action.import-zip", "Import .zip") : "Import .zip");
 
-        d.buttons.button(zipText, Icon.download, () -> {
+        UIUtils.pad(d.buttons.button(zipText, Icon.download, () -> {
             d.hide();
             pickZip(targetType);
-        }).get();
+        }).get());
 
-        d.buttons.button(Core.bundle != null ? Core.bundle.get("close", "Close") : "Close", Icon.cancel, d::hide);
+        UIUtils.pad(d.buttons.button(Core.bundle != null ? Core.bundle.get("close", "Close") : "Close", Icon.cancel, d::hide).get());
 
         d.show();
     }

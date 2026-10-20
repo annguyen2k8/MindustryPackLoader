@@ -116,20 +116,20 @@ public class PackResultDialog extends BaseDialog{
             boolean hasSchems = report.results.contains(r -> r.entry.type == PackType.SCHEMATIC && r.destinationFile != null);
 
             if(hasMaps && Vars.ui != null && Vars.ui.maps != null){
-                buttons.button(Core.bundle != null ? Core.bundle.get("packloader.result.open.maps") : "Open Maps", Icon.terrain, () -> {
+                UIUtils.pad(buttons.button(Core.bundle != null ? Core.bundle.get("packloader.result.open.maps") : "Open Maps", Icon.terrain, () -> {
                     hide();
                     Vars.ui.maps.show();
-                }).size(210f, 64f).pad(4f).get();
+                }).size(210f, 64f).pad(4f).get());
             }
 
             if(hasSchems && Vars.ui != null && Vars.ui.schematics != null){
-                buttons.button(Core.bundle != null ? Core.bundle.get("packloader.result.open.schematics") : "Open Schematics", Icon.paste, () -> {
+                UIUtils.pad(buttons.button(Core.bundle != null ? Core.bundle.get("packloader.result.open.schematics") : "Open Schematics", Icon.paste, () -> {
                     hide();
                     Vars.ui.schematics.show();
-                }).size(210f, 64f).pad(4f).get();
+                }).size(210f, 64f).pad(4f).get());
             }
         }
 
-        buttons.button(Core.bundle != null ? Core.bundle.get("packloader.result.close") : "Close", Icon.cancel, this::hide).size(210f, 64f).pad(4f);
+        UIUtils.pad(buttons.button(Core.bundle != null ? Core.bundle.get("packloader.result.close") : "Close", Icon.cancel, this::hide).size(210f, 64f).pad(4f).get());
     }
 }

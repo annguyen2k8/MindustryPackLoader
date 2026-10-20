@@ -12,6 +12,7 @@ import mindustry.gen.Icon;
 import mindustry.mod.Mod;
 import packloader.model.PackType;
 import packloader.ui.PackLoaderDialog;
+import packloader.ui.UIUtils;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -162,7 +163,7 @@ public class PackLoaderMod extends Mod{
         if(table == null || table.find(zipName) != null) return;
 
         table.row();
-        table.button(zipText, zipIcon, zipAction).size(210f, 64f).name(zipName);
-        table.button(folderText, folderIcon, folderAction).size(210f, 64f).name(folderName);
+        UIUtils.pad(table.button(zipText, zipIcon, zipAction).size(210f, 64f).name(zipName).get());
+        UIUtils.pad(table.button(folderText, folderIcon, folderAction).size(210f, 64f).name(folderName).get());
     }
 }

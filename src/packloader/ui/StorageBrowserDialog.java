@@ -76,13 +76,13 @@ public class StorageBrowserDialog extends BaseDialog{
         setFillParent(true);
         addCloseButton();
 
-        selectFolderButton = buttons.button(Core.bundle != null ? Core.bundle.get("packloader.browser.select.folder") : "Select", Icon.ok, () -> {
+        selectFolderButton = UIUtils.pad(buttons.button(Core.bundle != null ? Core.bundle.get("packloader.browser.select.folder") : "Select", Icon.ok, () -> {
             Fi chosen = selectedDirectory != null ? selectedDirectory : currentDirectory;
             hide();
             if(onFolderSelected != null && chosen != null){
                 onFolderSelected.get(chosen);
             }
-        }).get();
+        }).get());
     }
 
     public void rebuild(){
@@ -221,14 +221,14 @@ public class StorageBrowserDialog extends BaseDialog{
                     .color(Pal.remove).wrap().growX().pad(16f).center().row();
 
                 if(isRestricted){
-                    listTable.button(
+                    UIUtils.pad(listTable.button(
                         Core.bundle != null ? Core.bundle.get("packloader.action.import-zip", "Import .zip") : "Import .zip",
                         Icon.download, () -> {
                             hide();
                             if(packloader.PackLoaderMod.dialog != null){
                                 packloader.PackLoaderMod.dialog.pickZip(targetType);
                             }
-                        }).size(210f, 64f).pad(6f).get();
+                        }).size(210f, 64f).pad(6f).get());
                     listTable.row();
                 }
             }else{
@@ -287,14 +287,14 @@ public class StorageBrowserDialog extends BaseDialog{
                             "Android Scoped Storage may hide .msch/.msav files here.\nUse [Import .zip] to load all files without restriction.")
                             .color(Pal.accent).wrap().growX().pad(16f).center().row();
 
-                        listTable.button(
+                        UIUtils.pad(listTable.button(
                             Core.bundle != null ? Core.bundle.get("packloader.action.import-zip", "Import .zip") : "Import .zip",
                             Icon.download, () -> {
                                 hide();
                                 if(packloader.PackLoaderMod.dialog != null){
                                     packloader.PackLoaderMod.dialog.pickZip(targetType);
                                 }
-                            }).size(210f, 64f).pad(6f).get();
+                            }).size(210f, 64f).pad(6f).get());
                         listTable.row();
                     }else{
                         listTable.add(Core.bundle != null ? Core.bundle.get("packloader.browser.empty") : "No compatible files found").color(Pal.lightishGray).pad(20f).row();
