@@ -1,3 +1,4 @@
+![Logo](icon.png)
 # Mindustry PackLoader
 
 A Mindustry Java mod for bulk importing maps (`.msav`) and schematics (`.msch`) directly from ZIP archives or folders on Android and Desktop.
