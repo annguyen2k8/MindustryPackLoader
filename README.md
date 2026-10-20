@@ -1,51 +1,71 @@
-# Mindustry Java Mod Template
-A Java Mindustry mod template that works on Android and PC. The Kotlin version of this mod can be seen [here](https://github.com/Anuken/MindustryKotlinModTemplate).
+# Mindustry PackLoader
 
-## Registering the mod with Mindustry Mod Browser
+A Mindustry Java mod for bulk importing maps (`.msav`) and schematics (`.msch`) directly from ZIP archives or folders on Android and Desktop.
 
-The list of mods displayed in the Mod Browser is [created automatically](https://github.com/Anuken/MindustryMods). For your mod to be included, the following criteria need to be met:
+---
 
-- Must have a valid `mod.json` / `mod.hjson` file in the root or `assets/` directory.
-- Must have the `mindustry-mod` topic. Do **NOT** use the `mindustry-mod-v7` or `mindustry-mod-v8` topics, they are ignored!
-- Must have a `minGameVersion` >= `136` in `mod.json`.
-- Must have a release published, containing the compiled mod as an asset. This template ensures this asset is created automatically when a release is published, just creating and publishing a release is enough.
+## Features
 
-### Opting Out
+- **Bulk Import:** Import dozens of maps and schematics from `.zip` packs or folders in one operation.
+- **Smart Conflict Handling:** Choose how to resolve duplicate files:
+  - **Skip:** Keep existing game files intact.
+  - **Overwrite:** Replace existing files with imported versions.
+  - **Rename:** Automatically append numbers (`_1`, `_2`) to keep both.
+- **Instant Hot-Reload:** Automatically reloads game maps and schematics immediately without restarting Mindustry.
+- **Safe & Validated:** Built-in Zip Slip protection, file header verification for `.msch` and `.msav` streams, and atomic writes via temporary files.
+- **Mobile-Optimized:** Designed for Android with touch-friendly controls, multi-selection checkboxes, search filtering, and System File Picker (SAF) support.
+- **Seamless In-Game Integration:** Direct action buttons located on the **Main Menu**, **Schematics**, **Custom Game**, and **Map Editor** screens.
 
-If you would like to remove your mod from the public browser, add `hideBrowser: true` to your `mod.json` / `mod.hjson`.
+---
 
-## Building for Desktop Testing
+## Installation
 
-1. Install JDK **17**.
-2. Run `gradlew jar` [1].
-3. Your mod jar will be in the `build/libs` directory. **Only use this version for testing on desktop. It will not work with Android.**
-To build an Android-compatible version, you need the Android SDK. You can either let Github Actions handle this, or set it up yourself. See steps below.
+1. Download the latest `MindustryPackLoader.jar` from Releases (or build locally).
+2. Launch Mindustry, navigate to **Mods** > **Import Mod** > **Import from File**.
+3. Select `MindustryPackLoader.jar` and enable the mod.
 
-## Building through Github Actions
+---
 
-This repository is set up with Github Actions CI to automatically build the mod for you every commit. This requires a Github repository, for obvious reasons.
-To get a jar file that works for every platform, do the following:
-1. Make a Github repository with your mod name, and upload the contents of this repo to it. Perform any modifications necessary, then commit and push. 
-2. Check the "Actions" tab on your repository page. Select the most recent commit in the list. If it completed successfully, there should be a download link under the "Artifacts" section. 
-3. Click the download link (should be the name of your repo). Import the jar contained within in Mindustry. This version should work both on Android and Desktop.
+## Usage
 
-## Building Locally
+### Opening PackLoader
+- **Main Menu:** Click the **Pack Loader** button to open the loader dialog.
+- **Schematics / Maps Menus:** Click **Import .zip** or **Scan Folder** directly inside the respective dialogs.
 
-Building locally takes more time to set up, but shouldn't be a problem if you've done Android development before.
-1. Download the Android SDK, unzip it and set the `ANDROID_HOME` environment variable to its location.
-2. Make sure you have API level 30 installed, as well as any recent version of build tools (e.g. 30.0.1)
-3. Add a build-tools folder to your PATH. For example, if you have `30.0.1` installed, that would be `$ANDROID_HOME/build-tools/30.0.1`.
-4. Run `gradlew deploy`. If you did everything correctlly, this will create a jar file in the `build/libs` directory that can be run on both Android and desktop. 
+### Import Workflow
+1. **Choose Source:** Select a `.zip` pack via the file picker or browse a device folder.
+2. **Review & Select:** Check the items you want to import, or use **Select All** / **Deselect All**.
+3. **Select Conflict Policy:** Pick **Skip**, **Overwrite**, or **Rename**.
+4. **Import:** Tap **Import Selected**. Review the import summary and tap to open your updated Schematics or Maps library.
 
-## Adding Dependencies
+---
 
-Please note that all dependencies on Mindustry, Arc or its submodules **must be declared as compileOnly in Gradle**. Never use `implementation` for core Mindustry or Arc dependencies. 
+## Building & Testing
 
-- `implementation` **places the entire dependency in the jar**, which is, in most mod dependencies, very undesirable. You do not want the entirety of the Mindustry API included with your mod.
-- `compileOnly` means that the dependency is only around at compile time, and not included in the jar.
+### Requirements
+- **JDK 17**
+- **Android SDK** (API 21+, `d8` in `PATH` and `ANDROID_HOME` configured for Android builds)
+- Target: **Mindustry v160+**
 
-Only use `implementation` if you want to package another Java library *with your mod*, and that library is not present in Mindustry already.
+### Commands
 
---- 
+- **Run Unit Tests (27 tests):**
+  ```bash
+  ./gradlew test
+  ```
+- **Build Desktop Mod (`MindustryPackLoaderDesktop.jar`):**
+  ```bash
+  ./gradlew jar
+  ```
+  Output: `build/libs/MindustryPackLoaderDesktop.jar`
 
-*[1]* *On Linux/Mac it's `./gradlew`, but if you're using Linux I assume you know how to run executables properly anyway.* 
+- **Build Universal Mod with Android Support (`classes.dex`):**
+  ```bash
+  ./gradlew deploy
+  ```
+  Output: `build/libs/MindustryPackLoader.jar`
+
+- **Verify Localization & JAR Packaging:**
+  ```bash
+  ./gradlew verifyJar
+  ```

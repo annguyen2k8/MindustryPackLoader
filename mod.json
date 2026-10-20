@@ -1,0 +1,11 @@
+{
+  "displayName": "PackLoader",
+  "name": "mindustry-packloader",
+  "author": "Anzuno",
+  "main": "packloader.PackLoaderMod",
+  "description": "Bulk import maps (.msav) and schematics (.msch) directly from ZIP packs or folders on Android.",
+  "version": "1.0.0",
+  "minGameVersion": 160,
+  "java": true,
+  "hidden": true
+}
