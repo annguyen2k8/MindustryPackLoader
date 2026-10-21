@@ -3,7 +3,7 @@
   "name": "mindustry-packloader",
   "author": "Anzuno",
   "main": "packloader.PackLoaderMod",
-  "description": "Bulk import maps (.msav) and schematics (.msch) directly from ZIP packs or folders on Android.",
+  "description": "Bulk import maps (.msav) and schematics (.msch) directly from ZIP archives or folders on Android and Desktop.\n\nFeatures:\n- Bulk Import: Import dozens of maps and schematics from .zip packs or folders in one operation.\n- Smart Conflict Handling: Choose how to resolve duplicate files (Skip, Overwrite, Rename).\n- Instant Hot-Reload: Automatically reloads game maps and schematics immediately without restarting Mindustry.\n- Safe & Validated: Built-in Zip Slip protection, format header validation, and atomic writes.\n- Mobile-Optimized: Touch-friendly UI, search filtering, and System File Picker (SAF) support.\n- Seamless Integration: Quick-access buttons in Main Menu, Schematics, Custom Game, and Map Editor.\n\nUsage:\n- Main Menu: Click \"Pack Loader\" to open the loader dialog.\n- Schematics / Maps Menus: Click \"Import .zip\" or \"Scan Folder\" directly inside the respective dialogs.\n- Import Workflow: Choose Source -> Review & Select -> Select Conflict Policy -> Import Selected.",
   "version": "1.0.0",
   "minGameVersion": 160,
   "java": true,
