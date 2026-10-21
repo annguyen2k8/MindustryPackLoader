@@ -6,6 +6,11 @@ main: "packloader.PackLoaderMod"
 description: '''
 [accent[]]Bulk import[[]] maps ([stat[]][[]]) and schematics ([stat[]][[]]) directly from ZIP archives or folders on Android and Desktop.
 
+[accent[]]Usage:[[]]
+  [accent[]]1.[[]] [stat[]]Main Menu:[[]] [lightgray[]]Click [white[]]"Pack Loader"[[]] to open the loader dialog.[[]]
+  [accent[]]2.[[]] [stat[]]Schematics / Maps:[[]] [lightgray[]]Click [white[]]"Import .zip"[[]] or [white[]]"Scan Folder"[[]] directly inside their respective dialogs.[[]]
+  [accent[]]3.[[]] [stat[]]Import Workflow:[[]] [lightgray[]]Choose Source -> Review & Select -> Select Conflict Policy -> Import Selected.[[]]
+
 [accent[]]Features:[[]]
   [stat[]] Bulk Import:[[]] [lightgray[]]Import dozens of maps and schematics from .zip packs or folders in one operation.[[]]
   [stat[]] Smart Conflict Handling:[[]] [lightgray[]]Choose how to resolve duplicate files ([white[]]Skip[[]], [white[]]Overwrite[[]], [white[]]Rename[[]]).[[]]
@@ -13,11 +18,6 @@ description: '''
   [stat[]] Safe & Validated:[[]] [lightgray[]]Built-in Zip Slip protection, format header validation, and atomic writes.[[]]
   [stat[]] Mobile-Optimized:[[]] [lightgray[]]Touch-friendly UI, search filtering, and System File Picker ([white[]]SAF[[]]) support.[[]]
   [stat[]] Seamless Integration:[[]] [lightgray[]]Quick-access buttons in Main Menu, Schematics, Custom Game, and Map Editor.[[]]
-
-[accent[]]Usage:[[]]
-  [accent[]]1.[[]] [stat[]]Main Menu:[[]] [lightgray[]]Click [white[]]"Pack Loader"[[]] to open the loader dialog.[[]]
-  [accent[]]2.[[]] [stat[]]Schematics / Maps:[[]] [lightgray[]]Click [white[]]"Import .zip"[[]] or [white[]]"Scan Folder"[[]] directly inside their respective dialogs.[[]]
-  [accent[]]3.[[]] [stat[]]Import Workflow:[[]] [lightgray[]]Choose Source -> Review & Select -> Select Conflict Policy -> Import Selected.[[]]
 '''
 version: "1.0.0"
 minGameVersion: 160
