@@ -3,7 +3,6 @@
 ![Mindustry](https://img.shields.io/badge/Mindustry-v160+-EE82EE?style=for-the-badge)
 [![Latest Release](https://img.shields.io/github/v/release/annguyen2k8/MindustryPackLoader?style=for-the-badge&logo=github&color=32CD32)](https://github.com/annguyen2k8/MindustryPackLoader/releases/latest)
 [![Total Downloads](https://img.shields.io/github/downloads/annguyen2k8/MindustryPackLoader/total?style=for-the-badge&logo=github&color=2E7D32)](https://github.com/annguyen2k8/MindustryPackLoader/releases)
-![Java](https://img.shields.io/badge/Java-17-%23ED8B00.svg?style=for-the-badge&logo=openjdk&logoColor=white)
 
 A Mindustry Java mod for bulk importing maps (`.msav`) and schematics (`.msch`) directly from ZIP archives or folders on Android and Desktop.
 
