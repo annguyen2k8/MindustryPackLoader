@@ -6,7 +6,6 @@
 
 A Mindustry Java mod for bulk importing maps (`.msav`) and schematics (`.msch`) directly from ZIP archives or folders on Android and Desktop.
 
----
 
 ## Features
 
@@ -20,7 +19,6 @@ A Mindustry Java mod for bulk importing maps (`.msav`) and schematics (`.msch`) 
 - **Mobile-Optimized:** Designed for Android with touch-friendly controls, multi-selection checkboxes, search filtering, and System File Picker (SAF) support.
 - **Seamless In-Game Integration:** Direct action buttons located on the **Main Menu**, **Schematics**, **Custom Game**, and **Map Editor** screens.
 
----
 
 ## Installation
 
@@ -28,7 +26,6 @@ A Mindustry Java mod for bulk importing maps (`.msav`) and schematics (`.msch`) 
 2. Launch Mindustry, navigate to **Mods** > **Import Mod** > **Import from File**.
 3. Select `MindustryPackLoader.jar` and enable the mod.
 
----
 
 ## Usage
 
@@ -42,7 +39,6 @@ A Mindustry Java mod for bulk importing maps (`.msav`) and schematics (`.msch`) 
 3. **Select Conflict Policy:** Pick **Skip**, **Overwrite**, or **Rename**.
 4. **Import:** Tap **Import Selected**. Review the import summary and tap to open your updated Schematics or Maps library.
 
----
 
 ## Building & Testing
 
