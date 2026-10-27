@@ -21,6 +21,8 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
 
+import static packloader.util.Localization.getLocalizedText;
+
 public class PackImporter{
     private final Fi mapDirectory;
     private final Fi schematicDirectory;
@@ -78,7 +80,7 @@ public class PackImporter{
                     if(conflict != null){
                         if(policy == DuplicatePolicy.SKIP){
                             tempFile.delete();
-                            report.addResult(ImportItemResult.skipped(entry, Core.bundle != null ? Core.bundle.format("packloader.result.msg.skipped", mapName) : "Skipped: " + mapName));
+                            report.addResult(ImportItemResult.skipped(entry, getLocalizedText("packloader.result.msg.skipped", mapName)));
                             continue;
                         }else if(policy == DuplicatePolicy.OVERWRITE){
                             if(conflict.custom){
@@ -118,7 +120,7 @@ public class PackImporter{
 
                     if(conflict != null){
                         if(policy == DuplicatePolicy.SKIP){
-                            report.addResult(ImportItemResult.skipped(entry, Core.bundle != null ? Core.bundle.format("packloader.result.msg.skipped", schemName) : "Skipped: " + schemName));
+                            report.addResult(ImportItemResult.skipped(entry, getLocalizedText("packloader.result.msg.skipped", schemName)));
                             continue;
                         }else if(policy == DuplicatePolicy.OVERWRITE){
                             Vars.schematics.remove(conflict);
@@ -147,7 +149,7 @@ public class PackImporter{
             // Fallback for custom directories or headless unit tests
             Fi targetDir = (entry.type == PackType.MAP) ? mapDirectory : schematicDirectory;
             if(targetDir == null){
-                report.addResult(ImportItemResult.failed(entry, Core.bundle != null ? Core.bundle.get("packloader.error.target-unavailable") : "Target directory unavailable"));
+                report.addResult(ImportItemResult.failed(entry, getLocalizedText("packloader.error.target-unavailable")));
                 continue;
             }
 
@@ -160,7 +162,7 @@ public class PackImporter{
                 String targetFileName = entry.sanitizedFileName;
                 Fi targetFile = targetDir.child(targetFileName);
                 if(!isWithinDirectory(targetDir, targetFile)){
-                    report.addResult(ImportItemResult.failed(entry, Core.bundle != null ? Core.bundle.get("packloader.error.path-escape") : "Path escapes target directory"));
+                    report.addResult(ImportItemResult.failed(entry, getLocalizedText("packloader.error.path-escape")));
                     continue;
                 }
 
@@ -169,7 +171,7 @@ public class PackImporter{
 
                 if(isConflict){
                     if(policy == DuplicatePolicy.SKIP){
-                        report.addResult(ImportItemResult.skipped(entry, Core.bundle != null ? Core.bundle.format("packloader.result.msg.skipped", targetFileName) : "Skipped existing: " + targetFileName));
+                        report.addResult(ImportItemResult.skipped(entry, getLocalizedText("packloader.result.msg.skipped", targetFileName)));
                         continue;
                     }else if(policy == DuplicatePolicy.RENAME){
                         String baseName = PackEntry.extractBaseName(entry.sanitizedFileName);
@@ -216,7 +218,7 @@ public class PackImporter{
             entry.copyTo(tempFile);
             if(tempFile.length() == 0){
                 tempFile.delete();
-                throw new IOException(Core.bundle != null ? Core.bundle.get("packloader.error.empty-file") : "Extracted file is empty");
+                throw new IOException(getLocalizedText("packloader.error.empty-file"));
             }
             if(targetFile.exists()){
                 targetFile.delete();
@@ -316,7 +318,7 @@ public class PackImporter{
     private void recordFailure(ImportReport report, PackEntry entry, String logPrefix, Throwable t){
         Log.err("[PackLoader] " + logPrefix + " for '@':", entry.sourcePath, t);
         String msg = (t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
-        report.addResult(ImportItemResult.failed(entry, Core.bundle != null ? Core.bundle.format("packloader.result.msg.failed", msg) : "Failed: " + msg));
+        report.addResult(ImportItemResult.failed(entry, getLocalizedText("packloader.result.msg.failed", msg)));
     }
 
     private static void invokeSetup(Object dialog){

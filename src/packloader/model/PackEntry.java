@@ -1,12 +1,13 @@
 package packloader.model;
 
-import arc.Core;
 import arc.files.Fi;
 import arc.util.Strings;
 
 import java.io.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+
+import static packloader.util.Localization.getLocalizedText;
 
 public class PackEntry{
     public static final long MAX_MAP_BYTES = 100 * 1024 * 1024L;       // 100MB max per map
@@ -83,7 +84,7 @@ public class PackEntry{
 
         if(cachedData != null){
             if(cachedData.length > maxBytes){
-                throw new IOException(Core.bundle != null ? Core.bundle.format("packloader.error.zipbomb", maxBytes / (1024 * 1024)) : "File exceeds maximum allowed size: " + (maxBytes / (1024 * 1024)) + " MB");
+                throw new IOException(getLocalizedText("packloader.error.zipbomb", maxBytes / (1024 * 1024)));
             }
             dest.writeBytes(cachedData);
             return;
@@ -102,7 +103,7 @@ public class PackEntry{
         while((len = in.read(buffer)) > 0){
             totalBytes += len;
             if(totalBytes > maxBytes){
-                throw new IOException(Core.bundle != null ? Core.bundle.format("packloader.error.zipbomb", maxBytes / (1024 * 1024)) : "File exceeds maximum allowed size: " + (maxBytes / (1024 * 1024)) + " MB");
+                throw new IOException(getLocalizedText("packloader.error.zipbomb", maxBytes / (1024 * 1024)));
             }
             out.write(buffer, 0, len);
         }
@@ -121,7 +122,7 @@ public class PackEntry{
             ZipEntry entry = zf.getEntry(zipEntryName);
             if(entry == null){
                 zf.close();
-                throw new FileNotFoundException(Core.bundle != null ? Core.bundle.format("packloader.error.notfound", zipEntryName) : "Not found: " + zipEntryName);
+                throw new FileNotFoundException(getLocalizedText("packloader.error.notfound", zipEntryName));
             }
             InputStream in = zf.getInputStream(entry);
             return new FilterInputStream(in){
@@ -135,6 +136,6 @@ public class PackEntry{
                 }
             };
         }
-        throw new IOException(Core.bundle != null ? Core.bundle.format("packloader.error.notfound", sourcePath) : "Not found: " + sourcePath);
+        throw new IOException(getLocalizedText("packloader.error.notfound", sourcePath));
     }
 }

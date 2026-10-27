@@ -1,6 +1,5 @@
 package packloader.core;
 
-import arc.Core;
 import arc.files.Fi;
 import arc.struct.Seq;
 import arc.util.Log;
@@ -18,6 +17,8 @@ import java.util.Enumeration;
 import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+
+import static packloader.util.Localization.getLocalizedText;
 
 public class PackScanner{
     private final Fi mapDirectory;
@@ -192,7 +193,7 @@ public class PackScanner{
     /** Scans a ZIP archive filtering for specific PackType (MAP, SCHEMATIC, or null for all). */
     public Seq<PackEntry> scanZip(Fi zipFile, PackType targetType) throws IOException{
         if(zipFile == null){
-            throw new FileNotFoundException(Core.bundle != null ? Core.bundle.format("packloader.error.notfound", "null") : "Not found: null");
+            throw new FileNotFoundException(getLocalizedText("packloader.error.notfound", "null"));
         }
 
         Fi resolvedZip = resolveZipFi(zipFile);
@@ -210,7 +211,7 @@ public class PackScanner{
                 if(isIgnoredMetadata(entryName)) continue;
 
                 if(!isSafeZipEntry(entryName)){
-                    Log.warn("[PackLoader] " + (Core.bundle != null ? Core.bundle.format("packloader.error.zipslip", entryName) : "Zip Slip detected: " + entryName));
+                    Log.warn("[PackLoader] " + getLocalizedText("packloader.error.zipslip", entryName));
                     continue;
                 }
 
@@ -231,7 +232,7 @@ public class PackScanner{
                 entries.add(entry);
             }
         }catch(java.util.zip.ZipException ze){
-            throw new IOException(Core.bundle != null ? Core.bundle.format("packloader.error.zip-corrupt", ze.getMessage()) : "Corrupt ZIP archive: " + ze.getMessage(), ze);
+            throw new IOException(getLocalizedText("packloader.error.zip-corrupt", ze.getMessage()), ze);
         }
 
         return entries;
@@ -245,17 +246,17 @@ public class PackScanner{
     /** Recursively scans a directory filtering for specific PackType (MAP, SCHEMATIC, or null for all). */
     public Seq<PackEntry> scanDirectory(Fi dir, PackType targetType) throws IOException{
         if(dir == null || !dir.exists() || !dir.isDirectory()){
-            throw new FileNotFoundException(Core.bundle != null ? Core.bundle.format("packloader.error.directory-notfound", (dir == null ? "null" : dir.path())) : "Directory not found");
+            throw new FileNotFoundException(getLocalizedText("packloader.error.directory-notfound", (dir == null ? "null" : dir.path())));
         }
 
         Fi[] testList;
         try{
             testList = dir.list();
         }catch(Throwable t){
-            throw new IOException(Core.bundle != null ? Core.bundle.format("packloader.error.permission-denied", dir.path()) : "Permission denied: " + dir.path(), t);
+            throw new IOException(getLocalizedText("packloader.error.permission-denied", dir.path()), t);
         }
         if(testList == null){
-            throw new IOException(Core.bundle != null ? Core.bundle.format("packloader.error.permission-denied", dir.path()) : "Cannot list directory (permission denied): " + dir.path());
+            throw new IOException(getLocalizedText("packloader.error.permission-denied", dir.path()));
         }
 
         Seq<PackEntry> entries = new Seq<>();
@@ -359,7 +360,7 @@ public class PackScanner{
         }catch(Throwable t){
             entry.isValid = false;
             String msg = (t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
-            entry.errorReason = Core.bundle != null ? Core.bundle.format("packloader.error.validation", msg) : "Validation failed: " + msg;
+            entry.errorReason = getLocalizedText("packloader.error.validation", msg);
         }
     }
 
@@ -369,14 +370,14 @@ public class PackScanner{
             int read = in.read(header);
             if(read < 4 || header[0] != 'm' || header[1] != 's' || header[2] != 'c' || header[3] != 'h'){
                 entry.isValid = false;
-                entry.errorReason = Core.bundle != null ? Core.bundle.get("packloader.error.invalid-schematic") : "Invalid schematic header";
+                entry.errorReason = getLocalizedText("packloader.error.invalid-schematic");
                 return;
             }
 
             int ver = in.read();
             if(ver > 1){
                 entry.isValid = false;
-                entry.errorReason = Core.bundle != null ? Core.bundle.format("packloader.error.invalid-schematic-ver", ver) : "Unsupported schematic version: " + ver;
+                entry.errorReason = getLocalizedText("packloader.error.invalid-schematic-ver", ver);
                 return;
             }
 
@@ -399,7 +400,7 @@ public class PackScanner{
             int read = iis.read(header);
             if(read < 4 || header[0] != 'M' || header[1] != 'S' || header[2] != 'A' || header[3] != 'V'){
                 entry.isValid = false;
-                entry.errorReason = Core.bundle != null ? Core.bundle.get("packloader.error.invalid-map") : "Invalid map header";
+                entry.errorReason = getLocalizedText("packloader.error.invalid-map");
                 return;
             }
 
@@ -414,7 +415,7 @@ public class PackScanner{
             }
         }catch(Throwable t){
             entry.isValid = false;
-            entry.errorReason = Core.bundle != null ? Core.bundle.format("packloader.error.uncompress-map", t.getMessage()) : "Cannot decompress map: " + t.getMessage();
+            entry.errorReason = getLocalizedText("packloader.error.uncompress-map", t.getMessage());
         }
     }
 
@@ -427,7 +428,7 @@ public class PackScanner{
         Fi targetFile = targetDir.child(entry.sanitizedFileName);
         if(targetFile.exists()){
             entry.isDuplicate = true;
-            entry.duplicateReason = Core.bundle != null ? Core.bundle.format("packloader.duplicate.file", targetFile.name()) : "File already exists: " + targetFile.name();
+            entry.duplicateReason = getLocalizedText("packloader.duplicate.file", targetFile.name());
             return;
         }
 
@@ -439,7 +440,7 @@ public class PackScanner{
                 );
                 if(existing != null){
                     entry.isDuplicate = true;
-                    entry.duplicateReason = Core.bundle != null ? Core.bundle.format("packloader.duplicate.map", existing.name()) : "Duplicate map: " + existing.name();
+                    entry.duplicateReason = getLocalizedText("packloader.duplicate.map", existing.name());
                     return;
                 }
             }else if(entry.type == PackType.SCHEMATIC && Vars.schematics != null){
@@ -448,7 +449,7 @@ public class PackScanner{
                 );
                 if(existing != null){
                     entry.isDuplicate = true;
-                    entry.duplicateReason = Core.bundle != null ? Core.bundle.format("packloader.duplicate.schematic", existing.name()) : "Duplicate schematic: " + existing.name();
+                    entry.duplicateReason = getLocalizedText("packloader.duplicate.schematic", existing.name());
                     return;
                 }
             }

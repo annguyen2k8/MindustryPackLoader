@@ -17,6 +17,8 @@ import packloader.ui.UIUtils;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
+import static packloader.util.Localization.getLocalizedText;
+
 public class PackLoaderMod extends Mod{
     public static PackLoaderDialog dialog;
 
@@ -36,10 +38,10 @@ public class PackLoaderMod extends Mod{
                 dialog = new PackLoaderDialog();
             }
 
-            String menuButtonText = Core.bundle != null ? Core.bundle.get("packloader.button.menu", "Pack Loader") : "Pack Loader";
-            String importMapText = Core.bundle != null ? Core.bundle.get("packloader.action.import-map-zip", "Import .zip") : "Import .zip";
-            String importSchemText = Core.bundle != null ? Core.bundle.get("packloader.action.import-schem-zip", "Import .zip") : "Import .zip";
-            String scanFolderText = Core.bundle != null ? Core.bundle.get("packloader.action.scan-folder", "Scan Folder") : "Scan Folder";
+            String menuButtonText = getLocalizedText("packloader.button.menu");
+            String importMapText = getLocalizedText("packloader.action.import-map-zip");
+            String importSchemText = getLocalizedText("packloader.action.import-schem-zip");
+            String scanFolderText = getLocalizedText("packloader.action.scan-folder");
 
             // 1. Add dedicated entry button on Main Menu (Opens 2-choice selection: Load Schematics vs Load Maps)
             if(Vars.ui != null && Vars.ui.menufrag != null){

@@ -1,7 +1,8 @@
 package packloader.model;
 
-import arc.Core;
 import arc.files.Fi;
+
+import static packloader.util.Localization.getLocalizedText;
 
 public class ImportItemResult{
     public enum Status{
@@ -16,7 +17,7 @@ public class ImportItemResult{
         }
 
         public String localizedLabel(){
-            return Core.bundle != null ? Core.bundle.get(labelKey) : name();
+            return getLocalizedText(labelKey);
         }
     }
 
@@ -33,11 +34,11 @@ public class ImportItemResult{
     }
 
     public static ImportItemResult success(PackEntry entry, Fi dest){
-        return new ImportItemResult(entry, Status.SUCCESS, Core.bundle != null ? Core.bundle.format("packloader.result.msg.success", dest.name()) : "Imported: " + dest.name(), dest);
+        return new ImportItemResult(entry, Status.SUCCESS, getLocalizedText("packloader.result.msg.success", dest.name()), dest);
     }
 
     public static ImportItemResult overwritten(PackEntry entry, Fi dest){
-        return new ImportItemResult(entry, Status.OVERWRITTEN, Core.bundle != null ? Core.bundle.format("packloader.result.msg.overwritten", dest.name()) : "Overwritten: " + dest.name(), dest);
+        return new ImportItemResult(entry, Status.OVERWRITTEN, getLocalizedText("packloader.result.msg.overwritten", dest.name()), dest);
     }
 
     public static ImportItemResult skipped(PackEntry entry, String reason){

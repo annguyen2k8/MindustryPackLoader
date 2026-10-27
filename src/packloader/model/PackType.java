@@ -1,6 +1,6 @@
 package packloader.model;
 
-import arc.Core;
+import static packloader.util.Localization.getLocalizedText;
 
 public enum PackType{
     MAP("msav"),
@@ -13,7 +13,7 @@ public enum PackType{
     }
 
     public String localizedName(){
-        return Core.bundle != null ? Core.bundle.get(this == MAP ? "packloader.type.map" : "packloader.type.schematic") : name();
+        return getLocalizedText(this == MAP ? "packloader.type.map" : "packloader.type.schematic");
     }
 
     public static PackType fromFileName(String filename){

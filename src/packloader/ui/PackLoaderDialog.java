@@ -11,7 +11,6 @@ import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
 import arc.util.Align;
 import arc.util.Log;
-import arc.util.Strings;
 import arc.util.Threads;
 import mindustry.Vars;
 import mindustry.gen.Icon;
@@ -27,6 +26,8 @@ import packloader.model.ImportReport;
 import packloader.model.PackEntry;
 import packloader.model.PackType;
 
+import static packloader.util.Localization.getLocalizedText;
+
 public class PackLoaderDialog extends BaseDialog{
     private final PackScanner scanner = new PackScanner();
     private final PackImporter importer = new PackImporter();
@@ -41,7 +42,7 @@ public class PackLoaderDialog extends BaseDialog{
     private String searchText = "";
 
     public PackLoaderDialog(){
-        super(Core.bundle != null ? Core.bundle.get("packloader.dialog.title") : "Mindustry PackLoader");
+        super(getLocalizedText("packloader.dialog.title"));
 
         shouldPause = true;
         setFillParent(true);
@@ -79,11 +80,11 @@ public class PackLoaderDialog extends BaseDialog{
         // Contextual title: in source selection and review mode, respect targetType
         if(title != null){
             if(targetType == PackType.MAP){
-                title.setText(Core.bundle != null ? Core.bundle.get("packloader.dialog.title.maps") : "Import Maps");
+                title.setText(getLocalizedText("packloader.dialog.title.maps"));
             }else if(targetType == PackType.SCHEMATIC){
-                title.setText(Core.bundle != null ? Core.bundle.get("packloader.dialog.title.schematics") : "Import Schematics");
+                title.setText(getLocalizedText("packloader.dialog.title.schematics"));
             }else{
-                title.setText(Core.bundle != null ? Core.bundle.get("packloader.dialog.title") : "Mindustry PackLoader");
+                title.setText(getLocalizedText("packloader.dialog.title"));
             }
         }
 
@@ -105,14 +106,14 @@ public class PackLoaderDialog extends BaseDialog{
         root.defaults().pad(6f).width(maxW);
 
         // Prompt subtitle
-        root.add(Core.bundle != null ? Core.bundle.get("packloader.mode.prompt") : "Choose what you want to import:")
+        root.add(getLocalizedText("packloader.mode.prompt"))
             .color(Pal.lightishGray).style(Styles.defaultLabel).padTop(4f).padBottom(10f).row();
 
         // Choice 1: Schematics (.msch)
         root.add(createSourceOptionButton(
             Icon.paste,
-            Core.bundle != null ? Core.bundle.get("packloader.mode.schem.title") : "Schematics (.msch)",
-            Core.bundle != null ? Core.bundle.get("packloader.mode.schem.desc") : "Bulk import schematics from folders, ZIP archives, or files",
+            getLocalizedText("packloader.mode.schem.title"),
+            getLocalizedText("packloader.mode.schem.desc"),
             () -> {
                 targetType = PackType.SCHEMATIC;
                 rebuild();
@@ -123,8 +124,8 @@ public class PackLoaderDialog extends BaseDialog{
         // Choice 2: Maps (.msav)
         root.add(createSourceOptionButton(
             Icon.terrain,
-            Core.bundle != null ? Core.bundle.get("packloader.mode.map.title") : "Maps (.msav)",
-            Core.bundle != null ? Core.bundle.get("packloader.mode.map.desc") : "Bulk import custom maps from folders, ZIP archives, or files",
+            getLocalizedText("packloader.mode.map.title"),
+            getLocalizedText("packloader.mode.map.desc"),
             () -> {
                 targetType = PackType.MAP;
                 rebuild();
@@ -151,16 +152,16 @@ public class PackLoaderDialog extends BaseDialog{
         if(targetType == PackType.SCHEMATIC){
             root.add(createSourceOptionButton(
                 Icon.folder,
-                Core.bundle != null ? Core.bundle.get("packloader.source.scan-folder.schem") : "Scan Folder for Schematics",
-                Core.bundle != null ? Core.bundle.get("packloader.source.scan-folder.schem.desc") : "Explore local folders to scan .msch files",
+                getLocalizedText("packloader.source.scan-folder.schem"),
+                getLocalizedText("packloader.source.scan-folder.schem.desc"),
                 () -> openFolderPicker(PackType.SCHEMATIC),
                 maxW
             )).minHeight(68f).pad(4f).padTop(10f).padBottom(6f).row();
 
             root.add(createSourceOptionButton(
                 Icon.download,
-                Core.bundle != null ? Core.bundle.get("packloader.source.zip.schem") : "Import Schematics (.zip)",
-                Core.bundle != null ? Core.bundle.get("packloader.source.zip.schem.desc") : "Select a ZIP archive containing schematics",
+                getLocalizedText("packloader.source.zip.schem"),
+                getLocalizedText("packloader.source.zip.schem.desc"),
                 () -> pickZip(PackType.SCHEMATIC),
                 maxW
             )).minHeight(68f).pad(4f).row();
@@ -170,16 +171,16 @@ public class PackLoaderDialog extends BaseDialog{
         if(targetType == PackType.MAP){
             root.add(createSourceOptionButton(
                 Icon.folder,
-                Core.bundle != null ? Core.bundle.get("packloader.source.scan-folder.map") : "Scan Folder for Maps",
-                Core.bundle != null ? Core.bundle.get("packloader.source.scan-folder.map.desc") : "Explore local folders to scan .msav files",
+                getLocalizedText("packloader.source.scan-folder.map"),
+                getLocalizedText("packloader.source.scan-folder.map.desc"),
                 () -> openFolderPicker(PackType.MAP),
                 maxW
             )).minHeight(68f).pad(4f).padTop(10f).padBottom(6f).row();
 
             root.add(createSourceOptionButton(
                 Icon.download,
-                Core.bundle != null ? Core.bundle.get("packloader.source.zip.map") : "Import Maps (.zip)",
-                Core.bundle != null ? Core.bundle.get("packloader.source.zip.map.desc") : "Select a ZIP archive containing custom maps",
+                getLocalizedText("packloader.source.zip.map"),
+                getLocalizedText("packloader.source.zip.map.desc"),
                 () -> pickZip(PackType.MAP),
                 maxW
             )).minHeight(68f).pad(4f).row();
@@ -189,8 +190,8 @@ public class PackLoaderDialog extends BaseDialog{
         if(!Vars.mobile){
             root.add(createSourceOptionButton(
                 Icon.paste,
-                Core.bundle != null ? Core.bundle.get("packloader.source.path.title") : "Enter Directory Path",
-                Core.bundle != null ? Core.bundle.get("packloader.source.path.desc") : "Type an exact folder path to scan",
+                getLocalizedText("packloader.source.path.title"),
+                getLocalizedText("packloader.source.path.desc"),
                 this::openPathInputDialog,
                 maxW
             )).minHeight(68f).pad(3f).padTop(8f).row();
@@ -202,7 +203,7 @@ public class PackLoaderDialog extends BaseDialog{
         cont.add(pane).grow().pad(4f).row();
 
         buttons.clear();
-        UIUtils.pad(buttons.button(Core.bundle != null ? Core.bundle.get("back") : "Back", Icon.left, () -> {
+        UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, () -> {
             targetType = null;
             rebuild();
         }).size(210f, 64f).get());
@@ -239,21 +240,21 @@ public class PackLoaderDialog extends BaseDialog{
 
         header.table(t -> {
             t.left();
-            t.add(Core.bundle != null ? Core.bundle.format("packloader.source.info", sourceName) : "Source: " + sourceName)
+            t.add(getLocalizedText("packloader.source.info", sourceName))
              .color(Pal.accent).ellipsis(true).growX().minWidth(0f).left().row();
             String summary;
             if(targetType == PackType.MAP){
-                summary = Core.bundle != null ? Core.bundle.format("packloader.source.summary.single.map", mapsCount) : ("Found: " + mapsCount + " maps");
+                summary = getLocalizedText("packloader.source.summary.single.map", mapsCount);
             }else if(targetType == PackType.SCHEMATIC){
-                summary = Core.bundle != null ? Core.bundle.format("packloader.source.summary.single.schem", schemsCount) : ("Found: " + schemsCount + " schematics");
+                summary = getLocalizedText("packloader.source.summary.single.schem", schemsCount);
             }else{
-                summary = (Core.bundle != null ? Core.bundle.format("packloader.source.summary", mapsCount, schemsCount, entries.size) : "Found: " + mapsCount + " maps, " + schemsCount + " schematics");
+                summary = getLocalizedText("packloader.source.summary", mapsCount, schemsCount, entries.size);
             }
             t.add(summary).color(Pal.lightishGray).ellipsis(true).growX().minWidth(0f).left();
         }).growX().left().padLeft(6f).minWidth(0f);
 
         var changeBtn = UIUtils.pad(header.button(
-            Core.bundle != null ? Core.bundle.get("packloader.source.change") : "Change",
+            getLocalizedText("packloader.source.change"),
             Icon.refresh, Styles.flatt, () -> {
                 entries.clear();
                 sourceName = "";
@@ -272,22 +273,22 @@ public class PackLoaderDialog extends BaseDialog{
 
         // Filter buttons (only shown in general multi-type mode)
         if(targetType == null){
-            toolbar.button(Core.bundle != null ? Core.bundle.format("packloader.filter.all", entries.size) : "All (" + entries.size + ")", Styles.flatTogglet, () -> {
+            toolbar.button(getLocalizedText("packloader.filter.all", entries.size), Styles.flatTogglet, () -> {
                 filterMode = FilterMode.ALL;
                 rebuildEntriesList();
             }).checked(b -> filterMode == FilterMode.ALL).height(38f);
 
-            toolbar.button(Core.bundle != null ? Core.bundle.format("packloader.filter.maps", mapsCount) : "Maps (" + mapsCount + ")", Styles.flatTogglet, () -> {
+            toolbar.button(getLocalizedText("packloader.filter.maps", mapsCount), Styles.flatTogglet, () -> {
                 filterMode = FilterMode.MAPS;
                 rebuildEntriesList();
             }).checked(b -> filterMode == FilterMode.MAPS).height(38f);
 
-            toolbar.button(Core.bundle != null ? Core.bundle.format("packloader.filter.schematics", schemsCount) : "Schematics (" + schemsCount + ")", Styles.flatTogglet, () -> {
+            toolbar.button(getLocalizedText("packloader.filter.schematics", schemsCount), Styles.flatTogglet, () -> {
                 filterMode = FilterMode.SCHEMATICS;
                 rebuildEntriesList();
             }).checked(b -> filterMode == FilterMode.SCHEMATICS).height(38f);
         }else{
-            String title = (targetType == PackType.MAP ? (Core.bundle != null ? Core.bundle.get("packloader.dialog.title.maps") : "Maps") : (Core.bundle != null ? Core.bundle.get("packloader.dialog.title.schematics") : "Schematics")) + " (" + entries.size + ")";
+            String title = (targetType == PackType.MAP ? getLocalizedText("packloader.dialog.title.maps") : getLocalizedText("packloader.dialog.title.schematics")) + " (" + entries.size + ")";
             toolbar.add(title).color(Pal.accent).style(Styles.outlineLabel).left().padRight(8f);
         }
 
@@ -295,7 +296,7 @@ public class PackLoaderDialog extends BaseDialog{
 
         // Mass selection buttons with proper spacing between icon and text
         var selectAllBtn = UIUtils.pad(toolbar.button(
-            Core.bundle != null ? Core.bundle.get("packloader.select.all") : "All",
+            getLocalizedText("packloader.select.all"),
             Icon.ok, Styles.flatt, () -> {
                 for(PackEntry e : entries){
                     if(filterMatches(e)) e.selected = true;
@@ -307,7 +308,7 @@ public class PackLoaderDialog extends BaseDialog{
         }
 
         var deselectBtn = UIUtils.pad(toolbar.button(
-            Core.bundle != null ? Core.bundle.get("packloader.select.none") : "None",
+            getLocalizedText("packloader.select.none"),
             Icon.cancel, Styles.flatt, () -> {
                 for(PackEntry e : entries){
                     if(filterMatches(e)) e.selected = false;
@@ -325,7 +326,7 @@ public class PackLoaderDialog extends BaseDialog{
         conflictRow.margin(6f);
         conflictRow.defaults().pad(3f);
 
-        conflictRow.add(Core.bundle != null ? Core.bundle.get("packloader.conflict.label") : "On conflict:").color(Pal.accent).padRight(8f);
+        conflictRow.add(getLocalizedText("packloader.conflict.label")).color(Pal.accent).padRight(8f);
 
         for(DuplicatePolicy p : DuplicatePolicy.values()){
             conflictRow.button(b -> {
@@ -347,15 +348,11 @@ public class PackLoaderDialog extends BaseDialog{
         addCloseButton();
 
         int selectedCount = entries.count(e -> e.selected);
-        String initialImportText = Core.bundle != null ?
-            Core.bundle.format("packloader.import.action", selectedCount) :
-            ("Import (" + selectedCount + ")");
+        String initialImportText = getLocalizedText("packloader.import.action", selectedCount);
         var importBtn = UIUtils.pad(buttons.button(initialImportText, Icon.download, this::executeImport).size(210f, 64f).get());
         importBtn.update(() -> {
             int count = entries.count(e -> e.selected);
-            String text = Core.bundle != null ?
-                Core.bundle.format("packloader.import.action", count) :
-                ("Import (" + count + ")");
+            String text = getLocalizedText("packloader.import.action", count);
             importBtn.setText(text);
             importBtn.setDisabled(count == 0);
         });
@@ -385,7 +382,7 @@ public class PackLoaderDialog extends BaseDialog{
         Seq<PackEntry> filtered = entries.select(this::filterMatches);
 
         if(filtered.isEmpty()){
-            table.add(Core.bundle != null ? Core.bundle.get("packloader.filter.none") : "No matching files").color(Pal.lightishGray).pad(20f).row();
+            table.add(getLocalizedText("packloader.filter.none")).color(Pal.lightishGray).pad(20f).row();
             return;
         }
 
@@ -424,10 +421,10 @@ public class PackLoaderDialog extends BaseDialog{
                     entry.sanitizedFileName.substring(0, entry.sanitizedFileName.lastIndexOf('.')) : entry.sanitizedFileName;
 
                 if(entry.isDuplicate){
-                    titleBuilder.append("  [gold]").append(Core.bundle != null ? Core.bundle.get("packloader.badge.duplicate") : "[DUPLICATE]");
+                    titleBuilder.append("  [gold]").append(getLocalizedText("packloader.badge.duplicate"));
                 }
                 if(!entry.isValid){
-                    titleBuilder.append("  [scarlet]").append(Core.bundle != null ? Core.bundle.get("packloader.badge.invalid") : "[INVALID]");
+                    titleBuilder.append("  [scarlet]").append(getLocalizedText("packloader.badge.invalid"));
                 }
 
                 t.add(titleBuilder.toString()).color(Color.white).ellipsis(true).growX().minWidth(0f).left().row();
@@ -472,7 +469,7 @@ public class PackLoaderDialog extends BaseDialog{
         if(toImport.isEmpty()) return;
 
         if(Vars.ui != null && Vars.ui.loadfrag != null){
-            Vars.ui.loadfrag.show(Core.bundle != null ? Core.bundle.format("packloader.import.progress", toImport.size) : "Importing " + toImport.size + " files...");
+            Vars.ui.loadfrag.show(getLocalizedText("packloader.import.progress", toImport.size));
             Vars.ui.loadfrag.setProgress(0f);
         }
 
@@ -498,7 +495,7 @@ public class PackLoaderDialog extends BaseDialog{
                     Vars.ui.loadfrag.hide();
                 }
                 if(Vars.ui != null){
-                    Vars.ui.showException(Core.bundle != null ? Core.bundle.format("packloader.import.error", t.getMessage()) : "Import failed: " + t.getMessage(), t);
+                    Vars.ui.showException(getLocalizedText("packloader.import.error", t.getMessage()), t);
                 }
             }
         });
@@ -513,7 +510,7 @@ public class PackLoaderDialog extends BaseDialog{
             String ext = (targetType == PackType.MAP) ? "msav" : "msch";
             String titleKey = (targetType == PackType.MAP) ? "packloader.source.batch.map" : "packloader.source.batch.schem";
             FileChooser.open(ext)
-                .title(Core.bundle != null ? Core.bundle.get(titleKey) : ("Select " + ext.toUpperCase() + " Files"))
+                .title(getLocalizedText(titleKey))
                 .submitMulti(files -> {
                     if(files != null && files.length > 0){
                         scanAsync(targetType, files);
@@ -536,7 +533,7 @@ public class PackLoaderDialog extends BaseDialog{
                              targetType == PackType.SCHEMATIC ? "packloader.action.import-schem-zip" :
                              "packloader.source.saf.title";
             FileChooser.open("zip")
-                .title(Core.bundle != null ? Core.bundle.get(titleKey) : "Choose ZIP File")
+                .title(getLocalizedText(titleKey))
                 .submit(file -> {
                     if(file != null){
                         scanAsync(targetType, file);
@@ -564,16 +561,16 @@ public class PackLoaderDialog extends BaseDialog{
 
     /** Prompts user to input manual filesystem path */
     private void openPathInputDialog(){
-        BaseDialog pathDialog = new BaseDialog(Core.bundle != null ? Core.bundle.get("packloader.source.path.title") : "Enter Directory Path");
+        BaseDialog pathDialog = new BaseDialog(getLocalizedText("packloader.source.path.title"));
         pathDialog.addCloseButton();
 
         TextField field = new TextField("/sdcard/Download");
         field.setSize(340f, 50f);
 
-        pathDialog.cont.add(Core.bundle != null ? Core.bundle.get("packloader.source.path.prompt") : "Enter path to a folder or file:").pad(10f).row();
+        pathDialog.cont.add(getLocalizedText("packloader.source.path.prompt")).pad(10f).row();
         pathDialog.cont.add(field).width(360f).height(50f).pad(10f).row();
 
-        pathDialog.buttons.button(Core.bundle != null ? Core.bundle.get("packloader.source.path.scan") : "Scan", Icon.ok, () -> {
+        pathDialog.buttons.button(getLocalizedText("packloader.source.path.scan"), Icon.ok, () -> {
             String path = field.getText().trim();
             if(!path.isEmpty()){
                 Fi file = Core.files.absolute(path);
@@ -581,7 +578,7 @@ public class PackLoaderDialog extends BaseDialog{
                     pathDialog.hide();
                     scanAsync(targetType, file);
                 }else{
-                    Vars.ui.showErrorMessage(Core.bundle != null ? Core.bundle.format("packloader.source.path.notfound", path) : "Path not found: " + path);
+                    Vars.ui.showErrorMessage(getLocalizedText("packloader.source.path.notfound", path));
                 }
             }
         }).size(130f, 50f);
@@ -596,7 +593,7 @@ public class PackLoaderDialog extends BaseDialog{
         this.targetType = targetType;
         String name = sources.length == 1 ? sources[0].name() : (sources.length + " files");
         if(Vars.ui != null && Vars.ui.loadfrag != null){
-            Vars.ui.loadfrag.show(Core.bundle != null ? Core.bundle.format("packloader.import.scanning", name) : "Scanning: " + name);
+            Vars.ui.loadfrag.show(getLocalizedText("packloader.import.scanning", name));
         }
 
         Threads.daemon("PackLoader-Scan", () -> {
@@ -632,11 +629,11 @@ public class PackLoaderDialog extends BaseDialog{
                             }else{
                                 String emptyMsg;
                                 if(targetType == PackType.MAP){
-                                    emptyMsg = Core.bundle != null ? Core.bundle.get("packloader.source.empty.maps") : "No valid Mindustry Map (.msav) files found in the selected source.";
+                                    emptyMsg = getLocalizedText("packloader.source.empty.maps");
                                 }else if(targetType == PackType.SCHEMATIC){
-                                    emptyMsg = Core.bundle != null ? Core.bundle.get("packloader.source.empty.schematics") : "No valid Mindustry Schematic (.msch) files found in the selected source.";
+                                    emptyMsg = getLocalizedText("packloader.source.empty.schematics");
                                 }else{
-                                    emptyMsg = Core.bundle != null ? Core.bundle.get("packloader.source.empty") : "No valid Mindustry Map (.msav) or Schematic (.msch) files found in the selected source.";
+                                    emptyMsg = getLocalizedText("packloader.source.empty");
                                 }
                                 Vars.ui.showInfo(emptyMsg);
                             }
@@ -671,9 +668,9 @@ public class PackLoaderDialog extends BaseDialog{
                         }else{
                             String errorMsg;
                             if(t instanceof java.util.zip.ZipException){
-                                errorMsg = Core.bundle != null ? Core.bundle.format("packloader.error.zip-corrupt", t.getMessage()) : "ZIP corrupted: " + t.getMessage();
+                                errorMsg = getLocalizedText("packloader.error.zip-corrupt", t.getMessage());
                             }else{
-                                errorMsg = Core.bundle != null ? Core.bundle.format("packloader.import.error", t.getMessage()) : "Error: " + t.getMessage();
+                                errorMsg = getLocalizedText("packloader.import.error", t.getMessage());
                             }
                             Vars.ui.showErrorMessage(errorMsg);
                         }
@@ -684,37 +681,33 @@ public class PackLoaderDialog extends BaseDialog{
     }
 
     public void showScopedStorageDialog(PackType targetType){
-        BaseDialog d = new BaseDialog(Core.bundle != null ? Core.bundle.get("packloader.scoped.title", "Android Storage Notice") : "Android Storage Notice");
+        BaseDialog d = new BaseDialog(getLocalizedText("packloader.scoped.title"));
         d.setFillParent(false);
         d.cont.margin(16f);
 
         Table t = d.cont;
         t.image(Icon.info).size(48f).color(Pal.accent).padBottom(10f).row();
 
-        String headerText = Core.bundle != null ? Core.bundle.get("packloader.scoped.header", "Scoped Storage Restriction") : "Scoped Storage Restriction";
+        String headerText = getLocalizedText("packloader.scoped.header");
         t.add(headerText).color(Pal.accent).fontScale(1.1f).padBottom(8f).row();
 
-        String msgText = Core.bundle != null ?
-            Core.bundle.get("packloader.scoped.message") :
-            "Android restrictions prevent Mindustry from reading files in this folder directly (Mindustry does not have All Files Access permission).\n\n💡 Recommended solution:\nCompress your folder into a .zip archive and tap [Import .zip] to load all files without restriction!";
+        String msgText = getLocalizedText("packloader.scoped.message");
 
         float maxW = Math.min(Core.graphics.getWidth() * 0.88f, 480f);
         t.add(msgText).width(maxW).wrap().color(Color.lightGray).padBottom(16f).row();
 
         d.buttons.defaults().size(210f, 64f).pad(4f);
 
-        String zipText = targetType == PackType.MAP ?
-            (Core.bundle != null ? Core.bundle.get("packloader.action.import-map-zip", "Import .zip") : "Import .zip") :
-            targetType == PackType.SCHEMATIC ?
-            (Core.bundle != null ? Core.bundle.get("packloader.action.import-schem-zip", "Import .zip") : "Import .zip") :
-            (Core.bundle != null ? Core.bundle.get("packloader.action.import-zip", "Import .zip") : "Import .zip");
+        String zipText = targetType == PackType.MAP ? getLocalizedText("packloader.action.import-map-zip") :
+            targetType == PackType.SCHEMATIC ? getLocalizedText("packloader.action.import-schem-zip") :
+            getLocalizedText("packloader.action.import-zip");
 
         UIUtils.pad(d.buttons.button(zipText, Icon.download, () -> {
             d.hide();
             pickZip(targetType);
         }).get());
 
-        UIUtils.pad(d.buttons.button(Core.bundle != null ? Core.bundle.get("close", "Close") : "Close", Icon.cancel, d::hide).get());
+        UIUtils.pad(d.buttons.button(getLocalizedText("packloader.action.close"), Icon.cancel, d::hide).get());
 
         d.show();
     }

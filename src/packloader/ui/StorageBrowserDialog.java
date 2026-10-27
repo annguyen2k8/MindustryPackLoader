@@ -20,6 +20,8 @@ import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
 import packloader.model.PackType;
 
+import static packloader.util.Localization.getLocalizedText;
+
 public class StorageBrowserDialog extends BaseDialog{
     private final PackType targetType;
     private Fi currentDirectory;
@@ -36,11 +38,9 @@ public class StorageBrowserDialog extends BaseDialog{
     }
 
     public StorageBrowserDialog(PackType targetType, Cons<Fi> onFileSelected, Cons<Fi> onFolderSelected){
-        super(targetType == PackType.MAP ?
-            (Core.bundle != null ? Core.bundle.get("packloader.browser.title.maps") : "Scan Maps in Folder") :
-            targetType == PackType.SCHEMATIC ?
-            (Core.bundle != null ? Core.bundle.get("packloader.browser.title.schematics") : "Scan Schematics in Folder") :
-            (Core.bundle != null ? Core.bundle.get("packloader.browser.title") : "Storage Browser"));
+        super(targetType == PackType.MAP ? getLocalizedText("packloader.browser.title.maps") :
+            targetType == PackType.SCHEMATIC ? getLocalizedText("packloader.browser.title.schematics") :
+            getLocalizedText("packloader.browser.title"));
         this.targetType = targetType;
         this.onFileSelected = onFileSelected;
         this.onFolderSelected = onFolderSelected;
@@ -76,7 +76,7 @@ public class StorageBrowserDialog extends BaseDialog{
         setFillParent(true);
         addCloseButton();
 
-        selectFolderButton = UIUtils.pad(buttons.button(Core.bundle != null ? Core.bundle.get("packloader.browser.select.folder") : "Select", Icon.ok, () -> {
+        selectFolderButton = UIUtils.pad(buttons.button(getLocalizedText("packloader.browser.select.folder"), Icon.ok, () -> {
             Fi chosen = selectedDirectory != null ? selectedDirectory : currentDirectory;
             hide();
             if(onFolderSelected != null && chosen != null){
@@ -93,9 +93,7 @@ public class StorageBrowserDialog extends BaseDialog{
             Fi chosen = selectedDirectory != null ? selectedDirectory : currentDirectory;
             String chosenName = (chosen != null) ? chosen.name() : "";
             if(chosenName.isEmpty() && chosen != null) chosenName = chosen.path();
-            selectFolderButton.setText(Core.bundle != null ?
-                Core.bundle.format("packloader.browser.select.target", chosenName) :
-                ("Select: " + chosenName));
+            selectFolderButton.setText(getLocalizedText("packloader.browser.select.target", chosenName));
             if(selectFolderButton.getLabel() != null){
                 selectFolderButton.getLabel().setEllipsis(true);
             }
@@ -179,7 +177,7 @@ public class StorageBrowserDialog extends BaseDialog{
             }
         }).size(40f, 40f).disabled(b -> currentDirectory == null || currentDirectory.parent() == null || currentDirectory.equals(currentDirectory.parent()));
 
-        String displayPath = currentDirectory == null ? (Core.bundle != null ? Core.bundle.get("packloader.browser.unknown") : "Unknown") : currentDirectory.path();
+        String displayPath = currentDirectory == null ? getLocalizedText("packloader.browser.unknown") : currentDirectory.path();
         curRow.add(displayPath).color(Pal.accent).ellipsis(true).growX().minWidth(0f).left().padLeft(6f);
 
         curRow.button(Icon.refresh, Styles.flati, () -> {
@@ -202,7 +200,7 @@ public class StorageBrowserDialog extends BaseDialog{
         listTable.margin(6f);
 
         if(currentDirectory == null || !currentDirectory.exists() || !currentDirectory.isDirectory()){
-            listTable.add(Core.bundle != null ? Core.bundle.get("packloader.browser.unreadable") : "Cannot read folder").color(Pal.remove).pad(20f);
+            listTable.add(getLocalizedText("packloader.browser.unreadable")).color(Pal.remove).pad(20f);
         }else{
             Fi[] list = null;
             boolean permissionDenied = false;
@@ -215,14 +213,12 @@ public class StorageBrowserDialog extends BaseDialog{
 
             if(permissionDenied || list == null){
                 boolean isRestricted = packloader.core.PackScanner.isScopedStorageRestricted(currentDirectory);
-                listTable.add(Core.bundle != null ?
-                    (isRestricted ? Core.bundle.get("packloader.browser.scoped-denied") : Core.bundle.get("packloader.browser.denied")) :
-                    (isRestricted ? "Folder access restricted by Android Scoped Storage.\nUse [Import .zip] to load all files without restriction." : "Access denied"))
+                listTable.add(isRestricted ? getLocalizedText("packloader.browser.scoped-denied") : getLocalizedText("packloader.browser.denied"))
                     .color(Pal.remove).wrap().growX().pad(16f).center().row();
 
                 if(isRestricted){
                     UIUtils.pad(listTable.button(
-                        Core.bundle != null ? Core.bundle.get("packloader.action.import-zip", "Import .zip") : "Import .zip",
+                        getLocalizedText("packloader.action.import-zip"),
                         Icon.download, () -> {
                             hide();
                             if(packloader.PackLoaderMod.dialog != null){
@@ -282,13 +278,11 @@ public class StorageBrowserDialog extends BaseDialog{
                 if(dirs.isEmpty() && files.isEmpty()){
                     boolean isRestricted = packloader.core.PackScanner.isScopedStorageRestricted(currentDirectory);
                     if(isRestricted){
-                        listTable.add(Core.bundle != null ?
-                            Core.bundle.get("packloader.browser.scoped-hint") :
-                            "Android Scoped Storage may hide .msch/.msav files here.\nUse [Import .zip] to load all files without restriction.")
+                        listTable.add(getLocalizedText("packloader.browser.scoped-hint"))
                             .color(Pal.accent).wrap().growX().pad(16f).center().row();
 
                         UIUtils.pad(listTable.button(
-                            Core.bundle != null ? Core.bundle.get("packloader.action.import-zip", "Import .zip") : "Import .zip",
+                            getLocalizedText("packloader.action.import-zip"),
                             Icon.download, () -> {
                                 hide();
                                 if(packloader.PackLoaderMod.dialog != null){
@@ -297,7 +291,7 @@ public class StorageBrowserDialog extends BaseDialog{
                             }).size(210f, 64f).pad(6f).get());
                         listTable.row();
                     }else{
-                        listTable.add(Core.bundle != null ? Core.bundle.get("packloader.browser.empty") : "No compatible files found").color(Pal.lightishGray).pad(20f).row();
+                        listTable.add(getLocalizedText("packloader.browser.empty")).color(Pal.lightishGray).pad(20f).row();
                     }
                 }
 
@@ -357,12 +351,12 @@ public class StorageBrowserDialog extends BaseDialog{
                     row.table(t -> {
                         t.left().defaults().left().growX();
                         t.add(name).color(Color.white).ellipsis(true).growX().minWidth(0f).left().row();
-                        String typeDesc = isZip ? (Core.bundle != null ? Core.bundle.get("packloader.type.zip") : "ZIP Archive") : (type != null ? type.localizedName() : "");
+                        String typeDesc = isZip ? getLocalizedText("packloader.type.zip") : (type != null ? type.localizedName() : "");
                         t.add(packloader.core.PackScanner.formatSize(f.length()) + " (" + typeDesc + ")")
                          .color(Pal.lightishGray).ellipsis(true).growX().minWidth(0f).left();
                     }).growX().minWidth(0f).left().padLeft(8f);
 
-                    row.button(Core.bundle != null ? Core.bundle.get("packloader.browser.select.file") : "Select", Styles.flatt, () -> {
+                    row.button(getLocalizedText("packloader.browser.select.file"), Styles.flatt, () -> {
                         hide();
                         if(onFileSelected != null){
                             onFileSelected.get(f);

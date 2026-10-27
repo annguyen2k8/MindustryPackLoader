@@ -1,6 +1,5 @@
 package packloader.ui;
 
-import arc.Core;
 import arc.graphics.Color;
 import arc.scene.ui.ScrollPane;
 import arc.scene.ui.layout.Table;
@@ -13,11 +12,13 @@ import packloader.model.ImportItemResult;
 import packloader.model.ImportReport;
 import packloader.model.PackType;
 
+import static packloader.util.Localization.getLocalizedText;
+
 public class PackResultDialog extends BaseDialog{
     private final ImportReport report;
 
     public PackResultDialog(ImportReport report){
-        super(Core.bundle != null ? Core.bundle.get("packloader.result.title") : "Import Summary");
+        super(getLocalizedText("packloader.result.title"));
         this.report = report;
 
         setFillParent(true);
@@ -33,29 +34,29 @@ public class PackResultDialog extends BaseDialog{
         summary.defaults().pad(6f).height(50f);
 
         summary.table(t -> {
-            t.add(Core.bundle != null ? Core.bundle.format("packloader.result.success", report.totalSuccess) : "Success: " + report.totalSuccess).color(Pal.heal);
+            t.add(getLocalizedText("packloader.result.success", report.totalSuccess)).color(Pal.heal);
         }).padRight(10f);
 
         if(report.totalOverwritten > 0){
             summary.table(t -> {
-                t.add(Core.bundle != null ? Core.bundle.format("packloader.result.overwritten", report.totalOverwritten) : "Overwritten: " + report.totalOverwritten).color(Pal.accent);
+                t.add(getLocalizedText("packloader.result.overwritten", report.totalOverwritten)).color(Pal.accent);
             }).padRight(10f);
         }
 
         if(report.totalSkipped > 0){
             summary.table(t -> {
-                t.add(Core.bundle != null ? Core.bundle.format("packloader.result.skipped", report.totalSkipped) : "Skipped: " + report.totalSkipped).color(Color.orange);
+                t.add(getLocalizedText("packloader.result.skipped", report.totalSkipped)).color(Color.orange);
             }).padRight(10f);
         }
 
         if(report.totalFailed > 0){
             summary.table(t -> {
-                t.add(Core.bundle != null ? Core.bundle.format("packloader.result.failed", report.totalFailed) : "Failed: " + report.totalFailed).color(Pal.remove);
+                t.add(getLocalizedText("packloader.result.failed", report.totalFailed)).color(Pal.remove);
             }).padRight(10f);
         }
 
         summary.table(t -> {
-            t.add(Core.bundle != null ? Core.bundle.format("packloader.result.time", report.elapsedMillis) : report.elapsedMillis + " ms").color(Pal.lightishGray);
+            t.add(getLocalizedText("packloader.result.time", report.elapsedMillis)).color(Pal.lightishGray);
         });
 
         cont.add(summary).growX().pad(8f).row();
@@ -116,20 +117,20 @@ public class PackResultDialog extends BaseDialog{
             boolean hasSchems = report.results.contains(r -> r.entry.type == PackType.SCHEMATIC && r.destinationFile != null);
 
             if(hasMaps && Vars.ui != null && Vars.ui.maps != null){
-                UIUtils.pad(buttons.button(Core.bundle != null ? Core.bundle.get("packloader.result.open.maps") : "Open Maps", Icon.terrain, () -> {
+                UIUtils.pad(buttons.button(getLocalizedText("packloader.result.open.maps"), Icon.terrain, () -> {
                     hide();
                     Vars.ui.maps.show();
                 }).size(210f, 64f).pad(4f).get());
             }
 
             if(hasSchems && Vars.ui != null && Vars.ui.schematics != null){
-                UIUtils.pad(buttons.button(Core.bundle != null ? Core.bundle.get("packloader.result.open.schematics") : "Open Schematics", Icon.paste, () -> {
+                UIUtils.pad(buttons.button(getLocalizedText("packloader.result.open.schematics"), Icon.paste, () -> {
                     hide();
                     Vars.ui.schematics.show();
                 }).size(210f, 64f).pad(4f).get());
             }
         }
 
-        UIUtils.pad(buttons.button(Core.bundle != null ? Core.bundle.get("packloader.result.close") : "Close", Icon.cancel, this::hide).size(210f, 64f).pad(4f).get());
+        UIUtils.pad(buttons.button(getLocalizedText("packloader.result.close"), Icon.cancel, this::hide).size(210f, 64f).pad(4f).get());
     }
 }

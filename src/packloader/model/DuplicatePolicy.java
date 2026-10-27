@@ -1,6 +1,6 @@
 package packloader.model;
 
-import arc.Core;
+import static packloader.util.Localization.getLocalizedText;
 
 public enum DuplicatePolicy{
     SKIP("packloader.conflict.skip", "packloader.conflict.skip.desc"),
@@ -16,10 +16,10 @@ public enum DuplicatePolicy{
     }
 
     public String title(){
-        return Core.bundle != null ? Core.bundle.get(titleKey) : name();
+        return getLocalizedText(titleKey);
     }
 
     public String description(){
-        return Core.bundle != null ? Core.bundle.get(descKey) : "";
+        return getLocalizedText(descKey);
     }
 }
