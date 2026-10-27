@@ -49,7 +49,7 @@ A Mindustry Java mod for bulk importing maps (`.msav`) and schematics (`.msch`) 
 
 ### Commands
 
-- **Run Unit Tests (35 tests):**
+- **Run Unit Tests (45 tests):**
   ```bash
   ./gradlew test
   ```

@@ -19,6 +19,7 @@ import mindustry.graphics.Pal;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
 import packloader.model.PackType;
+import packloader.util.StorageSources;
 
 import static packloader.util.Localization.getLocalizedText;
 
@@ -114,56 +115,78 @@ public class StorageBrowserDialog extends BaseDialog{
         shortcuts.left();
         shortcuts.defaults().height(36f).pad(2f).padRight(8f);
 
-        shortcuts.button(b -> {
-            b.margin(4f, 10f, 4f, 10f);
-            b.image(Icon.download).size(18f).color(Pal.accent).padRight(10f);
-            b.add("Download").color(Color.white);
-        }, Styles.flatt, () -> {
-            try{
-                String ext = Core.files.getExternalStoragePath();
-                Fi dl = Core.files.absolute(ext).child("Download");
+        if(StorageSources.isWindows()){
+            Seq<StorageSources.StorageRoot> roots = StorageSources.windowsRoots(getLocalizedText("packloader.browser.drive"));
+
+            if(roots.isEmpty()){
+                shortcuts.add(getLocalizedText("packloader.browser.no-drives"))
+                    .color(Pal.lightishGray).padLeft(8f);
+            }else{
+                for(StorageSources.StorageRoot root : roots){
+                    shortcuts.button(b -> {
+                        b.margin(4f, 10f, 4f, 10f);
+                        b.image(Icon.folder).size(18f).color(Pal.accent).padRight(10f);
+                        b.add(root.displayName).color(Color.white);
+                    }, Styles.flatt, () -> {
+                        currentDirectory = Core.files.absolute(root.path);
+                        selectedDirectory = null;
+                        rebuild();
+                    });
+                }
+            }
+        }else{
+            shortcuts.button(b -> {
+                b.margin(4f, 10f, 4f, 10f);
+                b.image(Icon.download).size(18f).color(Pal.accent).padRight(10f);
+                b.add("Download").color(Color.white);
+            }, Styles.flatt, () -> {
+                try{
+                    String ext = Core.files.getExternalStoragePath();
+                    Fi dl = Core.files.absolute(ext).child("Download");
+                    if(dl.exists()){
+                        currentDirectory = dl;
+                        selectedDirectory = null;
+                        rebuild();
+                        return;
+                    }
+                }catch(Throwable ignored){}
+                Fi dl = Core.files.absolute("/sdcard/Download");
                 if(dl.exists()){
                     currentDirectory = dl;
                     selectedDirectory = null;
                     rebuild();
-                    return;
                 }
-            }catch(Throwable ignored){}
-            Fi dl = Core.files.absolute("/sdcard/Download");
-            if(dl.exists()){
-                currentDirectory = dl;
-                selectedDirectory = null;
-                rebuild();
-            }
-        });
+            });
 
-        shortcuts.button(b -> {
-            b.margin(4f, 10f, 4f, 10f);
-            b.image(Icon.folder).size(18f).color(Pal.accent).padRight(10f);
-            b.add("SDCard").color(Color.white);
-        }, Styles.flatt, () -> {
-            try{
-                String extPath = Core.files.getExternalStoragePath();
-                if(extPath != null && Core.files.absolute(extPath).exists()){
-                    currentDirectory = Core.files.absolute(extPath);
+            shortcuts.button(b -> {
+                b.margin(4f, 10f, 4f, 10f);
+                b.image(Icon.folder).size(18f).color(Pal.accent).padRight(10f);
+                b.add("SDCard").color(Color.white);
+            }, Styles.flatt, () -> {
+                try{
+                    String extPath = Core.files.getExternalStoragePath();
+                    if(extPath != null && Core.files.absolute(extPath).exists()){
+                        currentDirectory = Core.files.absolute(extPath);
+                        selectedDirectory = null;
+                        rebuild();
+                        return;
+                    }
+                }catch(Throwable ignored){}
+                Fi sd = Core.files.absolute("/sdcard");
+                if(sd.exists()){
+                    currentDirectory = sd;
                     selectedDirectory = null;
                     rebuild();
-                    return;
                 }
-            }catch(Throwable ignored){}
-            Fi sd = Core.files.absolute("/sdcard");
-            if(sd.exists()){
-                currentDirectory = sd;
-                selectedDirectory = null;
-                rebuild();
-            }
-        });
+            });
+        }
 
+        // Keep shortcuts scrollable so a long Windows drive list cannot widen the dialog.
         ScrollPane shortcutScroller = new ScrollPane(shortcuts);
         shortcutScroller.setScrollingDisabled(false, true);
         shortcutScroller.setOverscroll(false, false);
         shortcutScroller.setFadeScrollBars(false);
-        navTable.add(shortcutScroller).growX().height(40f).left().row();
+        navTable.add(shortcutScroller).growX().minWidth(0f).height(50f).left().row();
 
         // Current Directory row with Up button
         Table curRow = new Table();
