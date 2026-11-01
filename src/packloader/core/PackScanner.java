@@ -6,23 +6,64 @@ import arc.util.Log;
 import arc.util.Strings;
 import mindustry.Vars;
 import mindustry.game.Schematic;
-import mindustry.game.Schematics;
-import mindustry.io.MapIO;
 import mindustry.maps.Map;
 import packloader.model.PackEntry;
 import packloader.model.PackType;
+import packloader.util.MainThread;
 
 import java.io.*;
+import java.nio.file.LinkOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
 import static packloader.util.Localization.getLocalizedText;
 
 public class PackScanner{
+    public static final long MAX_ZIP_ARCHIVE_BYTES = 512L * 1024 * 1024;
+    public static final long MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES = 2L * 1024 * 1024 * 1024;
+    public static final int MAX_ZIP_ENTRIES = 20_000;
+    public static final int MAX_SCAN_DEPTH = 64;
+
+    private static final String SAF_TEMP_PREFIX = "saf_zip_";
+    private static final int MAX_UNTRACKED_SAF_ZIPS = 8;
+    private static final long MAX_UNTRACKED_SAF_ZIP_BYTES = 512L * 1024 * 1024;
+    private static final java.util.concurrent.atomic.AtomicLong TEMP_COUNTER =
+        new java.util.concurrent.atomic.AtomicLong();
+
     private final Fi mapDirectory;
     private final Fi schematicDirectory;
+    private final Object tempLock = new Object();
+    private final Seq<Fi> temporaryZips = new Seq<>();
+    private final Seq<String> warnings = new Seq<>();
+
+    /** Receives throttled-safe progress information from a background scan. */
+    public interface ScanListener{
+        void onProgress(String currentFile, int discovered, int total);
+
+        /** Receives non-fatal problems for this specific scan. */
+        default void onWarning(String message){
+        }
+
+        default boolean isCancelled(){
+            return false;
+        }
+    }
+
+    /** Thrown when a caller cancels a scan through {@link ScanListener#isCancelled()}. */
+    public static class ScanCancelledException extends IOException{
+        public ScanCancelledException(){
+            super("Scan cancelled");
+        }
+    }
 
     public PackScanner(){
         this(Vars.customMapDirectory, Vars.schematicDirectory);
@@ -31,6 +72,27 @@ public class PackScanner{
     public PackScanner(Fi mapDirectory, Fi schematicDirectory){
         this.mapDirectory = mapDirectory;
         this.schematicDirectory = schematicDirectory;
+    }
+
+    /** Clears warnings collected by previous scans. Call before starting a new scan session. */
+    public void clearWarnings(){
+        warnings.clear();
+    }
+
+    /** Returns a snapshot of non-fatal problems encountered while scanning. */
+    public Seq<String> getWarnings(){
+        return new Seq<>(warnings);
+    }
+
+    private void warn(ScanListener listener, String message){
+        Log.warn("[PackLoader] @", message);
+        if(listener != null){
+            // A scan listener owns the warnings for its own scan, so a stale scan cannot
+            // leak messages into a newer scan's summary.
+            listener.onWarning(message);
+        }else{
+            warnings.add(message);
+        }
     }
 
     /** Formats a byte count into a human-readable size string (e.g., 512 B, 12.4 KB, 1.5 MB). */
@@ -145,14 +207,13 @@ public class PackScanner{
         return path.startsWith("/storage/") || path.startsWith("/sdcard/") || path.startsWith("/mnt/");
     }
 
-    /** Resolves a virtual Android SAF Fi to a local POSIX-accessible ZIP file if needed. */
-    public static Fi resolveZipFi(Fi zipFile) throws IOException{
+    private ResolvedZip resolveZip(Fi zipFile) throws IOException{
         if(zipFile == null) throw new FileNotFoundException("ZIP file is null");
 
         // If local file exists and is directly readable by java.util.zip.ZipFile
         try{
             if(zipFile.file() != null && zipFile.file().exists() && zipFile.file().isFile() && zipFile.file().canRead()){
-                return zipFile;
+                return new ResolvedZip(zipFile, null);
             }
         }catch(Throwable ignored){}
 
@@ -161,15 +222,21 @@ public class PackScanner{
             Vars.tmpDirectory : Fi.tempDirectory("packload_cache");
         if(!tmpDir.exists()) tmpDir.mkdirs();
 
-        Fi cached = tmpDir.child("saf_zip_" + System.currentTimeMillis() + "_" + Math.abs(zipFile.hashCode()) + ".zip");
+        pruneUntrackedSafTemps(tmpDir);
+        Fi cached = tmpDir.child(SAF_TEMP_PREFIX + System.currentTimeMillis() + "_" +
+            TEMP_COUNTER.incrementAndGet() + "_" + Math.abs(zipFile.hashCode()) + ".zip");
         try(InputStream in = zipFile.read(16384);
             OutputStream out = cached.write(false, 16384)){
             byte[] buf = new byte[16384];
             int len;
             long total = 0;
             while((len = in.read(buf)) > 0){
-                out.write(buf, 0, len);
                 total += len;
+                if(total > MAX_ZIP_ARCHIVE_BYTES){
+                    throw new IOException(getLocalizedText("packloader.error.zip-too-large",
+                        MAX_ZIP_ARCHIVE_BYTES / (1024 * 1024)));
+                }
+                out.write(buf, 0, len);
             }
             out.flush();
             if(total == 0){
@@ -182,69 +249,140 @@ public class PackScanner{
             throw new IOException("Failed to materialize ZIP from SAF: " + t.getMessage(), t);
         }
 
-        return cached;
+        synchronized(tempLock){
+            temporaryZips.add(cached);
+        }
+        return new ResolvedZip(cached, cached);
     }
 
     /** Scans a ZIP archive and extracts all valid map and schematic entries. */
     public Seq<PackEntry> scanZip(Fi zipFile) throws IOException{
-        return scanZip(zipFile, null);
+        return scanZip(zipFile, null, null);
     }
 
     /** Scans a ZIP archive filtering for specific PackType (MAP, SCHEMATIC, or null for all). */
     public Seq<PackEntry> scanZip(Fi zipFile, PackType targetType) throws IOException{
+        return scanZip(zipFile, targetType, null);
+    }
+
+    /** Scans a ZIP archive with progress reporting and cooperative cancellation. */
+    public Seq<PackEntry> scanZip(Fi zipFile, PackType targetType, ScanListener listener) throws IOException{
         if(zipFile == null){
             throw new FileNotFoundException(getLocalizedText("packloader.error.notfound", "null"));
         }
 
-        Fi resolvedZip = resolveZipFi(zipFile);
-        File file = resolvedZip.file();
-
+        ResolvedZip resolved = resolveZip(zipFile);
+        File file = resolved.zip.file();
         Seq<PackEntry> entries = new Seq<>();
 
+        // Reject oversized local archives before ZipFile parses the central directory. SAF
+        // sources are already bounded while materializing, but a local path was not.
+        if(file.length() > MAX_ZIP_ARCHIVE_BYTES){
+            discardTemp(resolved.temporary);
+            throw new IOException(getLocalizedText("packloader.error.zip-too-large",
+                MAX_ZIP_ARCHIVE_BYTES / (1024 * 1024)));
+        }
+
         try(ZipFile zf = new ZipFile(file)){
+            Seq<ZipEntry> candidates = new Seq<>();
+            Set<String> names = new HashSet<>();
+            long totalUncompressed = 0;
+            int entryCount = 0;
             Enumeration<? extends ZipEntry> zipEntries = zf.entries();
             while(zipEntries.hasMoreElements()){
                 ZipEntry ze = zipEntries.nextElement();
+                entryCount++;
+                if(entryCount > MAX_ZIP_ENTRIES){
+                    throw new IOException(getLocalizedText("packloader.error.zip-too-many-entries", MAX_ZIP_ENTRIES));
+                }
                 if(ze.isDirectory()) continue;
 
                 String entryName = ze.getName();
                 if(isIgnoredMetadata(entryName)) continue;
 
                 if(!isSafeZipEntry(entryName)){
-                    Log.warn("[PackLoader] " + getLocalizedText("packloader.error.zipslip", entryName));
+                    warn(listener, getLocalizedText("packloader.error.zipslip", entryName));
                     continue;
                 }
+
+                String duplicateKey = entryName.replace('\\', '/').toLowerCase(Locale.ROOT);
+                if(!names.add(duplicateKey)){
+                    warn(listener, getLocalizedText("packloader.scan.warning.duplicate-entry", entryName));
+                    continue;
+                }
+
+                long entrySize = ze.getSize();
+                if(entrySize < 0){
+                    warn(listener, getLocalizedText("packloader.scan.warning.unknown-size", entryName));
+                    continue;
+                }
+                if(entrySize > MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES - totalUncompressed){
+                    throw new IOException(getLocalizedText("packloader.error.zip-uncompressed-too-large",
+                        MAX_ZIP_TOTAL_UNCOMPRESSED_BYTES / (1024 * 1024)));
+                }
+                totalUncompressed += entrySize;
 
                 PackType type = PackType.fromFileName(entryName);
                 if(type == null) continue; // Unsupported file type (e.g. .txt, .png)
                 if(targetType != null && type != targetType) continue; // Filter by target type
+                candidates.add(ze);
+            }
 
+            int total = candidates.size;
+            for(ZipEntry ze : candidates){
+                checkCancelled(listener);
+                String entryName = ze.getName();
                 String rawFileName = extractFileName(entryName);
                 long entrySize = ze.getSize() >= 0 ? ze.getSize() : 0;
-                PackEntry entry = new PackEntry(type, entryName, rawFileName, entrySize);
-                entry.zipFile = resolvedZip;
+                PackEntry entry = new PackEntry(PackType.fromFileName(entryName), entryName, rawFileName, entrySize);
+                entry.zipFile = resolved.zip;
                 entry.zipEntryName = entryName;
+                entry.temporaryZipFile = resolved.temporary;
 
-                // Validate and inspect content
-                validateAndInspectEntry(entry);
+                if(listener != null){
+                    listener.onProgress(entryName, entries.size + 1, total);
+                }
+
+                if(entrySize > entry.getMaxAllowedBytes()){
+                    entry.isValid = false;
+                    entry.errorReason = getLocalizedText("packloader.error.zipbomb", entry.getMaxAllowedBytes() / (1024 * 1024));
+                }else{
+                    validateAndInspectEntry(entry);
+                }
                 checkDuplicate(entry);
 
                 entries.add(entry);
             }
-        }catch(java.util.zip.ZipException ze){
-            throw new IOException(getLocalizedText("packloader.error.zip-corrupt", ze.getMessage()), ze);
+        }catch(ScanCancelledException e){
+            discardTemp(resolved.temporary);
+            throw e;
+        }catch(ZipException e){
+            // Preserve the exact exception so the UI can identify a corrupt archive.
+            discardTemp(resolved.temporary);
+            throw e;
+        }catch(IOException | RuntimeException e){
+            discardTemp(resolved.temporary);
+            throw e;
         }
 
+        if(entries.isEmpty()){
+            discardTemp(resolved.temporary);
+        }
         return entries;
     }
 
     /** Recursively scans a directory for map and schematic files. */
     public Seq<PackEntry> scanDirectory(Fi dir) throws IOException{
-        return scanDirectory(dir, null);
+        return scanDirectory(dir, null, null);
     }
 
     /** Recursively scans a directory filtering for specific PackType (MAP, SCHEMATIC, or null for all). */
     public Seq<PackEntry> scanDirectory(Fi dir, PackType targetType) throws IOException{
+        return scanDirectory(dir, targetType, null);
+    }
+
+    /** Recursively scans a directory with progress reporting and cooperative cancellation. */
+    public Seq<PackEntry> scanDirectory(Fi dir, PackType targetType, ScanListener listener) throws IOException{
         if(dir == null || !dir.exists() || !dir.isDirectory()){
             throw new FileNotFoundException(getLocalizedText("packloader.error.directory-notfound", (dir == null ? "null" : dir.path())));
         }
@@ -260,69 +398,164 @@ public class PackScanner{
         }
 
         Seq<PackEntry> entries = new Seq<>();
-        scanDirectoryRecursive(dir, dir, entries, targetType);
-        return entries;
+        try{
+            scanDirectoryRecursive(dir, dir, entries, targetType, listener, 0, new HashSet<>());
+            return entries;
+        }catch(Throwable t){
+            // Entries from already-scanned nested ZIPs own materialized SAF temp files;
+            // release them when the overall scan does not return a result.
+            cleanupTemporaryZips(entries);
+            throw t;
+        }
     }
 
-    private void scanDirectoryRecursive(Fi root, Fi current, Seq<PackEntry> entries, PackType targetType){
+    private void scanDirectoryRecursive(Fi root, Fi current, Seq<PackEntry> entries, PackType targetType,
+                                        ScanListener listener, int depth, Set<String> visited) throws IOException{
+        checkCancelled(listener);
+        if(depth > MAX_SCAN_DEPTH){
+            warn(listener, getLocalizedText("packloader.scan.warning.depth", current.path(), MAX_SCAN_DEPTH));
+            return;
+        }
+
+        String canonical;
+        try{
+            canonical = current.file().getCanonicalPath();
+        }catch(Throwable t){
+            canonical = current.path();
+        }
+        if(!visited.add(canonical)){
+            warn(listener, getLocalizedText("packloader.scan.warning.cycle", current.path()));
+            return;
+        }
+
         Fi[] children;
         try{
             children = current.list();
         }catch(Throwable t){
-            Log.warn("[PackLoader] Cannot list directory at: @ (@)", current.path(), t.getMessage());
+            warn(listener, getLocalizedText("packloader.scan.warning.unreadable-directory", current.path()));
             return;
         }
 
-        if(children == null) return;
+        if(children == null){
+            warn(listener, getLocalizedText("packloader.scan.warning.unreadable-directory", current.path()));
+            return;
+        }
 
         for(Fi child : children){
+            checkCancelled(listener);
             try{
+                if(isLinkOrJunction(child)){
+                    warn(listener, getLocalizedText("packloader.scan.warning.link-skipped", child.path()));
+                    continue;
+                }
+
                 if(child.isDirectory()){
-                    scanDirectoryRecursive(root, child, entries, targetType);
+                    scanDirectoryRecursive(root, child, entries, targetType, listener, depth + 1, visited);
                 }else{
                     PackEntry entry = createEntryIfSupported(child, makeRelative(root, child), targetType);
                     if(entry != null){
                         entries.add(entry);
+                        if(listener != null){
+                            listener.onProgress(child.name(), entries.size, 0);
+                        }
                     }else if(isZipFi(child)){
                         try{
-                            entries.addAll(scanZip(child, targetType));
+                            Seq<PackEntry> nested = scanZip(child, targetType, nestedListener(listener, child, entries.size));
+                            entries.addAll(nested);
+                            if(listener != null){
+                                listener.onProgress(child.name(), entries.size, 0);
+                            }
+                        }catch(ScanCancelledException e){
+                            throw e;
                         }catch(Throwable e){
-                            Log.err("[PackLoader] Error reading nested zip: @", child.path(), e);
+                            warn(listener, getLocalizedText("packloader.scan.warning.nested-zip", child.path(), safeMessage(e)));
                         }
                     }
                 }
+            }catch(ScanCancelledException e){
+                throw e;
             }catch(Throwable t){
-                Log.err("[PackLoader] Error scanning file: @", child.path(), t);
+                warn(listener, getLocalizedText("packloader.scan.warning.unreadable-file", child.path(), safeMessage(t)));
             }
         }
+    }
+
+    private static boolean isLinkOrJunction(Fi file){
+        try{
+            BasicFileAttributes attributes = java.nio.file.Files.readAttributes(
+                file.file().toPath(), BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            // On Windows, junctions are reported as "other" rather than symbolic links.
+            return attributes.isSymbolicLink() || attributes.isOther();
+        }catch(Throwable ignored){
+            return false;
+        }
+    }
+
+    private ScanListener nestedListener(ScanListener outer, Fi zip, int alreadyFound){
+        if(outer == null) return null;
+        return new ScanListener(){
+            @Override
+            public void onProgress(String currentFile, int discovered, int total){
+                outer.onProgress(getLocalizedText("packloader.scan.source.nested", zip.name(), currentFile),
+                    alreadyFound + discovered, 0);
+            }
+
+            @Override
+            public void onWarning(String message){
+                outer.onWarning(message);
+            }
+
+            @Override
+            public boolean isCancelled(){
+                return outer.isCancelled();
+            }
+        };
+    }
+
+    private static String safeMessage(Throwable t){
+        String message = t.getMessage();
+        return message == null || message.trim().isEmpty() ? t.getClass().getSimpleName() : message;
     }
 
     /** Scans a selection of arbitrary files (e.g. from SAF or file chooser). */
     public Seq<PackEntry> scanFiles(Fi... files) throws IOException{
-        return scanFiles(null, files);
+        return scanFiles(null, null, files);
     }
 
     /** Scans a selection of arbitrary files with target type filtering. */
     public Seq<PackEntry> scanFiles(PackType targetType, Fi... files) throws IOException{
+        return scanFiles(targetType, null, files);
+    }
+
+    /** Scans a selection of arbitrary files with progress reporting and cooperative cancellation. */
+    public Seq<PackEntry> scanFiles(PackType targetType, ScanListener listener, Fi... files) throws IOException{
         Seq<PackEntry> entries = new Seq<>();
         if(files == null) return entries;
 
-        for(Fi file : files){
-            if(file == null) continue;
+        try{
+            for(Fi file : files){
+                checkCancelled(listener);
+                if(file == null) continue;
 
-            if(file.isDirectory()){
-                entries.addAll(scanDirectory(file, targetType));
-            }else if(isZipFi(file)){
-                entries.addAll(scanZip(file, targetType));
-            }else{
-                PackEntry entry = createEntryIfSupported(file, file.name(), targetType);
-                if(entry != null){
-                    entries.add(entry);
+                if(file.isDirectory()){
+                    entries.addAll(scanDirectory(file, targetType, listener));
+                }else if(isZipFi(file)){
+                    entries.addAll(scanZip(file, targetType, listener));
+                }else{
+                    PackEntry entry = createEntryIfSupported(file, file.name(), targetType);
+                    if(entry != null){
+                        entries.add(entry);
+                        if(listener != null){
+                            listener.onProgress(file.name(), entries.size, 0);
+                        }
+                    }
                 }
             }
+            return entries;
+        }catch(Throwable t){
+            cleanupTemporaryZips(entries);
+            throw t;
         }
-
-        return entries;
     }
 
     private PackEntry createEntryIfSupported(Fi file, String path, PackType targetType){
@@ -351,6 +584,8 @@ public class PackScanner{
 
     /** Validates file structure and extracts display name metadata. */
     public void validateAndInspectEntry(PackEntry entry){
+        entry.isValid = true;
+        entry.errorReason = "";
         try{
             if(entry.type == PackType.SCHEMATIC){
                 validateSchematic(entry);
@@ -360,102 +595,195 @@ public class PackScanner{
         }catch(Throwable t){
             entry.isValid = false;
             String msg = (t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
-            entry.errorReason = getLocalizedText("packloader.error.validation", msg);
+            String lower = msg.toLowerCase();
+            if(entry.type == PackType.MAP){
+                entry.errorReason = (lower.contains("header") || lower.contains("msav")) ?
+                    getLocalizedText("packloader.error.invalid-map") :
+                    getLocalizedText("packloader.error.uncompress-map", msg);
+            }else{
+                entry.errorReason = lower.contains("header") ?
+                    getLocalizedText("packloader.error.invalid-schematic") :
+                    getLocalizedText("packloader.error.validation", msg);
+            }
         }
     }
 
     private void validateSchematic(PackEntry entry) throws IOException{
         try(InputStream in = entry.openStream()){
-            byte[] header = new byte[4];
-            int read = in.read(header);
-            if(read < 4 || header[0] != 'm' || header[1] != 's' || header[2] != 'c' || header[3] != 'h'){
-                entry.isValid = false;
-                entry.errorReason = getLocalizedText("packloader.error.invalid-schematic");
-                return;
-            }
-
-            int ver = in.read();
-            if(ver > 1){
-                entry.isValid = false;
-                entry.errorReason = getLocalizedText("packloader.error.invalid-schematic-ver", ver);
-                return;
-            }
-
-            // Attempt to read schematic metadata using official parser
-            try(InputStream schemIn = entry.openStream()){
-                Schematic s = Schematics.read(schemIn);
-                if(s != null && s.name() != null && !s.name().trim().isEmpty()){
-                    entry.displayName = s.name();
-                }
-            }catch(Throwable ignored){
-                // If full schematic body fails to deserialize, header was at least valid
+            Schematic s = PackFormat.readSchematic(in);
+            // Schematic.name() falls back to "unknown"; only use an explicit metadata name.
+            if(s != null && s.tags.containsKey("name") && !s.name().trim().isEmpty()){
+                entry.displayName = s.name();
             }
         }
     }
 
     private void validateMap(PackEntry entry) throws IOException{
-        try(InputStream in = entry.openStream();
-            InflaterInputStream iis = new InflaterInputStream(in)){
-            byte[] header = new byte[4];
-            int read = iis.read(header);
-            if(read < 4 || header[0] != 'M' || header[1] != 'S' || header[2] != 'A' || header[3] != 'V'){
-                entry.isValid = false;
-                entry.errorReason = getLocalizedText("packloader.error.invalid-map");
-                return;
-            }
-
-            // If sourceFile is available, try reading map tags through MapIO
-            if(entry.sourceFile != null){
-                try{
-                    Map map = MapIO.createMap(entry.sourceFile, true);
-                    if(map != null && map.name() != null && !map.name().trim().isEmpty()){
-                        entry.displayName = map.name();
-                    }
-                }catch(Throwable ignored){}
-            }
-        }catch(Throwable t){
-            entry.isValid = false;
-            entry.errorReason = getLocalizedText("packloader.error.uncompress-map", t.getMessage());
+        try(InputStream in = entry.openStream()){
+            PackFormat.MapInfo info = PackFormat.validateMap(in);
+            entry.displayName = info.name;
         }
     }
 
-    /** Checks whether the entry collides with an existing file or item in the game. */
+    /**
+     * Refreshes duplicate badges against the live game registries. This must be called
+     * on the main thread because {@code Vars.maps}/{@code Vars.schematics} are game state.
+     */
+    public void checkGameDuplicates(Seq<PackEntry> entries){
+        if(entries == null) return;
+        if(!MainThread.isMainThread()) return;
+
+        for(PackEntry entry : entries){
+            if(entry.isDuplicate) continue;
+            try{
+                if(entry.type == PackType.MAP && Vars.maps != null){
+                    Map existing = Vars.maps.all().find(m ->
+                        (m.name() != null && m.name().equalsIgnoreCase(entry.displayName)) ||
+                        (m.file != null && m.file.name().equalsIgnoreCase(entry.sanitizedFileName))
+                    );
+                    if(existing != null){
+                        entry.isDuplicate = true;
+                        entry.duplicateReason = getLocalizedText("packloader.duplicate.map", existing.name());
+                    }
+                }else if(entry.type == PackType.SCHEMATIC && Vars.schematics != null){
+                    Schematic existing = Vars.schematics.all().find(s ->
+                        (s.name() != null && s.name().equalsIgnoreCase(entry.displayName)) ||
+                        (s.file != null && s.file.name().equalsIgnoreCase(entry.sanitizedFileName))
+                    );
+                    if(existing != null){
+                        entry.isDuplicate = true;
+                        entry.duplicateReason = getLocalizedText("packloader.duplicate.schematic", existing.name());
+                    }
+                }
+            }catch(Throwable ignored){
+                // Registries may be unavailable during early startup or unit tests.
+            }
+        }
+    }
+
+    /** Checks whether the entry collides with an existing file in the target directory. */
     public void checkDuplicate(PackEntry entry){
         Fi targetDir = (entry.type == PackType.MAP) ? mapDirectory : schematicDirectory;
         if(targetDir == null) return;
 
-        // 1. Check direct file collision in target directory
         Fi targetFile = targetDir.child(entry.sanitizedFileName);
         if(targetFile.exists()){
             entry.isDuplicate = true;
             entry.duplicateReason = getLocalizedText("packloader.duplicate.file", targetFile.name());
-            return;
+        }
+    }
+
+    /** Deletes materialized SAF ZIPs referenced by the supplied entries. */
+    public void cleanupTemporaryZips(Seq<PackEntry> entries){
+        if(entries == null) return;
+        HashMap<String, Fi> temps = new HashMap<>();
+        for(PackEntry entry : entries){
+            if(entry.temporaryZipFile == null) continue;
+            String path;
+            try{
+                path = entry.temporaryZipFile.absolutePath();
+            }catch(Throwable t){
+                path = entry.temporaryZipFile.path();
+            }
+            temps.put(path, entry.temporaryZipFile);
+            entry.temporaryZipFile = null;
         }
 
-        // 2. Check collision with loaded game content by filename only (avoid false duplicates from common display names)
-        try{
-            if(entry.type == PackType.MAP && Vars.maps != null){
-                Map existing = Vars.maps.all().find(m ->
-                    (m.file != null && m.file.name().equalsIgnoreCase(entry.sanitizedFileName))
-                );
-                if(existing != null){
-                    entry.isDuplicate = true;
-                    entry.duplicateReason = getLocalizedText("packloader.duplicate.map", existing.name());
-                    return;
-                }
-            }else if(entry.type == PackType.SCHEMATIC && Vars.schematics != null){
-                Schematic existing = Vars.schematics.all().find(s ->
-                    (s.file != null && s.file.name().equalsIgnoreCase(entry.sanitizedFileName))
-                );
-                if(existing != null){
-                    entry.isDuplicate = true;
-                    entry.duplicateReason = getLocalizedText("packloader.duplicate.schematic", existing.name());
-                    return;
+        for(Entry<String, Fi> temp : temps.entrySet()){
+            deleteTemp(temp.getValue());
+        }
+    }
+
+    /** Deletes every SAF ZIP materialized by this scanner. */
+    public void cleanupAllTemporaryZips(){
+        Seq<Fi> copy;
+        synchronized(tempLock){
+            copy = new Seq<>(temporaryZips);
+            temporaryZips.clear();
+        }
+        for(Fi temp : copy){
+            try{
+                if(temp.exists()) temp.delete();
+            }catch(Throwable ignored){}
+        }
+    }
+
+    private void checkCancelled(ScanListener listener) throws ScanCancelledException{
+        if(listener != null && listener.isCancelled()){
+            throw new ScanCancelledException();
+        }
+    }
+
+    private void discardTemp(Fi temp){
+        if(temp == null) return;
+        deleteTemp(temp);
+    }
+
+    private void deleteTemp(Fi temp){
+        if(temp == null) return;
+        synchronized(tempLock){
+            for(int i = temporaryZips.size - 1; i >= 0; i--){
+                if(samePath(temporaryZips.get(i), temp)){
+                    temporaryZips.remove(i);
                 }
             }
-        }catch(Throwable ignored){
-            // Vars.maps or Vars.schematics might be null in tests
         }
+        try{
+            if(temp.exists()) temp.delete();
+        }catch(Throwable ignored){}
+    }
+
+    private static boolean samePath(Fi a, Fi b){
+        if(a == null || b == null) return false;
+        try{
+            return a.absolutePath().equals(b.absolutePath());
+        }catch(Throwable t){
+            return a.path().equals(b.path());
+        }
+    }
+
+    private void pruneUntrackedSafTemps(Fi tmpDir){
+        Fi[] files;
+        try{
+            files = tmpDir.list();
+        }catch(Throwable t){
+            return;
+        }
+        if(files == null || files.length == 0) return;
+
+        Seq<Fi> untracked = new Seq<>();
+        long total = 0;
+        for(Fi file : files){
+            try{
+                if(file.isDirectory() || !file.name().startsWith(SAF_TEMP_PREFIX)) continue;
+                if(isTracked(file)) continue;
+                untracked.add(file);
+                total += file.length();
+            }catch(Throwable ignored){}
+        }
+        if(untracked.isEmpty()) return;
+
+        untracked.sort((a, b) -> Long.compare(a.lastModified(), b.lastModified()));
+        int count = untracked.size;
+        for(Fi file : untracked){
+            if(count <= MAX_UNTRACKED_SAF_ZIPS && total <= MAX_UNTRACKED_SAF_ZIP_BYTES) break;
+            long length = file.length();
+            try{
+                if(file.delete()){
+                    count--;
+                    total -= length;
+                }
+            }catch(Throwable ignored){}
+        }
+    }
+
+    private boolean isTracked(Fi file){
+        synchronized(tempLock){
+            for(Fi temp : temporaryZips){
+                if(samePath(temp, file)) return true;
+            }
+        }
+        return false;
     }
 
     private static String extractFileName(String path){
@@ -477,5 +805,15 @@ public class PackScanner{
             }
         }catch(Throwable ignored){}
         return child.name();
+    }
+
+    private static final class ResolvedZip{
+        final Fi zip;
+        final Fi temporary;
+
+        ResolvedZip(Fi zip, Fi temporary){
+            this.zip = zip;
+            this.temporary = temporary;
+        }
     }
 }

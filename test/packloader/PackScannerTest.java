@@ -2,6 +2,7 @@ package packloader;
 
 import arc.files.Fi;
 import arc.struct.Seq;
+import mindustry.Vars;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,9 +10,17 @@ import packloader.core.PackScanner;
 import packloader.model.PackEntry;
 import packloader.model.PackType;
 
+import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
+import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -20,6 +29,7 @@ public class PackScannerTest{
     private Fi mapDir;
     private Fi schemDir;
     private PackScanner scanner;
+    private Fi originalTmpDirectory;
 
     @BeforeEach
     public void setup() throws IOException{
@@ -30,11 +40,14 @@ public class PackScannerTest{
         mapDir.mkdirs();
         schemDir.mkdirs();
 
+        originalTmpDirectory = Vars.tmpDirectory;
         scanner = new PackScanner(mapDir, schemDir);
     }
 
     @AfterEach
     public void teardown(){
+        Vars.tmpDirectory = originalTmpDirectory;
+
         if(tempDir != null && tempDir.exists()){
             new Fi(tempDir).deleteDirectory();
         }
@@ -146,6 +159,21 @@ public class PackScannerTest{
         PackEntry entry = entries.first();
         assertTrue(entry.isDuplicate);
         assertTrue(entry.duplicateReason.contains("existing_map.msav"));
+    }
+
+    @Test
+    public void testZipEntryCountLimitIsEnforced() throws IOException{
+        File zipFile = new File(tempDir, "too_many_entries.zip");
+        try(ZipOutputStream out = new ZipOutputStream(new FileOutputStream(zipFile))){
+            for(int i = 0; i <= PackScanner.MAX_ZIP_ENTRIES; i++){
+                out.putNextEntry(new ZipEntry("file_" + i + ".txt"));
+                out.closeEntry();
+            }
+        }
+
+        IOException error = assertThrows(IOException.class, () -> scanner.scanZip(new Fi(zipFile)));
+        assertTrue(error.getMessage().contains("20000") || error.getMessage().toLowerCase().contains("entries"),
+            error.getMessage());
     }
 
     @Test
@@ -336,5 +364,283 @@ public class PackScannerTest{
         assertEquals(1, entries.size);
         assertEquals(PackType.SCHEMATIC, entries.first().type);
         assertTrue(entries.first().sanitizedFileName.endsWith(".msch"));
+    }
+
+    @Test
+    public void testCorruptZipIsReportedAsZipException() throws IOException{
+        File corruptZip = new File(tempDir, "corrupt_archive.zip");
+        new Fi(corruptZip).writeBytes(new byte[]{1, 2, 3, 4, 5, 6, 7, 8});
+
+        assertThrows(ZipException.class, () -> scanner.scanZip(new Fi(corruptZip)));
+    }
+
+    @Test
+    public void testTruncatedAndMalformedFilesInsideZipAreInvalid() throws IOException{
+        File zipFile = new File(tempDir, "malformed_pack.zip");
+        byte[] validMap = TestHelper.createValidMapBytes("Valid Map");
+        byte[] truncatedMap = TestHelper.createTruncatedMapBytes("Truncated Map");
+        byte[] malformedMap = TestHelper.createMalformedMapContentBytes("Malformed Map");
+        byte[] truncatedSchematic = TestHelper.createTruncatedSchematicBytes();
+
+        TestHelper.createTestZip(zipFile,
+            new TestHelper.ZipEntryBuilder("valid.msav", validMap),
+            new TestHelper.ZipEntryBuilder("truncated.msav", truncatedMap),
+            new TestHelper.ZipEntryBuilder("malformed.msav", malformedMap),
+            new TestHelper.ZipEntryBuilder("truncated.msch", truncatedSchematic)
+        );
+
+        Seq<PackEntry> entries = scanner.scanZip(new Fi(zipFile));
+        assertEquals(4, entries.size);
+
+        PackEntry valid = entries.find(e -> e.sanitizedFileName.equals("valid.msav"));
+        assertNotNull(valid);
+        assertTrue(valid.isValid);
+
+        PackEntry truncated = entries.find(e -> e.sanitizedFileName.equals("truncated.msav"));
+        assertNotNull(truncated);
+        assertFalse(truncated.isValid);
+        assertFalse(truncated.errorReason.isEmpty());
+
+        PackEntry malformed = entries.find(e -> e.sanitizedFileName.equals("malformed.msav"));
+        assertNotNull(malformed);
+        assertFalse(malformed.isValid);
+        assertFalse(malformed.errorReason.isEmpty());
+
+        PackEntry truncatedSchem = entries.find(e -> e.sanitizedFileName.equals("truncated.msch"));
+        assertNotNull(truncatedSchem);
+        assertFalse(truncatedSchem.isValid);
+        assertFalse(truncatedSchem.errorReason.isEmpty());
+    }
+
+    @Test
+    public void testZipScanProgressReportsCurrentFileAndKnownTotal() throws IOException{
+        File zipFile = new File(tempDir, "progress.zip");
+        TestHelper.createTestZip(zipFile,
+            new TestHelper.ZipEntryBuilder("first.msav", TestHelper.createValidMapBytes("First")),
+            new TestHelper.ZipEntryBuilder("second.msch", TestHelper.createValidSchematicBytes("Second"))
+        );
+
+        RecordingListener listener = new RecordingListener();
+        Seq<PackEntry> entries = scanner.scanZip(new Fi(zipFile), null, listener);
+
+        assertEquals(2, entries.size);
+        assertEquals(2, listener.files.size());
+        for(int total : listener.totals){
+            assertEquals(2, total);
+        }
+        assertEquals(1, listener.discovered.get(0));
+        assertEquals(2, listener.discovered.get(1));
+        assertEquals("first.msav", listener.files.get(0));
+        assertEquals("second.msch", listener.files.get(1));
+    }
+
+    @Test
+    public void testDirectoryScanProgressUsesUnknownTotal() throws IOException{
+        File folder = new File(tempDir, "progress_folder");
+        folder.mkdirs();
+        new Fi(new File(folder, "one.msav")).writeBytes(TestHelper.createValidMapBytes("One"));
+        new Fi(new File(folder, "two.msch")).writeBytes(TestHelper.createValidSchematicBytes("Two"));
+
+        RecordingListener listener = new RecordingListener();
+        Seq<PackEntry> entries = scanner.scanDirectory(new Fi(folder), null, listener);
+
+        assertEquals(2, entries.size);
+        assertEquals(2, listener.files.size());
+        for(int total : listener.totals){
+            assertEquals(0, total, "Directory scans do not know the total ahead of time");
+        }
+        assertEquals(2, listener.discovered.get(listener.discovered.size() - 1));
+    }
+
+    @Test
+    public void testDuplicateZipEntriesWarnOnlyTheOwningScan() throws IOException{
+        File zipFile = new File(tempDir, "duplicates.zip");
+        byte[] mapBytes = TestHelper.createValidMapBytes("Duplicate Map");
+        try(java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(
+            new java.io.FileOutputStream(zipFile))){
+            for(String name : new String[]{"same.msav", "SAME.MSAV"}){
+                zos.putNextEntry(new java.util.zip.ZipEntry(name));
+                zos.write(mapBytes);
+                zos.closeEntry();
+            }
+        }
+
+        RecordingListener first = new RecordingListener();
+        Seq<PackEntry> entries = scanner.scanZip(new Fi(zipFile), null, first);
+
+        assertEquals(1, entries.size, "Case-insensitive duplicate ZIP entries must be skipped");
+        assertEquals(1, first.warnings.size);
+        assertTrue(first.warnings.get(0).contains("Duplicate ZIP entry"));
+
+        // The same archive still contains duplicates, so a new scan must produce its own
+        // warning. Ownership means each listener only receives warnings from its own scan.
+        RecordingListener second = new RecordingListener();
+        scanner.scanZip(new Fi(zipFile), null, second);
+        assertEquals(1, second.warnings.size,
+            "A new scan must report its own duplicate warning");
+        assertTrue(second.warnings.get(0).contains("Duplicate ZIP entry"));
+
+        File cleanZip = new File(tempDir, "clean.zip");
+        TestHelper.createTestZip(cleanZip,
+            new TestHelper.ZipEntryBuilder("clean.msav", mapBytes));
+        RecordingListener clean = new RecordingListener();
+        scanner.scanZip(new Fi(cleanZip), null, clean);
+        assertTrue(clean.warnings.isEmpty(),
+            "Warnings from a previous scan must not leak into a new scan");
+    }
+
+    @Test
+    public void testDirectoryDepthWarningIsDeliveredToListener() throws IOException{
+        File root = new File(tempDir, "deep_folder");
+        File current = root;
+        for(int i = 0; i < PackScanner.MAX_SCAN_DEPTH + 2; i++){
+            current = new File(current, "d");
+        }
+        current.mkdirs();
+
+        RecordingListener listener = new RecordingListener();
+        scanner.scanDirectory(new Fi(root), null, listener);
+
+        assertTrue(listener.warnings.find(w -> w.contains("deeper")) != null,
+            "Folder depth warnings must be delivered to the scan listener");
+    }
+
+    @Test
+    public void testScanCancellationStopsZipScan() throws IOException{
+        File zipFile = new File(tempDir, "cancel.zip");
+        TestHelper.createTestZip(zipFile,
+            new TestHelper.ZipEntryBuilder("one.msav", TestHelper.createValidMapBytes("One")),
+            new TestHelper.ZipEntryBuilder("two.msav", TestHelper.createValidMapBytes("Two"))
+        );
+
+        RecordingListener listener = new RecordingListener();
+        listener.cancelAfter = 1;
+
+        assertThrows(PackScanner.ScanCancelledException.class,
+            () -> scanner.scanZip(new Fi(zipFile), null, listener));
+    }
+
+    @Test
+    public void testScanCancellationBeforeFirstFile() throws IOException{
+        File input = new File(tempDir, "cancel_one.msav");
+        new Fi(input).writeBytes(TestHelper.createValidMapBytes("Cancel"));
+
+        RecordingListener listener = new RecordingListener();
+        listener.cancelAfter = 0;
+
+        assertThrows(PackScanner.ScanCancelledException.class,
+            () -> scanner.scanFiles(PackType.MAP, listener, new Fi(input)));
+    }
+
+    @Test
+    public void testMaterializedSafZipIsCleanedUpWithEntries() throws IOException{
+        File tmpRoot = new File(tempDir, "saf_tmp");
+        tmpRoot.mkdirs();
+        Vars.tmpDirectory = new Fi(tmpRoot);
+
+        byte[] zipBytes = createZipBytes(new TestHelper.ZipEntryBuilder(
+            "only.msav", TestHelper.createValidMapBytes("Only Map")));
+        VirtualZipFi virtual = new VirtualZipFi("saf_document", zipBytes);
+
+        Seq<PackEntry> entries = scanner.scanZip(virtual);
+        assertEquals(1, entries.size);
+
+        Fi temporary = entries.first().temporaryZipFile;
+        assertNotNull(temporary, "A virtual SAF ZIP must be materialized");
+        assertTrue(temporary.exists());
+        assertTrue(temporary.name().startsWith("saf_zip_"));
+
+        scanner.cleanupTemporaryZips(entries);
+
+        assertNull(entries.first().temporaryZipFile);
+        assertFalse(temporary.exists(), "The temporary ZIP must be deleted");
+    }
+
+    @Test
+    public void testUntrackedSafTempsArePrunedAndCapped() throws IOException{
+        File tmpRoot = new File(tempDir, "saf_prune");
+        tmpRoot.mkdirs();
+        Fi tmpDir = new Fi(tmpRoot);
+        Vars.tmpDirectory = tmpDir;
+
+        for(int i = 0; i < 10; i++){
+            Fi old = tmpDir.child("saf_zip_old_" + i + ".zip");
+            old.writeBytes(new byte[16]);
+            assertTrue(old.file().setLastModified(1000L + i * 1000L));
+        }
+
+        byte[] zipBytes = createZipBytes(new TestHelper.ZipEntryBuilder(
+            "only.msch", TestHelper.createValidSchematicBytes("Only Schematic")));
+        Seq<PackEntry> entries = scanner.scanZip(new VirtualZipFi("saf_document", zipBytes));
+        assertEquals(1, entries.size);
+
+        File[] remaining = tmpRoot.listFiles((dir, name) -> name.startsWith("saf_zip_"));
+        assertNotNull(remaining);
+        assertEquals(9, remaining.length, "8 pruned-cap untracked ZIPs plus the active one");
+        assertFalse(new File(tmpRoot, "saf_zip_old_0.zip").exists());
+        assertFalse(new File(tmpRoot, "saf_zip_old_1.zip").exists());
+
+        scanner.cleanupTemporaryZips(entries);
+        remaining = tmpRoot.listFiles((dir, name) -> name.startsWith("saf_zip_"));
+        assertNotNull(remaining);
+        assertEquals(8, remaining.length);
+    }
+
+    private static byte[] createZipBytes(TestHelper.ZipEntryBuilder... builders) throws IOException{
+        File zip = Files.createTempFile("packloader_test_zip", ".zip").toFile();
+        try{
+            TestHelper.createTestZip(zip, builders);
+            return Files.readAllBytes(zip.toPath());
+        }finally{
+            if(zip.exists()) zip.delete();
+        }
+    }
+
+    private static class RecordingListener implements PackScanner.ScanListener{
+        final List<String> files = new ArrayList<>();
+        final List<Integer> discovered = new ArrayList<>();
+        final List<Integer> totals = new ArrayList<>();
+        final Seq<String> warnings = new Seq<>();
+        int cancelAfter = -1;
+
+        @Override
+        public void onProgress(String currentFile, int discoveredCount, int total){
+            files.add(currentFile);
+            discovered.add(discoveredCount);
+            totals.add(total);
+        }
+
+        @Override
+        public void onWarning(String message){
+            warnings.add(message);
+        }
+
+        @Override
+        public boolean isCancelled(){
+            return cancelAfter >= 0 && files.size() >= cancelAfter;
+        }
+    }
+
+    /** Simulates an Android SAF document whose bytes are only available through read(). */
+    private static class VirtualZipFi extends Fi{
+        private final String fileName;
+        private final byte[] data;
+
+        VirtualZipFi(String fileName, byte[] data){
+            super(new File(System.getProperty("java.io.tmpdir"),
+                "packloader_virtual_" + System.nanoTime()));
+            this.fileName = fileName;
+            this.data = data;
+        }
+
+        @Override
+        public String name(){
+            return fileName;
+        }
+
+        @Override
+        public BufferedInputStream read(int bufferSize){
+            return new BufferedInputStream(new ByteArrayInputStream(data));
+        }
     }
 }
