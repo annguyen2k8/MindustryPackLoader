@@ -30,6 +30,8 @@ public class PackEntry{
     public Fi sourceFile;
     public Fi zipFile;
     public String zipEntryName;
+    /** Materialized SAF ZIP that must stay alive until this entry has been imported. */
+    public Fi temporaryZipFile;
     public byte[] cachedData;
 
     public PackEntry(PackType type, String sourcePath, String rawFileName, long size){
@@ -90,9 +92,18 @@ public class PackEntry{
             return;
         }
 
+        boolean existed = dest.exists();
         try(InputStream in = openStream();
             OutputStream out = dest.write(false, 8192)){
             copyStreamWithLimit(in, out, maxBytes);
+        }catch(Throwable t){
+            if(!existed && dest.exists()){
+                try{
+                    dest.delete();
+                }catch(Throwable ignored){}
+            }
+            if(t instanceof IOException io) throw io;
+            throw new IOException(t.getMessage(), t);
         }
     }
 

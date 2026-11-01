@@ -10,6 +10,13 @@ public class ImportReport{
     public int totalSkipped;
     public int totalFailed;
     public long elapsedMillis;
+    /** True when the user cancelled before every selected entry was processed. */
+    public boolean cancelled;
+
+    /** Number of entries that produced a result, including skipped and failed ones. */
+    public int processed(){
+        return results.size;
+    }
 
     public void addResult(ImportItemResult result){
         results.add(result);
