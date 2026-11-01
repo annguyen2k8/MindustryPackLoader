@@ -4,12 +4,12 @@ import arc.Core;
 import arc.files.Fi;
 import arc.graphics.Color;
 import arc.scene.style.Drawable;
+import arc.scene.ui.Button;
 import arc.scene.ui.CheckBox;
 import arc.scene.ui.ScrollPane;
 import arc.scene.ui.TextField;
 import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
-import arc.util.Align;
 import arc.util.Log;
 import arc.util.Threads;
 import mindustry.Vars;
@@ -20,11 +20,17 @@ import mindustry.ui.FileChooser;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
 import packloader.core.PackImporter;
+import packloader.core.PackImporter.ImportProgress;
 import packloader.core.PackScanner;
 import packloader.model.DuplicatePolicy;
+import packloader.model.EntryFilter;
 import packloader.model.ImportReport;
 import packloader.model.PackEntry;
 import packloader.model.PackType;
+import packloader.util.MainThread;
+import packloader.util.TaskGeneration;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static packloader.util.Localization.getLocalizedText;
 
@@ -33,6 +39,7 @@ public class PackLoaderDialog extends BaseDialog{
     private final PackImporter importer = new PackImporter();
 
     private final Seq<PackEntry> entries = new Seq<>();
+    private final Seq<PackEntry> deferredCleanup = new Seq<>();
     private String sourceName = "";
     private DuplicatePolicy duplicatePolicy = DuplicatePolicy.RENAME;
     private PackType targetType = null;
@@ -40,6 +47,14 @@ public class PackLoaderDialog extends BaseDialog{
     private enum FilterMode{ ALL, MAPS, SCHEMATICS }
     private FilterMode filterMode = FilterMode.ALL;
     private String searchText = "";
+
+    private final TaskGeneration scanGeneration = new TaskGeneration();
+    private final TaskGeneration importGeneration = new TaskGeneration();
+    private final AtomicBoolean importCancelled = new AtomicBoolean(false);
+    private boolean importRunning = false;
+    private long lastScanProgressPost = 0L;
+    private long lastImportProgressPost = 0L;
+    private float lastImportProgress = -1f;
 
     public PackLoaderDialog(){
         super(getLocalizedText("packloader.dialog.title"));
@@ -62,16 +77,55 @@ public class PackLoaderDialog extends BaseDialog{
 
     public void showMenu(){
         this.targetType = null;
-        this.entries.clear();
+        clearEntries();
         this.sourceName = "";
+        resetFilters();
         super.show();
     }
 
     public void showForType(PackType targetType){
         this.targetType = targetType;
-        this.entries.clear();
+        clearEntries();
         this.sourceName = "";
+        resetFilters();
         super.show();
+    }
+
+    @Override
+    public void hide(){
+        // Invalidate any in-flight work and release materialized SAF archives.
+        scanGeneration.cancel();
+        importGeneration.cancel();
+        clearEntries();
+        runDeferredCleanup();
+        if(Vars.ui != null && Vars.ui.loadfrag != null){
+            Vars.ui.loadfrag.hide();
+        }
+        super.hide();
+    }
+
+    private void clearEntries(){
+        if(entries.isEmpty()) return;
+        if(importRunning){
+            // The import worker may still be reading a materialized SAF ZIP. Move ownership
+            // to a deferred list and release it only after the worker has stopped.
+            deferredCleanup.addAll(entries);
+            entries.clear();
+            return;
+        }
+        scanner.cleanupTemporaryZips(entries);
+        entries.clear();
+    }
+
+    private void runDeferredCleanup(){
+        if(importRunning || deferredCleanup.isEmpty()) return;
+        scanner.cleanupTemporaryZips(deferredCleanup);
+        deferredCleanup.clear();
+    }
+
+    private void resetFilters(){
+        filterMode = FilterMode.ALL;
+        searchText = "";
     }
 
     public void rebuild(){
@@ -210,7 +264,9 @@ public class PackLoaderDialog extends BaseDialog{
     }
 
     private Table createSourceOptionButton(Drawable icon, String title, String desc, Runnable clicked, float buttonWidth){
-        Table btn = new Table(Tex.button);
+        // A Button (rather than a plain Table) provides hover/pressed/disabled feedback
+        // from the standard Mindustry button style on both Desktop and Android.
+        Button btn = new Button(UIUtils.cardStyle());
         btn.clicked(clicked);
         btn.margin(8f);
 
@@ -256,9 +312,10 @@ public class PackLoaderDialog extends BaseDialog{
         var changeBtn = UIUtils.pad(header.button(
             getLocalizedText("packloader.source.change"),
             Icon.refresh, Styles.flatt, () -> {
-                entries.clear();
+                clearEntries();
                 sourceName = "";
                 targetType = null;
+                resetFilters();
                 rebuild();
             }).height(40f).padRight(4f).get());
         if(changeBtn != null){
@@ -298,9 +355,7 @@ public class PackLoaderDialog extends BaseDialog{
         var selectAllBtn = UIUtils.pad(toolbar.button(
             getLocalizedText("packloader.select.all"),
             Icon.ok, Styles.flatt, () -> {
-                for(PackEntry e : entries){
-                    if(filterMatches(e)) e.selected = true;
-                }
+                EntryFilter.setVisibleSelected(entries, targetType, filterType(), searchText, true);
                 rebuildEntriesList();
             }).height(38f).pad(2f).get());
         if(selectAllBtn != null){
@@ -310,9 +365,7 @@ public class PackLoaderDialog extends BaseDialog{
         var deselectBtn = UIUtils.pad(toolbar.button(
             getLocalizedText("packloader.select.none"),
             Icon.cancel, Styles.flatt, () -> {
-                for(PackEntry e : entries){
-                    if(filterMatches(e)) e.selected = false;
-                }
+                EntryFilter.setVisibleSelected(entries, targetType, filterType(), searchText, false);
                 rebuildEntriesList();
             }).height(38f).pad(2f).get());
         if(deselectBtn != null){
@@ -347,14 +400,14 @@ public class PackLoaderDialog extends BaseDialog{
         buttons.clear();
         addCloseButton();
 
-        int selectedCount = entries.count(e -> e.selected);
+        int selectedCount = visibleSelectedCount();
         String initialImportText = getLocalizedText("packloader.import.action", selectedCount);
         var importBtn = UIUtils.pad(buttons.button(initialImportText, Icon.download, this::executeImport).size(210f, 64f).get());
         importBtn.update(() -> {
-            int count = entries.count(e -> e.selected);
+            int count = visibleSelectedCount();
             String text = getLocalizedText("packloader.import.action", count);
             importBtn.setText(text);
-            importBtn.setDisabled(count == 0);
+            importBtn.setDisabled(count == 0 || importRunning);
         });
     }
 
@@ -378,8 +431,17 @@ public class PackLoaderDialog extends BaseDialog{
         }
     }
 
+    private Seq<PackEntry> visibleEntries(){
+        return entries.select(this::filterMatches);
+    }
+
+    private int visibleSelectedCount(){
+        // Called from a per-frame update callback; do not allocate a filtered Seq here.
+        return EntryFilter.countSelected(entries, targetType, filterType(), searchText);
+    }
+
     private void populateListTable(Table table){
-        Seq<PackEntry> filtered = entries.select(this::filterMatches);
+        Seq<PackEntry> filtered = visibleEntries();
 
         if(filtered.isEmpty()){
             table.add(getLocalizedText("packloader.filter.none")).color(Pal.lightishGray).pad(20f).row();
@@ -387,7 +449,8 @@ public class PackLoaderDialog extends BaseDialog{
         }
 
         for(PackEntry entry : filtered){
-            Table row = new Table(Tex.pane);
+            // Button rows get hover/pressed feedback while keeping the pane-like look.
+            Button row = new Button(UIUtils.rowStyle());
             row.margin(6f);
             row.defaults().pad(3f);
 
@@ -452,53 +515,143 @@ public class PackLoaderDialog extends BaseDialog{
         }
     }
 
-    private boolean filterMatches(PackEntry e){
-        if(targetType != null && e.type != targetType) return false;
-        if(filterMode == FilterMode.MAPS && e.type != PackType.MAP) return false;
-        if(filterMode == FilterMode.SCHEMATICS && e.type != PackType.SCHEMATIC) return false;
-        if(!searchText.isEmpty()){
-            String term = searchText.toLowerCase();
-            return e.displayName.toLowerCase().contains(term) || e.sanitizedFileName.toLowerCase().contains(term);
-        }
-        return true;
+    private PackType filterType(){
+        return switch(filterMode){
+            case MAPS -> PackType.MAP;
+            case SCHEMATICS -> PackType.SCHEMATIC;
+            default -> null;
+        };
     }
 
-    /** Triggers the import operation with progress on the main thread */
+    private boolean filterMatches(PackEntry e){
+        return EntryFilter.matches(e, targetType, filterType(), searchText);
+    }
+
+    /**
+     * Starts an import on a daemon worker, importing only the selected entries that are
+     * currently visible under the active filter. File parsing/staging stays on the worker;
+     * the few game-registry operations are marshalled to the main thread by PackImporter.
+     */
     private void executeImport(){
-        Seq<PackEntry> toImport = entries.select(e -> e.selected);
+        if(importRunning) return;
+
+        Seq<PackEntry> toImport = EntryFilter.collectSelected(entries, targetType, filterType(), searchText);
         if(toImport.isEmpty()) return;
 
+        importRunning = true;
+        importCancelled.set(false);
+        lastImportProgressPost = 0L;
+        lastImportProgress = -1f;
+        int token = importGeneration.begin();
+        // Snapshot the policy so changing the UI mid-import cannot affect later entries.
+        DuplicatePolicy policy = duplicatePolicy;
+
         if(Vars.ui != null && Vars.ui.loadfrag != null){
-            Vars.ui.loadfrag.show(getLocalizedText("packloader.import.progress", toImport.size));
+            Vars.ui.loadfrag.show(getLocalizedText("packloader.import.progress.start", 0, toImport.size));
+            Vars.ui.loadfrag.showProgressBar();
             Vars.ui.loadfrag.setProgress(0f);
+            Vars.ui.loadfrag.setButton(() -> {
+                if(importCancelled.compareAndSet(false, true) && Vars.ui != null && Vars.ui.loadfrag != null){
+                    Vars.ui.loadfrag.setText(getLocalizedText("packloader.import.cancelling"));
+                }
+            });
         }
 
-        arc.util.Time.runTask(2f, () -> {
-            try{
-                ImportReport report = importer.importEntries(entries, duplicatePolicy, progress -> {
-                    if(Vars.ui != null && Vars.ui.loadfrag != null){
-                        Vars.ui.loadfrag.setProgress(progress);
-                    }
-                });
-
-                if(Vars.ui != null && Vars.ui.loadfrag != null){
-                    Vars.ui.loadfrag.hide();
-                }
-                hide();
-                entries.clear();
-                sourceName = "";
-                targetType = null;
-                new PackResultDialog(report).show();
-            }catch(Throwable t){
-                Log.err("[PackLoader] Import error:", t);
-                if(Vars.ui != null && Vars.ui.loadfrag != null){
-                    Vars.ui.loadfrag.hide();
-                }
-                if(Vars.ui != null){
-                    Vars.ui.showException(getLocalizedText("packloader.import.error", t.getMessage()), t);
+        PackImporter.ImportListener listener = new PackImporter.ImportListener(){
+            @Override
+            public void onProgress(ImportProgress progress){
+                if(!importGeneration.isCurrent(token)) return;
+                if(MainThread.isMainThread()){
+                    updateImportProgress(progress);
+                }else{
+                    MainThread.post(() -> {
+                        if(importGeneration.isCurrent(token)) updateImportProgress(progress);
+                    });
                 }
             }
+
+            @Override
+            public boolean isCancelled(){
+                return importCancelled.get() || !importGeneration.isCurrent(token);
+            }
+        };
+
+        Threads.daemon("PackLoader-Import", () -> {
+            ImportReport report;
+            try{
+                report = importer.importEntries(toImport, policy, listener);
+            }catch(Throwable t){
+                Log.err("[PackLoader] Import error:", t);
+                MainThread.post(() -> {
+                    // Completion must always release deferred SAF archives, even when the
+                    // dialog was closed and this generation is no longer current.
+                    boolean current = importGeneration.isCurrent(token);
+                    importRunning = false;
+                    if(current){
+                        if(Vars.ui != null && Vars.ui.loadfrag != null){
+                            Vars.ui.loadfrag.hide();
+                        }
+                        if(Vars.ui != null){
+                            Vars.ui.showException(getLocalizedText("packloader.import.error", safeMessage(t)), t);
+                        }
+                    }
+                    runDeferredCleanup();
+                });
+                return;
+            }
+
+            MainThread.post(() -> {
+                boolean current = importGeneration.isCurrent(token);
+                importRunning = false;
+                if(current){
+                    if(Vars.ui != null && Vars.ui.loadfrag != null){
+                        Vars.ui.loadfrag.hide();
+                    }
+                    sourceName = "";
+                    targetType = null;
+                    resetFilters();
+                    // hide() also releases materialized SAF ZIPs once importing has finished.
+                    hide();
+                    new PackResultDialog(report).show();
+                }
+                runDeferredCleanup();
+            });
         });
+    }
+
+    private void updateImportProgress(ImportProgress progress){
+        if(Vars.ui == null || Vars.ui.loadfrag == null) return;
+
+        boolean finished = progress.total <= 0 || progress.processed >= progress.total;
+        long now = System.currentTimeMillis();
+        if(!finished && now - lastImportProgressPost < 80L) return;
+        lastImportProgressPost = now;
+
+        String current = progress.currentFile == null || progress.currentFile.isEmpty() ?
+            getLocalizedText("packloader.import.finishing") : progress.currentFile;
+        Vars.ui.loadfrag.setText(getLocalizedText("packloader.import.progress.detail",
+            current, progress.processed, progress.total, progress.success, progress.failed));
+
+        float value = progress.total <= 0 ? 0f :
+            Math.min(1f, progress.processed / (float)progress.total);
+        if(value != lastImportProgress){
+            lastImportProgress = value;
+            Vars.ui.loadfrag.setProgress(value);
+        }
+    }
+
+    private static String safeMessage(Throwable t){
+        return t.getMessage() == null || t.getMessage().trim().isEmpty() ?
+            t.getClass().getSimpleName() : t.getMessage();
+    }
+
+    private static String joinWarnings(Seq<String> warnings){
+        StringBuilder result = new StringBuilder();
+        for(String warning : warnings){
+            if(result.length() > 0) result.append('\n');
+            result.append("• ").append(warning);
+        }
+        return result.toString();
     }
 
     /**
@@ -586,33 +739,108 @@ public class PackLoaderDialog extends BaseDialog{
         pathDialog.show();
     }
 
-    /** Runs scanner asynchronously to prevent UI freeze on large archives or deep folders */
+    /** Runs scanner asynchronously to prevent UI freeze on large archives or deep folders. */
     public void scanAsync(PackType targetType, Fi... sources){
         if(sources == null || sources.length == 0) return;
 
         this.targetType = targetType;
-        String name = sources.length == 1 ? sources[0].name() : (sources.length + " files");
+        String name = sources.length == 1 ? sources[0].name() :
+            getLocalizedText("packloader.source.multiple", sources.length);
+        int token = scanGeneration.begin();
+        lastScanProgressPost = 0L;
+        Seq<String> scanWarnings = new Seq<>();
+        final int[] completedEntries = {0};
+
         if(Vars.ui != null && Vars.ui.loadfrag != null){
-            Vars.ui.loadfrag.show(getLocalizedText("packloader.import.scanning", name));
+            Vars.ui.loadfrag.show(getLocalizedText("packloader.scan.starting", name));
+            Vars.ui.loadfrag.showProgressBar();
+            Vars.ui.loadfrag.setProgress(0f);
+            Vars.ui.loadfrag.setButton(() -> {
+                scanGeneration.cancel();
+                if(Vars.ui != null && Vars.ui.loadfrag != null){
+                    Vars.ui.loadfrag.hide();
+                }
+            });
         }
 
-        Threads.daemon("PackLoader-Scan", () -> {
-            try{
-                Seq<PackEntry> scanned = new Seq<>();
-                for(Fi src : sources){
-                    if(src.isDirectory()){
-                        scanned.addAll(scanner.scanDirectory(src, targetType));
-                    }else if(PackScanner.isZipFi(src)){
-                        scanned.addAll(scanner.scanZip(src, targetType));
+        PackScanner.ScanListener listener = new PackScanner.ScanListener(){
+            @Override
+            public void onProgress(String currentFile, int discovered, int total){
+                if(!scanGeneration.isCurrent(token)) return;
+
+                int found = completedEntries[0] + discovered;
+                boolean totalKnown = sources.length == 1 && total > 0;
+                boolean completed = totalKnown && discovered >= total;
+                long now = System.currentTimeMillis();
+                if(!completed && now - lastScanProgressPost < 80L) return;
+                lastScanProgressPost = now;
+
+                MainThread.post(() -> {
+                    if(!scanGeneration.isCurrent(token) || Vars.ui == null || Vars.ui.loadfrag == null) return;
+                    String fileName = currentFile == null ? "" : currentFile;
+                    if(totalKnown){
+                        Vars.ui.loadfrag.setText(getLocalizedText("packloader.scan.progress.total",
+                            Math.min(found, total), total, fileName));
+                        Vars.ui.loadfrag.setProgress(Math.min(1f, found / (float)total));
                     }else{
-                        scanned.addAll(scanner.scanFiles(targetType, src));
+                        Vars.ui.loadfrag.setText(getLocalizedText("packloader.scan.progress", found, fileName));
                     }
+                });
+            }
+
+            @Override
+            public void onWarning(String message){
+                synchronized(scanWarnings){
+                    scanWarnings.add(message);
+                }
+            }
+
+            @Override
+            public boolean isCancelled(){
+                return !scanGeneration.isCurrent(token);
+            }
+        };
+
+        Threads.daemon("PackLoader-Scan", () -> {
+            Seq<PackEntry> scanned = new Seq<>();
+            try{
+                for(Fi src : sources){
+                    if(!scanGeneration.isCurrent(token)){
+                        scanner.cleanupTemporaryZips(scanned);
+                        return;
+                    }
+
+                    if(src.isDirectory()){
+                        scanned.addAll(scanner.scanDirectory(src, targetType, listener));
+                    }else if(PackScanner.isZipFi(src)){
+                        scanned.addAll(scanner.scanZip(src, targetType, listener));
+                    }else{
+                        scanned.addAll(scanner.scanFiles(targetType, listener, src));
+                    }
+                    completedEntries[0] = scanned.size;
                 }
 
-                Core.app.post(() -> {
+                if(!scanGeneration.isCurrent(token)){
+                    scanner.cleanupTemporaryZips(scanned);
+                    return;
+                }
+
+                MainThread.post(() -> {
+                    if(!scanGeneration.isCurrent(token)){
+                        scanner.cleanupTemporaryZips(scanned);
+                        return;
+                    }
+
                     if(Vars.ui != null && Vars.ui.loadfrag != null){
                         Vars.ui.loadfrag.hide();
                     }
+
+                    Seq<String> warningSnapshot;
+                    synchronized(scanWarnings){
+                        warningSnapshot = new Seq<>(scanWarnings);
+                    }
+                    String warningText = warningSnapshot.isEmpty() ? "" :
+                        getLocalizedText("packloader.scan.warnings", joinWarnings(warningSnapshot));
 
                     if(scanned.isEmpty()){
                         if(Vars.ui != null){
@@ -635,20 +863,31 @@ public class PackLoaderDialog extends BaseDialog{
                                 }else{
                                     emptyMsg = getLocalizedText("packloader.source.empty");
                                 }
-                                Vars.ui.showInfo(emptyMsg);
+                                Vars.ui.showInfo(warningText.isEmpty() ? emptyMsg : warningText + "\n\n" + emptyMsg);
                             }
                         }
                     }else{
-                        entries.clear();
+                        // Duplicate badges read live game registries, so refresh them on the main thread.
+                        scanner.checkGameDuplicates(scanned);
+                        clearEntries();
                         entries.addAll(scanned);
                         sourceName = name;
+                        resetFilters();
                         rebuild();
                         if(!isShown()) super.show();
+                        if(!warningText.isEmpty() && Vars.ui != null){
+                            Vars.ui.showInfo(warningText);
+                        }
                     }
                 });
+            }catch(PackScanner.ScanCancelledException e){
+                scanner.cleanupTemporaryZips(scanned);
+                Log.info("[PackLoader] Scan cancelled.");
             }catch(Throwable t){
+                scanner.cleanupTemporaryZips(scanned);
                 Log.err("[PackLoader] Scan error:", t);
-                Core.app.post(() -> {
+                MainThread.post(() -> {
+                    if(!scanGeneration.isCurrent(token)) return;
                     if(Vars.ui != null && Vars.ui.loadfrag != null){
                         Vars.ui.loadfrag.hide();
                     }
@@ -668,9 +907,9 @@ public class PackLoaderDialog extends BaseDialog{
                         }else{
                             String errorMsg;
                             if(t instanceof java.util.zip.ZipException){
-                                errorMsg = getLocalizedText("packloader.error.zip-corrupt", t.getMessage());
+                                errorMsg = getLocalizedText("packloader.error.zip-corrupt", safeMessage(t));
                             }else{
-                                errorMsg = getLocalizedText("packloader.import.error", t.getMessage());
+                                errorMsg = getLocalizedText("packloader.import.error", safeMessage(t));
                             }
                             Vars.ui.showErrorMessage(errorMsg);
                         }

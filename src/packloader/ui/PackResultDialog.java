@@ -61,6 +61,14 @@ public class PackResultDialog extends BaseDialog{
 
         cont.add(summary).growX().pad(8f).row();
 
+        if(report.cancelled){
+            Table cancelled = new Table(Tex.pane);
+            cancelled.margin(8f);
+            cancelled.add(getLocalizedText("packloader.result.cancelled",
+                report.processed(), report.totalSelected)).color(Color.orange).wrap().growX().minWidth(0f).left();
+            cont.add(cancelled).growX().pad(4f, 8f, 4f, 8f).row();
+        }
+
         // Detailed per-file list
         Table list = new Table();
         list.margin(6f);
@@ -98,8 +106,10 @@ public class PackResultDialog extends BaseDialog{
                 if(detail == null || detail.isEmpty()){
                     detail = res.entry.sourcePath;
                 }
-                t.add(detail).color(Pal.lightishGray).size(12f).left().wrap();
-            }).growX().left().padLeft(6f);
+                // Let the label use the remaining row width and wrap naturally instead of
+                // constraining it to a 12x12 cell, which made long errors unreadable.
+                t.add(detail).color(Pal.lightishGray).growX().minWidth(0f).left().wrap().padTop(2f);
+            }).growX().minWidth(0f).left().padLeft(6f);
 
             list.add(itemRow).growX().pad(3f).row();
         }
@@ -116,10 +126,12 @@ public class PackResultDialog extends BaseDialog{
             boolean hasMaps = report.results.contains(r -> r.entry.type == PackType.MAP && r.destinationFile != null);
             boolean hasSchems = report.results.contains(r -> r.entry.type == PackType.SCHEMATIC && r.destinationFile != null);
 
-            if(hasMaps && Vars.ui != null && Vars.ui.maps != null){
-                UIUtils.pad(buttons.button(getLocalizedText("packloader.result.open.maps"), Icon.terrain, () -> {
+            if(hasMaps && Vars.ui != null && Vars.ui.custom != null){
+                // Custom maps are playable through the Custom Game dialog; opening the
+                // editor map list would show a different, non-playable context.
+                UIUtils.pad(buttons.button(getLocalizedText("packloader.result.open.custom"), Icon.terrain, () -> {
                     hide();
-                    Vars.ui.maps.show();
+                    Vars.ui.custom.show();
                 }).size(210f, 64f).pad(4f).get());
             }
 

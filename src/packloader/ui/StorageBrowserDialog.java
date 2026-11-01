@@ -6,6 +6,7 @@ import arc.func.Cons;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Lines;
+import arc.scene.ui.Button;
 import arc.scene.ui.ScrollPane;
 import arc.scene.ui.layout.Scl;
 import arc.scene.ui.layout.Table;
@@ -282,7 +283,7 @@ public class StorageBrowserDialog extends BaseDialog{
 
                 // Parent directory entry (..) with folder icon
                 if(currentDirectory != null && currentDirectory.parent() != null && currentDirectory.parent().exists() && !currentDirectory.equals(currentDirectory.parent())){
-                    Table parentRow = new Table(Tex.pane);
+                    Button parentRow = new Button(UIUtils.rowStyle());
                     parentRow.margin(6f);
                     parentRow.defaults().pad(3f);
 
@@ -321,7 +322,7 @@ public class StorageBrowserDialog extends BaseDialog{
                 // Directories first (clean row without arrow button)
                 for(Fi d : dirs){
                     boolean isSelected = d.equals(selectedDirectory);
-                    Table row = new Table(Tex.pane){
+                    Button row = new Button(UIUtils.rowStyle()){
                         @Override
                         public void draw(){
                             super.draw();
@@ -355,7 +356,7 @@ public class StorageBrowserDialog extends BaseDialog{
 
                 // Compatible files
                 for(Fi f : files){
-                    Table row = new Table(Tex.pane);
+                    Button row = new Button(UIUtils.rowStyle());
                     row.margin(6f);
                     row.defaults().pad(3f);
 
