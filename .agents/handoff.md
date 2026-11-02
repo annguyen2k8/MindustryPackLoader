@@ -3,10 +3,10 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-02 09:21 +07:00
+- **Last updated:** 2026-11-02 09:22 +07:00
 - **Updated by:** OpenCode / DeepSeek V4.1 Flash Free
 - **Task:** Implement the user-level Shared Context & Memory system for Antigravity CLI and OpenCode.
-- **Branch:** master; see `git log -1` for the implementation commit.
+- **Branch:** master; implementation commit `217b5b9`.
 
 ## Results
 
@@ -15,6 +15,7 @@
 - [verified] Wired Agy through `~/.gemini/config/AGENTS.md` using native `@[label](path)` includes.
 - [verified] Wired OpenCode through `~/.config/opencode/opencode.json` using the native `instructions` array.
 - [verified] Created project context at `AGENTS.md`, the handoff at `.agents/handoff.md`, and the project bridge at `opencode.json`.
+- [verified] Both CLIs can write files in a trusted workspace; byte-exact write probes passed.
 - [verified] Project files are included in the implementation commit.
 
 ## Remaining
@@ -37,6 +38,7 @@
 
 - `agy -p` global preferences, first decision, project handoff, and subdirectory handoff — pass.
 - `opencode run` global preferences, project handoff, and subdirectory handoff — pass.
+- `agy -p` and `opencode run --auto` byte-exact write probes in a trusted workspace — pass.
 - `opencode debug config` shows the global and project configuration documents with their `instructions` arrays.
 - `.\gradlew.bat test --rerun-tasks` — BUILD SUCCESSFUL; 102 tests, 0 failures, 0 errors, 0 skipped.
 - `.\gradlew.bat verifyJar --rerun-tasks` — BUILD SUCCESSFUL; desktop jar bundles verified.
