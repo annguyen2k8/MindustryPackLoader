@@ -28,6 +28,8 @@ import packloader.model.ImportReport;
 import packloader.model.PackEntry;
 import packloader.model.PackType;
 import packloader.util.MainThread;
+import packloader.util.PackLoaderSettings;
+import packloader.util.RecentSources;
 import packloader.util.TaskGeneration;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -40,8 +42,9 @@ public class PackLoaderDialog extends BaseDialog{
 
     private final Seq<PackEntry> entries = new Seq<>();
     private final Seq<PackEntry> deferredCleanup = new Seq<>();
+    private final Seq<Fi> queuedSources = new Seq<>();
     private String sourceName = "";
-    private DuplicatePolicy duplicatePolicy = DuplicatePolicy.RENAME;
+    private DuplicatePolicy duplicatePolicy = PackLoaderSettings.getDuplicatePolicy();
     private PackType targetType = null;
 
     private enum FilterMode{ ALL, MAPS, SCHEMATICS }
@@ -105,6 +108,7 @@ public class PackLoaderDialog extends BaseDialog{
     }
 
     private void clearEntries(){
+        queuedSources.clear();
         if(entries.isEmpty()) return;
         if(importRunning){
             // The import worker may still be reading a materialized SAF ZIP. Move ownership
@@ -187,6 +191,59 @@ public class PackLoaderDialog extends BaseDialog{
             maxW
         )).minHeight(76f).pad(4f).row();
 
+        // Quick Import Option Toggle
+        Table quickRow = new Table(Tex.pane);
+        quickRow.margin(8f);
+        CheckBox quickBox = new CheckBox(" " + getLocalizedText("packloader.quick-import"));
+        quickBox.setChecked(PackLoaderSettings.isQuickImport());
+        quickBox.changed(() -> PackLoaderSettings.setQuickImport(quickBox.isChecked()));
+        quickRow.add(quickBox).left().pad(2f);
+        quickRow.add().growX();
+        root.add(quickRow).growX().padTop(6f).padBottom(4f).row();
+
+        // Recent Sources
+        Seq<RecentSources.SourceItem> recents = RecentSources.load();
+        if(!recents.isEmpty()){
+            Table recentsHeader = new Table();
+            recentsHeader.add(getLocalizedText("packloader.recent.title")).color(Pal.accent).style(Styles.outlineLabel).left().growX();
+            recentsHeader.button(getLocalizedText("packloader.recent.clear"), Icon.trash, Styles.flatt, () -> {
+                RecentSources.clear();
+                rebuild();
+            }).height(32f).padRight(2f);
+            root.add(recentsHeader).growX().padTop(12f).padBottom(4f).row();
+
+            for(RecentSources.SourceItem item : recents){
+                Button card = new Button(UIUtils.cardStyle());
+                card.margin(6f);
+                card.clicked(() -> {
+                    Fi file = Core.files.absolute(item.path);
+                    if(!file.exists()){
+                        RecentSources.remove(item.path);
+                        if(Vars.ui != null){
+                            Vars.ui.showErrorMessage(getLocalizedText("packloader.source.path.notfound", item.path));
+                        }
+                        rebuild();
+                        return;
+                    }
+                    scanAsync(item.type, false, file);
+                });
+
+                card.image(item.isDirectory ? Icon.folder : Icon.download).size(28f).color(Pal.accent).pad(4f);
+                card.table(t -> {
+                    t.left().defaults().left().growX();
+                    t.add(item.name).style(Styles.defaultLabel).color(Color.white).ellipsis(true).row();
+                    t.add(item.path).style(Styles.defaultLabel).color(Pal.lightishGray).ellipsis(true);
+                }).growX().left().padLeft(6f);
+
+                card.button(Icon.cancel, Styles.clearNonei, () -> {
+                    RecentSources.remove(item.path);
+                    rebuild();
+                }).size(32f).pad(2f);
+
+                root.add(card).growX().minHeight(56f).pad(3f).row();
+            }
+        }
+
         ScrollPane pane = new ScrollPane(root);
         pane.setScrollingDisabled(true, false);
         pane.setFadeScrollBars(false);
@@ -251,6 +308,59 @@ public class PackLoaderDialog extends BaseDialog{
             )).minHeight(68f).pad(3f).padTop(8f).row();
         }
 
+        // Quick Import Option Toggle
+        Table quickRow = new Table(Tex.pane);
+        quickRow.margin(8f);
+        CheckBox quickBox = new CheckBox(" " + getLocalizedText("packloader.quick-import"));
+        quickBox.setChecked(PackLoaderSettings.isQuickImport());
+        quickBox.changed(() -> PackLoaderSettings.setQuickImport(quickBox.isChecked()));
+        quickRow.add(quickBox).left().pad(2f);
+        quickRow.add().growX();
+        root.add(quickRow).growX().padTop(6f).padBottom(4f).row();
+
+        // Recent Sources
+        Seq<RecentSources.SourceItem> recents = RecentSources.getForType(targetType);
+        if(!recents.isEmpty()){
+            Table recentsHeader = new Table();
+            recentsHeader.add(getLocalizedText("packloader.recent.title")).color(Pal.accent).style(Styles.outlineLabel).left().growX();
+            recentsHeader.button(getLocalizedText("packloader.recent.clear"), Icon.trash, Styles.flatt, () -> {
+                RecentSources.clear();
+                rebuild();
+            }).height(32f).padRight(2f);
+            root.add(recentsHeader).growX().padTop(12f).padBottom(4f).row();
+
+            for(RecentSources.SourceItem item : recents){
+                Button card = new Button(UIUtils.cardStyle());
+                card.margin(6f);
+                card.clicked(() -> {
+                    Fi file = Core.files.absolute(item.path);
+                    if(!file.exists()){
+                        RecentSources.remove(item.path);
+                        if(Vars.ui != null){
+                            Vars.ui.showErrorMessage(getLocalizedText("packloader.source.path.notfound", item.path));
+                        }
+                        rebuild();
+                        return;
+                    }
+                    scanAsync(targetType, false, file);
+                });
+
+                card.image(item.isDirectory ? Icon.folder : Icon.download).size(28f).color(Pal.accent).pad(4f);
+                card.table(t -> {
+                    t.left().defaults().left().growX();
+                    t.add(item.name).style(Styles.defaultLabel).color(Color.white).ellipsis(true).row();
+                    t.add(item.path).style(Styles.defaultLabel).color(Pal.lightishGray).ellipsis(true);
+                }).growX().left().padLeft(6f);
+
+                card.button(Icon.cancel, Styles.clearNonei, () -> {
+                    RecentSources.remove(item.path);
+                    rebuild();
+                }).size(32f).pad(2f);
+
+                root.add(card).growX().minHeight(56f).pad(3f).row();
+            }
+        }
+
         ScrollPane pane = new ScrollPane(root);
         pane.setScrollingDisabled(true, false);
         pane.setFadeScrollBars(false);
@@ -309,6 +419,14 @@ public class PackLoaderDialog extends BaseDialog{
             t.add(summary).color(Pal.lightishGray).ellipsis(true).growX().minWidth(0f).left();
         }).growX().left().padLeft(6f).minWidth(0f);
 
+        var addBtn = UIUtils.pad(header.button(
+            getLocalizedText("packloader.source.add"),
+            Icon.add, Styles.flatt, this::openAddSourceMenu
+        ).height(40f).padRight(4f).get());
+        if(addBtn != null){
+            addBtn.margin(4f, 10f, 4f, 10f);
+        }
+
         var changeBtn = UIUtils.pad(header.button(
             getLocalizedText("packloader.source.change"),
             Icon.refresh, Styles.flatt, () -> {
@@ -323,6 +441,26 @@ public class PackLoaderDialog extends BaseDialog{
         }
 
         cont.add(header).growX().pad(6f).row();
+
+        // Search bar row
+        Table searchRow = new Table(Tex.pane);
+        searchRow.margin(4f);
+        searchRow.image(Icon.zoom).size(22f).color(Pal.accent).padLeft(6f).padRight(6f);
+        TextField searchField = new TextField(searchText);
+        searchField.setMessageText(getLocalizedText("packloader.search.placeholder"));
+        searchField.changed(() -> {
+            searchText = searchField.getText();
+            rebuildEntriesList();
+        });
+        searchRow.add(searchField).growX().height(36f);
+        if(!searchText.isEmpty()){
+            searchRow.button(Icon.cancel, Styles.clearNonei, () -> {
+                searchText = "";
+                searchField.setText("");
+                rebuildEntriesList();
+            }).size(32f).padRight(4f);
+        }
+        cont.add(searchRow).growX().pad(4f).row();
 
         // Toolbar: Filter, Selection, Conflict Resolution Mode
         Table toolbar = new Table();
@@ -351,7 +489,7 @@ public class PackLoaderDialog extends BaseDialog{
 
         toolbar.add().growX(); // spacer pushes mass selection buttons to right
 
-        // Mass selection buttons with proper spacing between icon and text
+        // Smart selection buttons
         var selectAllBtn = UIUtils.pad(toolbar.button(
             getLocalizedText("packloader.select.all"),
             Icon.ok, Styles.flatt, () -> {
@@ -359,7 +497,27 @@ public class PackLoaderDialog extends BaseDialog{
                 rebuildEntriesList();
             }).height(38f).pad(2f).get());
         if(selectAllBtn != null){
-            selectAllBtn.margin(4f, 10f, 4f, 10f);
+            selectAllBtn.margin(4f, 8f, 4f, 8f);
+        }
+
+        var selectNewBtn = UIUtils.pad(toolbar.button(
+            getLocalizedText("packloader.select.new"),
+            Icon.add, Styles.flatt, () -> {
+                EntryFilter.selectNewOnly(entries, targetType, filterType(), searchText);
+                rebuildEntriesList();
+            }).height(38f).pad(2f).get());
+        if(selectNewBtn != null){
+            selectNewBtn.margin(4f, 8f, 4f, 8f);
+        }
+
+        var invertBtn = UIUtils.pad(toolbar.button(
+            getLocalizedText("packloader.select.invert"),
+            Icon.refresh, Styles.flatt, () -> {
+                EntryFilter.invertVisibleSelected(entries, targetType, filterType(), searchText);
+                rebuildEntriesList();
+            }).height(38f).pad(2f).get());
+        if(invertBtn != null){
+            invertBtn.margin(4f, 8f, 4f, 8f);
         }
 
         var deselectBtn = UIUtils.pad(toolbar.button(
@@ -369,7 +527,7 @@ public class PackLoaderDialog extends BaseDialog{
                 rebuildEntriesList();
             }).height(38f).pad(2f).get());
         if(deselectBtn != null){
-            deselectBtn.margin(4f, 10f, 4f, 10f);
+            deselectBtn.margin(4f, 8f, 4f, 8f);
         }
 
         cont.add(toolbar).growX().pad(4f).row();
@@ -387,6 +545,7 @@ public class PackLoaderDialog extends BaseDialog{
                 b.add(p.title()).padLeft(4f).padRight(4f);
             }, Styles.flatTogglet, () -> {
                 duplicatePolicy = p;
+                PackLoaderSettings.setDuplicatePolicy(p);
                 rebuildEntriesList();
             }).checked(btn -> duplicatePolicy == p).height(34f).pad(2f);
         }
@@ -680,6 +839,10 @@ public class PackLoaderDialog extends BaseDialog{
      * Respects targetType (MAP, SCHEMATIC, or null).
      */
     public void pickZip(PackType targetType){
+        pickZip(targetType, false);
+    }
+
+    public void pickZip(PackType targetType, boolean append){
         this.targetType = targetType;
         try{
             String titleKey = targetType == PackType.MAP ? "packloader.action.import-map-zip" :
@@ -689,12 +852,12 @@ public class PackLoaderDialog extends BaseDialog{
                 .title(getLocalizedText(titleKey))
                 .submit(file -> {
                     if(file != null){
-                        scanAsync(targetType, file);
+                        scanAsync(targetType, append, file);
                     }
                 });
         }catch(Throwable t){
             Log.warn("[PackLoader] System FileChooser failed, falling back to folder picker: @", t.getMessage());
-            openFolderPicker(targetType);
+            openFolderPicker(targetType, append);
         }
     }
 
@@ -704,16 +867,24 @@ public class PackLoaderDialog extends BaseDialog{
 
     /** Opens in-game Touch-Friendly Storage Browser configured for folder or file selection */
     public void openFolderPicker(PackType targetType){
+        openFolderPicker(targetType, false);
+    }
+
+    public void openFolderPicker(PackType targetType, boolean append){
         this.targetType = targetType;
         new StorageBrowserDialog(
             targetType,
-            file -> scanAsync(targetType, file),
-            dir -> scanAsync(targetType, dir)
+            file -> scanAsync(targetType, append, file),
+            dir -> scanAsync(targetType, append, dir)
         ).show();
     }
 
     /** Prompts user to input manual filesystem path */
     private void openPathInputDialog(){
+        openPathInputDialog(false);
+    }
+
+    private void openPathInputDialog(boolean append){
         BaseDialog pathDialog = new BaseDialog(getLocalizedText("packloader.source.path.title"));
         pathDialog.addCloseButton();
 
@@ -726,12 +897,21 @@ public class PackLoaderDialog extends BaseDialog{
         pathDialog.buttons.button(getLocalizedText("packloader.source.path.scan"), Icon.ok, () -> {
             String path = field.getText().trim();
             if(!path.isEmpty()){
-                Fi file = Core.files.absolute(path);
-                if(file.exists()){
+                String[] parts = path.split("[,;\\r?\\n]+");
+                Seq<Fi> sources = new Seq<>();
+                for(String p : parts){
+                    String trimmed = p.trim();
+                    if(trimmed.isEmpty()) continue;
+                    Fi file = Core.files.absolute(trimmed);
+                    if(file.exists()){
+                        sources.add(file);
+                    }else if(Vars.ui != null){
+                        Vars.ui.showErrorMessage(getLocalizedText("packloader.source.path.notfound", trimmed));
+                    }
+                }
+                if(!sources.isEmpty()){
                     pathDialog.hide();
-                    scanAsync(targetType, file);
-                }else{
-                    Vars.ui.showErrorMessage(getLocalizedText("packloader.source.path.notfound", path));
+                    scanAsync(targetType, append, sources.toArray(Fi.class));
                 }
             }
         }).size(130f, 50f);
@@ -739,8 +919,48 @@ public class PackLoaderDialog extends BaseDialog{
         pathDialog.show();
     }
 
+    private void openAddSourceMenu(){
+        showAddSourceDialog(targetType);
+    }
+
+    private void showAddSourceDialog(PackType type){
+        BaseDialog d = new BaseDialog(getLocalizedText("packloader.source.add"));
+        d.addCloseButton();
+        d.cont.defaults().size(300f, 64f).pad(6f);
+
+        String zipText = type == PackType.MAP ? getLocalizedText("packloader.source.zip.map") :
+                         type == PackType.SCHEMATIC ? getLocalizedText("packloader.source.zip.schem") :
+                         getLocalizedText("packloader.source.saf.title");
+        String folderText = type == PackType.MAP ? getLocalizedText("packloader.source.scan-folder.map") :
+                            type == PackType.SCHEMATIC ? getLocalizedText("packloader.source.scan-folder.schem") :
+                            getLocalizedText("packloader.action.scan-folder");
+
+        d.cont.button(zipText, Icon.download, () -> {
+            d.hide();
+            pickZip(type, true);
+        }).row();
+
+        d.cont.button(folderText, Icon.folder, () -> {
+            d.hide();
+            openFolderPicker(type, true);
+        }).row();
+
+        if(!Vars.mobile){
+            d.cont.button(getLocalizedText("packloader.source.path.title"), Icon.paste, () -> {
+                d.hide();
+                openPathInputDialog(true);
+            }).row();
+        }
+
+        d.show();
+    }
+
     /** Runs scanner asynchronously to prevent UI freeze on large archives or deep folders. */
     public void scanAsync(PackType targetType, Fi... sources){
+        scanAsync(targetType, false, sources);
+    }
+
+    public void scanAsync(PackType targetType, boolean append, Fi... sources){
         if(sources == null || sources.length == 0) return;
 
         this.targetType = targetType;
@@ -843,7 +1063,7 @@ public class PackLoaderDialog extends BaseDialog{
                         getLocalizedText("packloader.scan.warnings", joinWarnings(warningSnapshot));
 
                     if(scanned.isEmpty()){
-                        if(Vars.ui != null){
+                        if(!append && Vars.ui != null){
                             boolean isRestricted = false;
                             for(Fi src : sources){
                                 if(src.isDirectory() && PackScanner.isScopedStorageRestricted(src)){
@@ -867,14 +1087,40 @@ public class PackLoaderDialog extends BaseDialog{
                             }
                         }
                     }else{
+                        for(Fi src : sources){
+                            RecentSources.add(src.path(), src.name(), targetType, src.isDirectory());
+                        }
+
+                        if(!append){
+                            clearEntries();
+                            queuedSources.clear();
+                            queuedSources.addAll(sources);
+                            entries.addAll(scanned);
+                            sourceName = name;
+                        }else{
+                            queuedSources.addAll(sources);
+                            entries.addAll(scanned);
+                            sourceName = getLocalizedText("packloader.source.queued", queuedSources.size);
+                        }
+
                         // Duplicate badges read live game registries, so refresh them on the main thread.
-                        scanner.checkGameDuplicates(scanned);
-                        clearEntries();
-                        entries.addAll(scanned);
-                        sourceName = name;
+                        scanner.checkGameDuplicates(entries);
                         resetFilters();
                         rebuild();
                         if(!isShown()) super.show();
+
+                        if(!append && PackLoaderSettings.isQuickImport()){
+                            if(duplicatePolicy == DuplicatePolicy.SKIP){
+                                EntryFilter.selectNewOnly(entries, targetType, filterType(), searchText);
+                            }else{
+                                EntryFilter.setVisibleSelected(entries, targetType, filterType(), searchText, true);
+                            }
+                            if(visibleSelectedCount() > 0){
+                                executeImport();
+                                return;
+                            }
+                        }
+
                         if(!warningText.isEmpty() && Vars.ui != null){
                             Vars.ui.showInfo(warningText);
                         }

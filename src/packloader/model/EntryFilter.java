@@ -41,6 +41,42 @@ public final class EntryFilter{
         }
     }
 
+    /** Selects only new (non-duplicate and valid) visible entries, deselecting duplicates. */
+    public static void selectNewOnly(Seq<PackEntry> entries, PackType targetType, PackType filterType,
+                                     String searchText){
+        if(entries == null) return;
+        for(int i = 0; i < entries.size; i++){
+            PackEntry entry = entries.get(i);
+            if(matches(entry, targetType, filterType, searchText)){
+                entry.selected = !entry.isDuplicate && entry.isValid;
+            }
+        }
+    }
+
+    /** Selects only duplicate visible entries, deselecting new ones. */
+    public static void selectDuplicatesOnly(Seq<PackEntry> entries, PackType targetType, PackType filterType,
+                                            String searchText){
+        if(entries == null) return;
+        for(int i = 0; i < entries.size; i++){
+            PackEntry entry = entries.get(i);
+            if(matches(entry, targetType, filterType, searchText)){
+                entry.selected = entry.isDuplicate && entry.isValid;
+            }
+        }
+    }
+
+    /** Inverts the selection status of all visible valid entries. */
+    public static void invertVisibleSelected(Seq<PackEntry> entries, PackType targetType, PackType filterType,
+                                             String searchText){
+        if(entries == null) return;
+        for(int i = 0; i < entries.size; i++){
+            PackEntry entry = entries.get(i);
+            if(matches(entry, targetType, filterType, searchText)){
+                entry.selected = !entry.selected;
+            }
+        }
+    }
+
     /** Collects entries that are selected and visible. Used once when an import starts. */
     public static Seq<PackEntry> collectSelected(Seq<PackEntry> entries, PackType targetType,
                                                   PackType filterType, String searchText){

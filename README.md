@@ -10,12 +10,16 @@ A Mindustry Java mod for bulk importing maps (`.msav`) and schematics (`.msch`) 
 ## Features
 
 - **Bulk Import:** Import dozens of maps and schematics from `.zip` packs or folders in one operation.
+- **Quick Import:** Fast-path auto-import option with remembered conflict policy, skipping manual review when desired.
+- **Smart Selection:** Instant selection filters including **All**, **New Only** (skips duplicates), **Invert**, and **Deselect All**, with live name search.
+- **Recent Sources:** Quick access to recently opened ZIPs and directories for 1-click re-scanning.
+- **Multi-Source Queue:** Queue and merge multiple ZIP packs and folders into a single unified import batch.
 - **Smart Conflict Handling:** Choose how to resolve duplicate files:
   - **Skip:** Keep existing game files intact.
   - **Overwrite:** Replace existing files with imported versions.
   - **Rename:** Automatically append numbers (`_1`, `_2`) to keep both.
 - **Instant Hot-Reload:** Automatically reloads game maps and schematics immediately without restarting Mindustry.
-- **Safe & Validated:** Built-in Zip Slip protection, file header verification for `.msch` and `.msav` streams, and atomic writes via temporary files.
+- **Safe & Validated:** Built-in Zip Slip protection, format verification for `.msch` and `.msav` streams, and atomic writes via temporary files with rollback.
 - **Mobile-Optimized:** Designed for Android with touch-friendly controls, multi-selection checkboxes, search filtering, and System File Picker (SAF) support.
 - **Seamless In-Game Integration:** Direct action buttons located on the **Main Menu**, **Schematics**, **Custom Game**, and **Map Editor** screens.
 
@@ -49,7 +53,7 @@ A Mindustry Java mod for bulk importing maps (`.msav`) and schematics (`.msch`) 
 
 ### Commands
 
-- **Run Unit Tests (45 tests):**
+- **Run Unit Tests (118 tests):**
   ```bash
   ./gradlew test
   ```

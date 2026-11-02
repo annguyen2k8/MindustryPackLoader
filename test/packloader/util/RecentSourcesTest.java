@@ -1,0 +1,102 @@
+package packloader.util;
+
+import arc.Core;
+import arc.Settings;
+import arc.struct.Seq;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import packloader.model.DuplicatePolicy;
+import packloader.model.PackType;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+public class RecentSourcesTest{
+
+    @BeforeEach
+    public void setup(){
+        Core.settings = new Settings();
+    }
+
+    @AfterEach
+    public void teardown(){
+        Core.settings = null;
+    }
+
+    @Test
+    public void testAddAndRetrieveRecentSources(){
+        RecentSources.add("C:/maps/pack1.zip", "pack1.zip", PackType.MAP, false);
+        RecentSources.add("C:/schems/base.msch", "base.msch", PackType.SCHEMATIC, false);
+
+        Seq<RecentSources.SourceItem> list = RecentSources.load();
+        assertEquals(2, list.size);
+
+        // Most recent should be at index 0
+        assertEquals("C:/schems/base.msch", list.get(0).path);
+        assertEquals(PackType.SCHEMATIC, list.get(0).type);
+
+        assertEquals("C:/maps/pack1.zip", list.get(1).path);
+        assertEquals(PackType.MAP, list.get(1).type);
+    }
+
+    @Test
+    public void testDeduplicationBumpsToFront(){
+        RecentSources.add("path/a.zip", "a.zip", PackType.MAP, false);
+        RecentSources.add("path/b.zip", "b.zip", PackType.MAP, false);
+        RecentSources.add("path/a.zip", "a.zip", PackType.MAP, false);
+
+        Seq<RecentSources.SourceItem> list = RecentSources.load();
+        assertEquals(2, list.size);
+        assertEquals("path/a.zip", list.get(0).path, "Re-added item must be moved to front");
+        assertEquals("path/b.zip", list.get(1).path);
+    }
+
+    @Test
+    public void testCapLimit(){
+        for(int i = 0; i < 10; i++){
+            RecentSources.add("path/file_" + i + ".zip", "file_" + i + ".zip", PackType.MAP, false);
+        }
+
+        Seq<RecentSources.SourceItem> list = RecentSources.load();
+        assertEquals(RecentSources.MAX_RECENT, list.size);
+        assertEquals("path/file_9.zip", list.get(0).path);
+    }
+
+    @Test
+    public void testRemoveAndClear(){
+        RecentSources.add("path/x.zip", "x.zip", PackType.MAP, false);
+        RecentSources.add("path/y.zip", "y.zip", PackType.MAP, false);
+
+        RecentSources.remove("path/x.zip");
+        Seq<RecentSources.SourceItem> list = RecentSources.load();
+        assertEquals(1, list.size);
+        assertEquals("path/y.zip", list.get(0).path);
+
+        RecentSources.clear();
+        assertTrue(RecentSources.load().isEmpty());
+    }
+
+    @Test
+    public void testFilterByType(){
+        RecentSources.add("maps.zip", "maps.zip", PackType.MAP, false);
+        RecentSources.add("schems.zip", "schems.zip", PackType.SCHEMATIC, false);
+        RecentSources.add("mixed.zip", "mixed.zip", null, false);
+
+        Seq<RecentSources.SourceItem> maps = RecentSources.getForType(PackType.MAP);
+        assertEquals(2, maps.size); // maps.zip and mixed.zip (null type matches all)
+
+        Seq<RecentSources.SourceItem> schems = RecentSources.getForType(PackType.SCHEMATIC);
+        assertEquals(2, schems.size); // schems.zip and mixed.zip
+    }
+
+    @Test
+    public void testPackLoaderSettings(){
+        assertFalse(PackLoaderSettings.isQuickImport());
+        PackLoaderSettings.setQuickImport(true);
+        assertTrue(PackLoaderSettings.isQuickImport());
+
+        assertEquals(DuplicatePolicy.SKIP, PackLoaderSettings.getDuplicatePolicy());
+        PackLoaderSettings.setDuplicatePolicy(DuplicatePolicy.RENAME);
+        assertEquals(DuplicatePolicy.RENAME, PackLoaderSettings.getDuplicatePolicy());
+    }
+}
