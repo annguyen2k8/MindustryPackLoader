@@ -46,7 +46,7 @@ A Mindustry Java mod that bulk-imports maps (`.msav`) and schematics (`.msch`) f
 
 Global user memory is loaded from `~/.agent-memory/` by both Antigravity and OpenCode. Keep this file project-specific.
 
-Read `.agents/handoff.md` before starting work. Antigravity also inlines it here:
+Read `.agents/handoff.md` from disk at the start of each task before changing code. Antigravity also inlines it here:
 
 @[Current handoff](.agents/handoff.md)
 
