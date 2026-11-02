@@ -19,7 +19,7 @@ description: '''
   [stat[]] Mobile-Optimized:[[]] [lightgray[]]Touch-friendly UI, search filtering, and System File Picker ([white[]]SAF[[]]) support.[[]]
   [stat[]] Seamless Integration:[[]] [lightgray[]]Quick-access buttons in Main Menu, Schematics, Custom Game, and Map Editor.[[]]
 '''
-version: "1.0.1"
+version: "1.1.0"
 minGameVersion: 160
 java: true
 hidden: true

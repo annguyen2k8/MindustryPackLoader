@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -223,6 +224,39 @@ public class BundleTest{
                 assertNotNull(zip.getEntry("bundles/bundle.properties"), "Deploy JAR must contain default bundle");
                 assertNotNull(zip.getEntry("bundles/bundle_vi.properties"), "Deploy JAR must contain Vietnamese bundle");
             }
+        }
+    }
+
+    @Test
+    public void testAllSourceKeysExistInBothBundles() throws Exception{
+        Properties en = new Properties();
+        try(InputStream in = getClass().getResourceAsStream("/bundles/bundle.properties")){
+            en.load(new InputStreamReader(in, StandardCharsets.UTF_8));
+        }
+        Properties vi = new Properties();
+        try(InputStream in = getClass().getResourceAsStream("/bundles/bundle_vi.properties")){
+            vi.load(new InputStreamReader(in, StandardCharsets.UTF_8));
+        }
+
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("getLocalizedText\\(\\s*\"([^\"]+)\"");
+        File srcDir = new File("src");
+        assertTrue(srcDir.exists(), "src directory must exist");
+
+        try(var stream = java.nio.file.Files.walk(srcDir.toPath())){
+            stream.filter(p -> p.toString().endsWith(".java"))
+                .forEach(p -> {
+                    try{
+                        String content = java.nio.file.Files.readString(p);
+                        java.util.regex.Matcher m = pattern.matcher(content);
+                        while(m.find()){
+                            String key = m.group(1);
+                            assertTrue(en.containsKey(key), "English bundle missing key from " + p.getFileName() + ": " + key);
+                            assertTrue(vi.containsKey(key), "Vietnamese bundle missing key from " + p.getFileName() + ": " + key);
+                        }
+                    }catch(IOException e){
+                        fail("Failed to read " + p + ": " + e.getMessage());
+                    }
+                });
         }
     }
 }
