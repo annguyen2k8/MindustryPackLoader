@@ -1,7 +1,9 @@
 package packloader.ui;
 
 import arc.scene.ui.Button;
+import arc.scene.ui.CheckBox;
 import arc.scene.ui.TextButton;
+import arc.util.Scaling;
 import mindustry.ui.Styles;
 
 /** UI helper methods for consistent Mindustry styling. */
@@ -29,5 +31,24 @@ public final class UIUtils{
             }
         }
         return btn;
+    }
+
+    /**
+     * Configures a standalone CheckBox (with empty label text) to maintain a strict 1:1 square
+     * aspect ratio matching native Mindustry widgets, eliminating distortion caused by internal label padding.
+     */
+    public static CheckBox squareCheck(CheckBox box, float size){
+        if(box != null){
+            if(box.getImageCell() != null){
+                box.getImageCell().size(size);
+            }
+            if(box.getLabelCell() != null){
+                box.getLabelCell().padLeft(0f);
+            }
+            if(box.getImage() != null){
+                box.getImage().setScaling(Scaling.fit);
+            }
+        }
+        return box;
     }
 }

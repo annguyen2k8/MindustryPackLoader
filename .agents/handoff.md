@@ -3,37 +3,33 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-02 19:15 +07:00
+- **Last updated:** 2026-11-02 20:25 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** P3 — Runtime Smoke Test & Release Readiness: audit runtime compatibility against Mindustry v160.7, construct smoke-test matrix, verify packaging, bump version to 1.1.0, update docs, and establish release readiness.
-- **Branch:** master; commits `65dd3f1`, `3ff9706`, `4275c1c`.
+- **Task:** Fix CheckBox distortion: audit CheckBox layout and styling against native Mindustry v160.7, eliminate asymmetrical label padding, enforce square 1:1 aspect ratio with Scaling.fit, and add automated regression test.
+- **Branch:** master; working tree clean post-commit.
 
 ## Results
 
-- [verified] Localization & Source Coverage:
-  - Added reflection-free static AST/file walker test (`testAllSourceKeysExistInBothBundles`) verifying that 100% of `getLocalizedText("...")` keys across all Java sources exist in both `bundle.properties` and `bundle_vi.properties`.
-  - Zero missing keys, zero format mismatches.
-- [verified] Release Metadata & Packaging:
-  - Bumped version to `1.1.0` in both `mod.json` and `mod.hjson` (matching minor feature additions from P2 & P3).
-  - Confirmed `minGameVersion: 160` and `main: packloader.PackLoaderMod`.
-  - Updated `README.md` documenting new P2/P3 capabilities (Interactive Schematic Preview/Placement, Scan Optimization, Bug Reporting, Quick Import) and updated test suite count to 128 tests.
-  - Verified `MindustryPackLoaderDesktop.jar` packaging: bundles at `bundles/*`, no nested directories, valid metadata and icons.
-- [verified] Runtime Architecture & Compatibility Audit:
-  - Mod loading: `Vars.clientLoaded` check with `ClientLoadEvent` listener, safe reflection into `MenuFragment.customButtons` with resize fallback.
-  - Scan pipeline: streaming decompression, zip-slip and zip-bomb protections, cooperative task generation cancellation.
-  - Import pipeline: atomic staging, rollback on failure, native `Vars.maps` & `Vars.schematics` registration on MainThread, safe duplicate handling (`SKIP`, `OVERWRITE`, `RENAME`).
-  - Native UI integration: `Vars.ui.schematics.showInfo` and `Vars.control.input.useSchematic` properly checked against `Vars.state.isGame()`, click events isolated from selection checkboxes via `InputListener.stop()`.
+- [verified] Root Cause Analysis:
+  - Checkboxes in `PackLoaderDialog` (`quickBox` at line 447, entry selection `box` at line 705) used `new CheckBox("")`.
+  - In Arc, `CheckBox` constructor adds `imageCell = add(image = new Image(style.checkboxOff, Scaling.stretch))` and `add(label).padLeft(4)`.
+  - Because `size(26f)` / `size(36f)` was applied to the outer container cell without zeroing label padding or sizing `imageCell`, the empty label's `padLeft(4)` subtracted 4px from `imageCell` width (`26 - 4 = 22px` and `36 - 4 = 32px`).
+  - `Scaling.stretch` then squashed the square 32x32 native sprite (`Tex.checkOn` / `Tex.checkOff`) horizontally into a 22x26 or 32x36 rectangle, causing the tick button to appear distorted/uneven ("không đều") compared to native Mindustry.
+- [verified] Fix Implementation:
+  - Added `UIUtils.squareCheck(CheckBox box, float size)`: sets `box.getImageCell().size(size)`, zeroes label padding via `box.getLabelCell().padLeft(0f)`, and enforces `box.getImage().setScaling(Scaling.fit)`.
+  - Configured `quickBox` and list row `box` with `UIUtils.squareCheck(..., 26f)` and parent cell `size(26f)`, guaranteeing exact 1:1 square aspect ratio matching native Mindustry widgets.
+  - Preserved selection toggling, row clicking, touch isolation, and localization.
 - [verified] Automated Tests:
-  - Configured memory-safe JVM flags (`-Xmx256m`, `-XX:+UseSerialGC`, `-XX:TieredStopAtLevel=1`) on Gradle daemon and test runner to operate within host memory boundaries.
-  - 128/128 tests passed (0 failures, 0 skipped).
+  - Added unit test in `test/packloader/UIUtilsTest.java`: `testSquareCheckNullSafe` and `testSquareCheckEnforcesSquareDimensionsAndFitScaling` (using headless `MockApplication`, `MockGL20`, `MockGraphics` and reflection to verify `padLeft = 0f`, `Scaling.fit`, `prefWidth = prefHeight = 26f`).
+  - Total test count expanded to 130 passing tests.
 - [verified] Preserved Changes:
   - No remote push executed.
   - Local untracked artifacts (`session.json`) completely preserved.
 
 ## Remaining
 
+- In-game live visual inspection with OpenGL context to observe dynamic hover/checked transitions.
 - Physical Android device testing with Storage Access Framework (SAF) file picker.
-- Live Mindustry desktop game runtime verification with active OpenGL display context.
 
 ## Next steps
 
@@ -41,10 +37,7 @@
 2. Desktop In-Game Smoke Test:
    - Copy `build/libs/MindustryPackLoaderDesktop.jar` into portable Mindustry mod folder `D:\Anzuno\Mindustry\MindustryData\mods\` (or `%APPDATA%\Mindustry\mods\`).
    - Launch `D:\Anzuno\Mindustry\Mindustry.exe`.
-   - Verify: Main menu button "Pack Loader" appears, first-run dialog shows once, scanning ZIPs works, schematic info preview displays properly, and bulk import completes without crashing.
-3. Android Deployment Smoke Test:
-   - Run `.\gradlew.bat deploy` with Android SDK configured to produce universal `build/libs/MindustryPackLoader.jar` containing `classes.dex`.
-   - Transfer to Android device, load via Mindustry Mods menu, and test SAF multi-file picker.
+   - Verify: Main menu button "Pack Loader" appears, quick import checkbox and list row checkboxes render as exact squares matching native Mindustry styling.
 
 ## Open questions
 
@@ -52,8 +45,7 @@
 
 ## Verification
 
-- `.\gradlew.bat test` — BUILD SUCCESSFUL (128 tests, 0 failures, 0 skipped).
-- `.\gradlew.bat check` — BUILD SUCCESSFUL (128 tests passed, desktop JAR verified).
+- `.\gradlew.bat test` — BUILD SUCCESSFUL (130 tests, 0 failures, 0 skipped).
+- `.\gradlew.bat check` — BUILD SUCCESSFUL (130 tests passed, desktop JAR verified).
 - `.\gradlew.bat verifyJar` — BUILD SUCCESSFUL (packaged bundle paths verified at `bundles/*`).
-- `git status` — commit `4275c1c`.
 - `session.json` — verified unaffected.

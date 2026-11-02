@@ -447,6 +447,7 @@ public class PackLoaderDialog extends BaseDialog{
         CheckBox quickBox = new CheckBox("");
         quickBox.setChecked(PackLoaderSettings.isQuickImport());
         quickBox.changed(() -> PackLoaderSettings.setQuickImport(quickBox.isChecked()));
+        UIUtils.squareCheck(quickBox, 26f);
 
         row.add(quickBox).size(26f).padRight(8f).center();
 
@@ -701,11 +702,12 @@ public class PackLoaderDialog extends BaseDialog{
             row.margin(6f);
             row.defaults().pad(3f);
 
-            // Large touch-friendly CheckBox (touch disabled so row click handles toggle cleanly)
+            // Touch-friendly CheckBox (touch disabled so row click handles toggle cleanly)
             CheckBox box = new CheckBox("");
             box.setChecked(entry.selected);
             box.touchable = Touchable.disabled;
-            row.add(box).size(36f).padRight(4f);
+            UIUtils.squareCheck(box, 26f);
+            row.add(box).size(26f).padRight(6f);
 
             // Clicking whole row toggles selection
             row.clicked(() -> {
