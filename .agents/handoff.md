@@ -3,29 +3,41 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-02 18:06 +07:00
+- **Last updated:** 2026-11-02 18:52 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** Quick Import UI & behavior audit: remove standalone border, align layout and vertical spacing, center checkbox and label, add concise EN/VI explanation, automate eligible auto-selection and fast-path execution bypassing manual entry list review.
-- **Branch:** master; commits `8ae7e21` (P1 fix), `a98b247` (P1 handoff), `e27a407` (P2 feat), `e4762d1` (Quick Import fix).
+- **Task:** Implement 5 prioritized items: scan performance optimization, native schematic interaction, default directory path improvements, import progress UI layout and truncation, and bug reporting & first-run welcome dialog.
+- **Branch:** master; commit `65dd3f1`.
 
 ## Results
 
-- [verified] UI Cleanup: Removed standalone `Tex.pane` panel/border around the Quick Import row across `buildModeSelection` and `buildSourceSelection`. Aligned outer row width (`maxW`) and padding (`pad(4f).padTop(8f).padBottom(6f)`) with options above.
-- [verified] Vertical Centering & Spacing: Checkbox and 2-line title/description block are centered vertically (`.center()`), eliminating vertical misalignment.
-- [verified] Explanatory Text: Added concise explanatory subtitle (`packloader.quick-import.desc`) below title in `Pal.lightishGray` with automatic text wrapping (`width(textWidth).wrap()`), ensuring no text clipping on mobile or narrow desktop windows in both English and Vietnamese.
-- [verified] Usability: Clicking either the checkbox or the text label block toggles Quick Import cleanly.
-- [verified] Fast-Path Execution: Implemented `EntryFilter.selectEligibleForQuickImport(entries, targetType, duplicatePolicy)`:
-  - Under `SKIP`, selects all valid non-duplicates, excludes duplicates and invalid entries.
-  - Under `OVERWRITE` and `RENAME`, selects all valid entries (both fresh and duplicates).
-  - Invalid / corrupt entries are never selected.
-  - In `scanAsync`, when Quick Import is enabled and `eligible > 0`, immediately triggers `executeImport()` on the main thread without displaying or requiring manual confirmation in the entry list dialog.
-- [verified] Safety & Edge Cases:
-  - If `eligible == 0` (e.g. all files duplicate with `SKIP` policy, or all invalid), falls back to normal review dialog so the user can inspect entries and badges.
-  - When Quick Import is OFF, behavior is completely unchanged.
-  - Empty scan results, cancellation, scan failures, and repeated scans behave safely.
-- [verified] Tests: Added regression tests in `EntryFilterTest` and `MultiSourceQueueTest`. Test suite expanded to 124 tests (0 failures, 0 skipped).
-- [verified] Build: `.\gradlew.bat check` and `.\gradlew.bat verifyJar` passed cleanly.
-- [verified] Committed as `e4762d1`. No push executed.
+- [verified] Scan performance:
+  - Eliminated redundant `ZipFile` re-reads from disk: streamed entries directly into validation pipeline (`zf.getInputStream(ze)`).
+  - Cached parsed `Schematic` objects on `PackEntry` during inspection, eliminating disk re-reads on info view or placement.
+  - Cached directory listings in `getExistingFileNames` to eliminate repeated filesystem `exists()` stat syscalls.
+  - Pre-indexed game maps and schematics in `HashMap` inside `checkGameDuplicates` for $O(1)$ duplicate checking instead of $O(N \times M)$ linear scans on the main thread.
+  - Added benchmark logging for scan operations.
+- [verified] Schematic interaction:
+  - Integrated native Mindustry schematic info UI (`Vars.ui.schematics.showInfo(schematic)`), supporting inspection of tags, requirements, power production/consumption, and preview.
+  - Added native in-world schematic placement via `Vars.control.input.useSchematic(schematic)` when in active game (`Vars.state.isGame()`).
+  - Isolated info/place button click events using `InputListener` with `event.stop()` so actions do not toggle entry selection checkbox.
+- [verified] Default directory path:
+  - Replaced hardcoded `/sdcard/Download` default with dynamic lookup prioritizing recent sources.
+  - Provided placeholder guidance (`packloader.source.path.placeholder`) and validation for empty input (`packloader.source.path.empty`).
+  - Added existence and Scoped Storage access checks on desktop and Android.
+  - Updated storage browser to verify existence of non-Windows shortcuts (`Download`, `Storage`) before rendering.
+- [verified] Import progress UI:
+  - Verified hazard stripes originate from Mindustry core engine's base `LoadingFragment` (not mod-owned).
+  - Structured import progress text clearly showing processed count, total, success, and failed counts.
+  - Implemented `truncateFileName(name, maxLength)` to cleanly truncate long file names, preventing line breaks or text clipping on narrow mobile screens.
+- [verified] Bug reporting & first-run feedback:
+  - Retrieved verified GitHub Issues URL: `https://github.com/annguyen2k8/MindustryPackLoader/issues`.
+  - Added "Report a Bug" button linking directly to GitHub Issues across mode selection, source selection, and review views.
+  - Implemented polite one-time welcome dialog on first launch stored in `Core.settings` (`packloader.first-run.shown`) with EN and VI localization.
+- [verified] Build & Tests:
+  - Configured lightweight test JVM arguments (`-Xmx256m`, `-XX:+UseSerialGC`, `-XX:TieredStopAtLevel=1`) to prevent host native memory exhaustion.
+  - Expanded test suite to 127 tests (0 failures, 0 skipped).
+  - Built and verified desktop JAR with `verifyJar` checking bundle packaging.
+  - Committed as `65dd3f1`. No push executed.
 
 ## Remaining
 
@@ -44,8 +56,8 @@
 
 ## Verification
 
-- `.\gradlew.bat test` — BUILD SUCCESSFUL (124 tests, 0 failures, 0 skipped).
-- `.\gradlew.bat check` — BUILD SUCCESSFUL (124 tests passed, desktop JAR verified).
+- `.\gradlew.bat test` — BUILD SUCCESSFUL (127 tests, 0 failures, 0 skipped).
+- `.\gradlew.bat check` — BUILD SUCCESSFUL (127 tests passed, desktop JAR verified).
 - `.\gradlew.bat verifyJar` — BUILD SUCCESSFUL (packaged bundle paths verified at `bundles/*`).
-- `git status` — commit `e4762d1`.
+- `git status` — commit `65dd3f1`.
 - `session.json` — verified unaffected.
