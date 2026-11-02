@@ -65,6 +65,36 @@ public final class EntryFilter{
         }
     }
 
+    /**
+     * Automatically selects eligible entries according to the duplicate policy for Quick Import.
+     * When policy is SKIP, only valid non-duplicate entries are selected.
+     * When policy is OVERWRITE or RENAME, all valid entries (both new and duplicate) are selected.
+     * Invalid entries are never selected.
+     * @return count of selected eligible entries.
+     */
+    public static int selectEligibleForQuickImport(Seq<PackEntry> entries, PackType targetType, DuplicatePolicy policy){
+        if(entries == null) return 0;
+        int count = 0;
+        for(int i = 0; i < entries.size; i++){
+            PackEntry entry = entries.get(i);
+            if(targetType != null && entry.type != targetType){
+                entry.selected = false;
+                continue;
+            }
+            if(!entry.isValid){
+                entry.selected = false;
+                continue;
+            }
+            if(policy == DuplicatePolicy.SKIP && entry.isDuplicate){
+                entry.selected = false;
+                continue;
+            }
+            entry.selected = true;
+            count++;
+        }
+        return count;
+    }
+
     /** Inverts the selection status of all visible valid entries. */
     public static void invertVisibleSelected(Seq<PackEntry> entries, PackType targetType, PackType filterType,
                                              String searchText){

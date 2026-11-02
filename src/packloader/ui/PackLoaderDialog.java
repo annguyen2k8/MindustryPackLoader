@@ -3,6 +3,7 @@ package packloader.ui;
 import arc.Core;
 import arc.files.Fi;
 import arc.graphics.Color;
+import arc.scene.event.Touchable;
 import arc.scene.style.Drawable;
 import arc.scene.ui.Button;
 import arc.scene.ui.CheckBox;
@@ -161,7 +162,7 @@ public class PackLoaderDialog extends BaseDialog{
     private void buildModeSelection(){
         Table root = new Table();
         float maxW = Math.min(Core.graphics.getWidth() * 0.92f, 480f);
-        root.defaults().pad(6f).width(maxW);
+        root.defaults().pad(4f).width(maxW);
 
         // Prompt subtitle
         root.add(getLocalizedText("packloader.mode.prompt"))
@@ -191,15 +192,8 @@ public class PackLoaderDialog extends BaseDialog{
             maxW
         )).minHeight(76f).pad(4f).row();
 
-        // Quick Import Option Toggle
-        Table quickRow = new Table(Tex.pane);
-        quickRow.margin(8f);
-        CheckBox quickBox = new CheckBox(" " + getLocalizedText("packloader.quick-import"));
-        quickBox.setChecked(PackLoaderSettings.isQuickImport());
-        quickBox.changed(() -> PackLoaderSettings.setQuickImport(quickBox.isChecked()));
-        quickRow.add(quickBox).left().pad(2f);
-        quickRow.add().growX();
-        root.add(quickRow).growX().padTop(6f).padBottom(4f).row();
+        // Quick Import Option Toggle (no border, aligned with options above)
+        root.add(createQuickImportRow(maxW)).pad(4f).padTop(8f).padBottom(6f).row();
 
         // Recent Sources
         Seq<RecentSources.SourceItem> recents = RecentSources.load();
@@ -210,7 +204,7 @@ public class PackLoaderDialog extends BaseDialog{
                 RecentSources.clear();
                 rebuild();
             }).height(32f).padRight(2f);
-            root.add(recentsHeader).growX().padTop(12f).padBottom(4f).row();
+            root.add(recentsHeader).pad(4f).padTop(12f).padBottom(4f).row();
 
             for(RecentSources.SourceItem item : recents){
                 Button card = new Button(UIUtils.cardStyle());
@@ -240,7 +234,7 @@ public class PackLoaderDialog extends BaseDialog{
                     rebuild();
                 }).size(32f).pad(2f);
 
-                root.add(card).growX().minHeight(56f).pad(3f).row();
+                root.add(card).minHeight(56f).pad(4f).row();
             }
         }
 
@@ -267,7 +261,7 @@ public class PackLoaderDialog extends BaseDialog{
                 getLocalizedText("packloader.source.scan-folder.schem.desc"),
                 () -> openFolderPicker(PackType.SCHEMATIC),
                 maxW
-            )).minHeight(68f).pad(4f).padTop(10f).padBottom(6f).row();
+            )).minHeight(68f).pad(4f).padTop(8f).row();
 
             root.add(createSourceOptionButton(
                 Icon.download,
@@ -286,7 +280,7 @@ public class PackLoaderDialog extends BaseDialog{
                 getLocalizedText("packloader.source.scan-folder.map.desc"),
                 () -> openFolderPicker(PackType.MAP),
                 maxW
-            )).minHeight(68f).pad(4f).padTop(10f).padBottom(6f).row();
+            )).minHeight(68f).pad(4f).padTop(8f).row();
 
             root.add(createSourceOptionButton(
                 Icon.download,
@@ -305,18 +299,11 @@ public class PackLoaderDialog extends BaseDialog{
                 getLocalizedText("packloader.source.path.desc"),
                 this::openPathInputDialog,
                 maxW
-            )).minHeight(68f).pad(3f).padTop(8f).row();
+            )).minHeight(68f).pad(4f).row();
         }
 
-        // Quick Import Option Toggle
-        Table quickRow = new Table(Tex.pane);
-        quickRow.margin(8f);
-        CheckBox quickBox = new CheckBox(" " + getLocalizedText("packloader.quick-import"));
-        quickBox.setChecked(PackLoaderSettings.isQuickImport());
-        quickBox.changed(() -> PackLoaderSettings.setQuickImport(quickBox.isChecked()));
-        quickRow.add(quickBox).left().pad(2f);
-        quickRow.add().growX();
-        root.add(quickRow).growX().padTop(6f).padBottom(4f).row();
+        // Quick Import Option Toggle (no border, aligned with options above)
+        root.add(createQuickImportRow(maxW)).pad(4f).padTop(8f).padBottom(6f).row();
 
         // Recent Sources
         Seq<RecentSources.SourceItem> recents = RecentSources.getForType(targetType);
@@ -327,7 +314,7 @@ public class PackLoaderDialog extends BaseDialog{
                 RecentSources.clear();
                 rebuild();
             }).height(32f).padRight(2f);
-            root.add(recentsHeader).growX().padTop(12f).padBottom(4f).row();
+            root.add(recentsHeader).pad(4f).padTop(12f).padBottom(4f).row();
 
             for(RecentSources.SourceItem item : recents){
                 Button card = new Button(UIUtils.cardStyle());
@@ -357,7 +344,7 @@ public class PackLoaderDialog extends BaseDialog{
                     rebuild();
                 }).size(32f).pad(2f);
 
-                root.add(card).growX().minHeight(56f).pad(3f).row();
+                root.add(card).minHeight(56f).pad(4f).row();
             }
         }
 
@@ -392,6 +379,41 @@ public class PackLoaderDialog extends BaseDialog{
         }).growX().left();
 
         return btn;
+    }
+
+    private Table createQuickImportRow(float rowWidth){
+        Table row = new Table();
+        row.left();
+
+        CheckBox quickBox = new CheckBox("");
+        quickBox.setChecked(PackLoaderSettings.isQuickImport());
+        quickBox.changed(() -> PackLoaderSettings.setQuickImport(quickBox.isChecked()));
+
+        row.add(quickBox).size(26f).padRight(8f).center();
+
+        float textWidth = Math.max(160f, rowWidth - 44f);
+        Table textTable = new Table();
+        textTable.left().defaults().left().growX();
+        textTable.add(getLocalizedText("packloader.quick-import"))
+            .style(Styles.defaultLabel)
+            .color(Color.white)
+            .row();
+        textTable.add(getLocalizedText("packloader.quick-import.desc"))
+            .style(Styles.defaultLabel)
+            .color(Pal.lightishGray)
+            .width(textWidth)
+            .wrap();
+
+        // Tapping label area also toggles the checkbox
+        textTable.touchable = Touchable.enabled;
+        textTable.clicked(() -> {
+            quickBox.setChecked(!quickBox.isChecked());
+            PackLoaderSettings.setQuickImport(quickBox.isChecked());
+        });
+
+        row.add(textTable).growX().left().center();
+
+        return row;
     }
 
     /** View 2: File Review and Bulk Import Controls */
@@ -616,7 +638,7 @@ public class PackLoaderDialog extends BaseDialog{
             // Large touch-friendly CheckBox (touch disabled so row click handles toggle cleanly)
             CheckBox box = new CheckBox("");
             box.setChecked(entry.selected);
-            box.touchable = arc.scene.event.Touchable.disabled;
+            box.touchable = Touchable.disabled;
             row.add(box).size(36f).padRight(4f);
 
             // Clicking whole row toggles selection
@@ -1106,20 +1128,18 @@ public class PackLoaderDialog extends BaseDialog{
                         // Duplicate badges read live game registries, so refresh them on the main thread.
                         scanner.checkGameDuplicates(entries);
                         resetFilters();
-                        rebuild();
-                        if(!isShown()) super.show();
 
+                        duplicatePolicy = PackLoaderSettings.getDuplicatePolicy();
                         if(!append && PackLoaderSettings.isQuickImport()){
-                            if(duplicatePolicy == DuplicatePolicy.SKIP){
-                                EntryFilter.selectNewOnly(entries, targetType, filterType(), searchText);
-                            }else{
-                                EntryFilter.setVisibleSelected(entries, targetType, filterType(), searchText, true);
-                            }
-                            if(visibleSelectedCount() > 0){
+                            int eligible = EntryFilter.selectEligibleForQuickImport(entries, targetType, duplicatePolicy);
+                            if(eligible > 0){
                                 executeImport();
                                 return;
                             }
                         }
+
+                        rebuild();
+                        if(!isShown()) super.show();
 
                         if(!warningText.isEmpty() && Vars.ui != null){
                             Vars.ui.showInfo(warningText);

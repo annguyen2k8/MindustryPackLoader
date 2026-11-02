@@ -134,4 +134,59 @@ public class MultiSourceQueueTest{
 
         scanner.cleanupTemporaryZips(scanned);
     }
+
+    @Test
+    public void testQuickImportFlowWithOverwriteAndRename() throws IOException{
+        mapDir.child("existing.msav").writeBytes(TestHelper.createValidMapBytes("Old Version"));
+
+        File zip = new File(tempDir, "update.zip");
+        TestHelper.createTestZip(zip,
+            new TestHelper.ZipEntryBuilder("existing.msav", TestHelper.createValidMapBytes("Updated Version")),
+            new TestHelper.ZipEntryBuilder("bonus.msav", TestHelper.createValidMapBytes("Bonus Map"))
+        );
+
+        Seq<PackEntry> scanned = scanner.scanZip(new Fi(zip), PackType.MAP, null);
+        for(PackEntry e : scanned) scanner.checkDuplicate(e);
+
+        PackLoaderSettings.setQuickImport(true);
+        PackLoaderSettings.setDuplicatePolicy(DuplicatePolicy.OVERWRITE);
+
+        int eligible = EntryFilter.selectEligibleForQuickImport(scanned, PackType.MAP, PackLoaderSettings.getDuplicatePolicy());
+        assertEquals(2, eligible, "OVERWRITE policy must auto-select all 2 valid entries");
+
+        Seq<PackEntry> toImport = EntryFilter.collectSelected(scanned, PackType.MAP, null, "");
+        assertEquals(2, toImport.size);
+
+        ImportReport report = importer.importEntries(toImport, DuplicatePolicy.OVERWRITE, null);
+        assertEquals(2, report.totalSuccess + report.totalOverwritten);
+        assertEquals(1, report.totalOverwritten);
+
+        scanner.cleanupTemporaryZips(scanned);
+    }
+
+    @Test
+    public void testQuickImportFlowAllDuplicatesSkipProducesZeroEligible() throws IOException{
+        mapDir.child("map_a.msav").writeBytes(TestHelper.createValidMapBytes("Map A"));
+        mapDir.child("map_b.msav").writeBytes(TestHelper.createValidMapBytes("Map B"));
+
+        File zip = new File(tempDir, "all_dups.zip");
+        TestHelper.createTestZip(zip,
+            new TestHelper.ZipEntryBuilder("map_a.msav", TestHelper.createValidMapBytes("Map A")),
+            new TestHelper.ZipEntryBuilder("map_b.msav", TestHelper.createValidMapBytes("Map B"))
+        );
+
+        Seq<PackEntry> scanned = scanner.scanZip(new Fi(zip), PackType.MAP, null);
+        for(PackEntry e : scanned) scanner.checkDuplicate(e);
+
+        PackLoaderSettings.setQuickImport(true);
+        PackLoaderSettings.setDuplicatePolicy(DuplicatePolicy.SKIP);
+
+        int eligible = EntryFilter.selectEligibleForQuickImport(scanned, PackType.MAP, DuplicatePolicy.SKIP);
+        assertEquals(0, eligible, "When all items are duplicates, SKIP must produce 0 eligible entries without auto-importing");
+
+        Seq<PackEntry> toImport = EntryFilter.collectSelected(scanned, PackType.MAP, null, "");
+        assertTrue(toImport.isEmpty(), "Nothing should be marked to import");
+
+        scanner.cleanupTemporaryZips(scanned);
+    }
 }

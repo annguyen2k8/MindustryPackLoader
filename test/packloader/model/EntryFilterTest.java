@@ -95,4 +95,76 @@ public class EntryFilterTest{
         assertFalse(match.selected);
         assertTrue(hidden.selected, "Hidden schematic selection state must still remain unchanged");
     }
+
+    @Test
+    public void testSelectEligibleForQuickImportSkipPolicy(){
+        Seq<PackEntry> list = new Seq<>();
+        PackEntry fresh = createEntry(PackType.MAP, "fresh.msav", false, true);
+        PackEntry duplicate = createEntry(PackType.MAP, "dup.msav", true, true);
+        PackEntry corruptFresh = createEntry(PackType.MAP, "bad_fresh.msav", false, false);
+        PackEntry corruptDup = createEntry(PackType.MAP, "bad_dup.msav", true, false);
+        list.add(fresh, duplicate, corruptFresh, corruptDup);
+
+        int eligible = EntryFilter.selectEligibleForQuickImport(list, PackType.MAP, DuplicatePolicy.SKIP);
+
+        assertEquals(1, eligible, "Under SKIP, only valid fresh files should be eligible");
+        assertTrue(fresh.selected, "Fresh valid file must be selected");
+        assertFalse(duplicate.selected, "Duplicate must be excluded under SKIP");
+        assertFalse(corruptFresh.selected, "Corrupt files must never be selected");
+        assertFalse(corruptDup.selected, "Corrupt duplicates must never be selected");
+    }
+
+    @Test
+    public void testSelectEligibleForQuickImportOverwriteAndRenamePolicies(){
+        Seq<PackEntry> list = new Seq<>();
+        PackEntry fresh = createEntry(PackType.SCHEMATIC, "fresh.msch", false, true);
+        PackEntry duplicate = createEntry(PackType.SCHEMATIC, "dup.msch", true, true);
+        PackEntry corrupt = createEntry(PackType.SCHEMATIC, "bad.msch", false, false);
+        list.add(fresh, duplicate, corrupt);
+
+        int overwriteCount = EntryFilter.selectEligibleForQuickImport(list, PackType.SCHEMATIC, DuplicatePolicy.OVERWRITE);
+        assertEquals(2, overwriteCount, "OVERWRITE selects all valid files (new & duplicates)");
+        assertTrue(fresh.selected);
+        assertTrue(duplicate.selected);
+        assertFalse(corrupt.selected);
+
+        // Reset
+        fresh.selected = false;
+        duplicate.selected = false;
+
+        int renameCount = EntryFilter.selectEligibleForQuickImport(list, PackType.SCHEMATIC, DuplicatePolicy.RENAME);
+        assertEquals(2, renameCount, "RENAME selects all valid files (new & duplicates)");
+        assertTrue(fresh.selected);
+        assertTrue(duplicate.selected);
+        assertFalse(corrupt.selected);
+    }
+
+    @Test
+    public void testSelectEligibleForQuickImportTargetTypeAndEmpty(){
+        Seq<PackEntry> list = new Seq<>();
+        PackEntry map = createEntry(PackType.MAP, "map.msav", false, true);
+        PackEntry schem = createEntry(PackType.SCHEMATIC, "schem.msch", false, true);
+        list.add(map, schem);
+
+        int mapEligible = EntryFilter.selectEligibleForQuickImport(list, PackType.MAP, DuplicatePolicy.SKIP);
+        assertEquals(1, mapEligible);
+        assertTrue(map.selected);
+        assertFalse(schem.selected, "Schematic must not be selected when targetType is MAP");
+
+        assertEquals(0, EntryFilter.selectEligibleForQuickImport(null, PackType.MAP, DuplicatePolicy.SKIP));
+        assertEquals(0, EntryFilter.selectEligibleForQuickImport(new Seq<>(), PackType.MAP, DuplicatePolicy.SKIP));
+    }
+
+    @Test
+    public void testSelectEligibleForQuickImportAllDuplicatesWithSkip(){
+        Seq<PackEntry> list = new Seq<>();
+        PackEntry dup1 = createEntry(PackType.MAP, "dup1.msav", true, true);
+        PackEntry dup2 = createEntry(PackType.MAP, "dup2.msav", true, true);
+        list.add(dup1, dup2);
+
+        int eligible = EntryFilter.selectEligibleForQuickImport(list, PackType.MAP, DuplicatePolicy.SKIP);
+        assertEquals(0, eligible, "No entries eligible when all are duplicates and policy is SKIP");
+        assertFalse(dup1.selected);
+        assertFalse(dup2.selected);
+    }
 }
