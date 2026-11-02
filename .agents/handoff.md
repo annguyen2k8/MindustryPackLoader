@@ -3,41 +3,32 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-02 18:52 +07:00
+- **Last updated:** 2026-11-02 19:15 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** Implement 5 prioritized items: scan performance optimization, native schematic interaction, default directory path improvements, import progress UI layout and truncation, and bug reporting & first-run welcome dialog.
-- **Branch:** master; commit `65dd3f1`.
+- **Task:** P3 — Runtime Smoke Test & Release Readiness: audit runtime compatibility against Mindustry v160.7, construct smoke-test matrix, verify packaging, bump version to 1.1.0, update docs, and establish release readiness.
+- **Branch:** master; commits `65dd3f1`, `3ff9706`, `4275c1c`.
 
 ## Results
 
-- [verified] Scan performance:
-  - Eliminated redundant `ZipFile` re-reads from disk: streamed entries directly into validation pipeline (`zf.getInputStream(ze)`).
-  - Cached parsed `Schematic` objects on `PackEntry` during inspection, eliminating disk re-reads on info view or placement.
-  - Cached directory listings in `getExistingFileNames` to eliminate repeated filesystem `exists()` stat syscalls.
-  - Pre-indexed game maps and schematics in `HashMap` inside `checkGameDuplicates` for $O(1)$ duplicate checking instead of $O(N \times M)$ linear scans on the main thread.
-  - Added benchmark logging for scan operations.
-- [verified] Schematic interaction:
-  - Integrated native Mindustry schematic info UI (`Vars.ui.schematics.showInfo(schematic)`), supporting inspection of tags, requirements, power production/consumption, and preview.
-  - Added native in-world schematic placement via `Vars.control.input.useSchematic(schematic)` when in active game (`Vars.state.isGame()`).
-  - Isolated info/place button click events using `InputListener` with `event.stop()` so actions do not toggle entry selection checkbox.
-- [verified] Default directory path:
-  - Replaced hardcoded `/sdcard/Download` default with dynamic lookup prioritizing recent sources.
-  - Provided placeholder guidance (`packloader.source.path.placeholder`) and validation for empty input (`packloader.source.path.empty`).
-  - Added existence and Scoped Storage access checks on desktop and Android.
-  - Updated storage browser to verify existence of non-Windows shortcuts (`Download`, `Storage`) before rendering.
-- [verified] Import progress UI:
-  - Verified hazard stripes originate from Mindustry core engine's base `LoadingFragment` (not mod-owned).
-  - Structured import progress text clearly showing processed count, total, success, and failed counts.
-  - Implemented `truncateFileName(name, maxLength)` to cleanly truncate long file names, preventing line breaks or text clipping on narrow mobile screens.
-- [verified] Bug reporting & first-run feedback:
-  - Retrieved verified GitHub Issues URL: `https://github.com/annguyen2k8/MindustryPackLoader/issues`.
-  - Added "Report a Bug" button linking directly to GitHub Issues across mode selection, source selection, and review views.
-  - Implemented polite one-time welcome dialog on first launch stored in `Core.settings` (`packloader.first-run.shown`) with EN and VI localization.
-- [verified] Build & Tests:
-  - Configured lightweight test JVM arguments (`-Xmx256m`, `-XX:+UseSerialGC`, `-XX:TieredStopAtLevel=1`) to prevent host native memory exhaustion.
-  - Expanded test suite to 127 tests (0 failures, 0 skipped).
-  - Built and verified desktop JAR with `verifyJar` checking bundle packaging.
-  - Committed as `65dd3f1`. No push executed.
+- [verified] Localization & Source Coverage:
+  - Added reflection-free static AST/file walker test (`testAllSourceKeysExistInBothBundles`) verifying that 100% of `getLocalizedText("...")` keys across all Java sources exist in both `bundle.properties` and `bundle_vi.properties`.
+  - Zero missing keys, zero format mismatches.
+- [verified] Release Metadata & Packaging:
+  - Bumped version to `1.1.0` in both `mod.json` and `mod.hjson` (matching minor feature additions from P2 & P3).
+  - Confirmed `minGameVersion: 160` and `main: packloader.PackLoaderMod`.
+  - Updated `README.md` documenting new P2/P3 capabilities (Interactive Schematic Preview/Placement, Scan Optimization, Bug Reporting, Quick Import) and updated test suite count to 128 tests.
+  - Verified `MindustryPackLoaderDesktop.jar` packaging: bundles at `bundles/*`, no nested directories, valid metadata and icons.
+- [verified] Runtime Architecture & Compatibility Audit:
+  - Mod loading: `Vars.clientLoaded` check with `ClientLoadEvent` listener, safe reflection into `MenuFragment.customButtons` with resize fallback.
+  - Scan pipeline: streaming decompression, zip-slip and zip-bomb protections, cooperative task generation cancellation.
+  - Import pipeline: atomic staging, rollback on failure, native `Vars.maps` & `Vars.schematics` registration on MainThread, safe duplicate handling (`SKIP`, `OVERWRITE`, `RENAME`).
+  - Native UI integration: `Vars.ui.schematics.showInfo` and `Vars.control.input.useSchematic` properly checked against `Vars.state.isGame()`, click events isolated from selection checkboxes via `InputListener.stop()`.
+- [verified] Automated Tests:
+  - Configured memory-safe JVM flags (`-Xmx256m`, `-XX:+UseSerialGC`, `-XX:TieredStopAtLevel=1`) on Gradle daemon and test runner to operate within host memory boundaries.
+  - 128/128 tests passed (0 failures, 0 skipped).
+- [verified] Preserved Changes:
+  - No remote push executed.
+  - Local untracked artifacts (`session.json`) completely preserved.
 
 ## Remaining
 
@@ -47,8 +38,13 @@
 ## Next steps
 
 1. Read `.agents/handoff.md` from disk at task start.
-2. For desktop in-game smoke testing: copy `build/libs/MindustryPackLoaderDesktop.jar` to local Mindustry `mods/` directory and launch the game.
-3. For mobile testing: run `.\gradlew.bat deploy` with Android SDK configured to produce universal `MindustryPackLoader.jar` and test on a physical Android device.
+2. Desktop In-Game Smoke Test:
+   - Copy `build/libs/MindustryPackLoaderDesktop.jar` into portable Mindustry mod folder `D:\Anzuno\Mindustry\MindustryData\mods\` (or `%APPDATA%\Mindustry\mods\`).
+   - Launch `D:\Anzuno\Mindustry\Mindustry.exe`.
+   - Verify: Main menu button "Pack Loader" appears, first-run dialog shows once, scanning ZIPs works, schematic info preview displays properly, and bulk import completes without crashing.
+3. Android Deployment Smoke Test:
+   - Run `.\gradlew.bat deploy` with Android SDK configured to produce universal `build/libs/MindustryPackLoader.jar` containing `classes.dex`.
+   - Transfer to Android device, load via Mindustry Mods menu, and test SAF multi-file picker.
 
 ## Open questions
 
@@ -56,8 +52,8 @@
 
 ## Verification
 
-- `.\gradlew.bat test` — BUILD SUCCESSFUL (127 tests, 0 failures, 0 skipped).
-- `.\gradlew.bat check` — BUILD SUCCESSFUL (127 tests passed, desktop JAR verified).
+- `.\gradlew.bat test` — BUILD SUCCESSFUL (128 tests, 0 failures, 0 skipped).
+- `.\gradlew.bat check` — BUILD SUCCESSFUL (128 tests passed, desktop JAR verified).
 - `.\gradlew.bat verifyJar` — BUILD SUCCESSFUL (packaged bundle paths verified at `bundles/*`).
-- `git status` — commit `65dd3f1`.
+- `git status` — commit `4275c1c`.
 - `session.json` — verified unaffected.
