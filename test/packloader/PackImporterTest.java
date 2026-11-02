@@ -245,6 +245,29 @@ public class PackImporterTest{
     }
 
     @Test
+    public void testNativeMapImportWithOnlyMapNameTag() throws IOException{
+        FakeGame.FakeMaps maps = installMaps();
+        byte[] mapBytes = TestHelper.createMapWithMapNameOnlyBytes("Savegame Map");
+        PackEntry entry = scanSingle("save_1.msav", mapBytes);
+
+        ImportReport report = importer.importEntries(seqOf(entry), DuplicatePolicy.SKIP, null);
+
+        assertEquals(1, report.totalSuccess);
+        assertEquals(0, report.totalFailed);
+
+        Fi destination = mapDir.child("Savegame Map.msav");
+        assertTrue(destination.exists(), "Destination must use the mapname metadata");
+        assertEquals(1, maps.importCalls);
+        assertEquals(1, maps.all.size);
+        assertEquals("Savegame Map", maps.all.first().name());
+
+        // Verify the saved file now has a valid "name" tag in its metadata
+        PackFormat.MapInfo writtenInfo = PackFormat.validateMap(destination.read());
+        assertEquals("Savegame Map", writtenInfo.name);
+        assertTrue(writtenInfo.hasNameTag, "Native import must have injected the 'name' tag");
+    }
+
+    @Test
     public void testNativeMapSkipKeepsExistingCustomMap() throws IOException{
         FakeGame.FakeMaps maps = installMaps();
         Map existing = existingMap(maps, "Shared Name", true);

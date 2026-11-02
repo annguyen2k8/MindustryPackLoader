@@ -3,6 +3,7 @@ package packloader;
 import arc.Core;
 import arc.files.Fi;
 import arc.util.I18NBundle;
+import mindustry.ctype.ContentType;
 
 import java.io.*;
 import java.util.Locale;
@@ -106,6 +107,68 @@ public class TestHelper{
                                         byte[] contentPayload, int trailingChunks) throws IOException{
         return createMapBytes(name, version, width, height, contentPayload,
             createMapPayload(version, width, height), createEntityPayload(version), trailingChunks);
+    }
+
+    public static byte[] createMapWithMapNameOnlyBytes(String mapname) throws IOException{
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try(DataOutputStream dos = new DataOutputStream(new DeflaterOutputStream(baos))){
+            dos.write(new byte[]{'M', 'S', 'A', 'V'});
+            dos.writeInt(13);
+
+            ByteArrayOutputStream metaBaos = new ByteArrayOutputStream();
+            try(DataOutputStream metaDos = new DataOutputStream(metaBaos)){
+                metaDos.writeShort(4);
+                metaDos.writeUTF("mapname");
+                metaDos.writeUTF(mapname);
+                metaDos.writeUTF("width");
+                metaDos.writeUTF("4");
+                metaDos.writeUTF("height");
+                metaDos.writeUTF("4");
+                metaDos.writeUTF("build");
+                metaDos.writeUTF("160");
+            }
+            writeChunk(dos, metaBaos.toByteArray());
+            writeChunk(dos, new byte[0]); // patches
+            writeChunk(dos, new byte[]{0}); // content
+            writeChunk(dos, createMapPayload(13, 4, 4));
+            writeChunk(dos, createEntityPayload(13));
+            writeChunk(dos, new byte[0]); // markers
+            writeChunk(dos, createCustomPayload());
+        }
+        return baos.toByteArray();
+    }
+
+    public static byte[] createLegacyMapWithFallbackBlock(String name, String fallbackBlockName) throws IOException{
+        ByteArrayOutputStream contentBaos = new ByteArrayOutputStream();
+        try(DataOutputStream out = new DataOutputStream(contentBaos)){
+            out.writeByte(1); // 1 mapped type
+            out.writeByte(ContentType.block.ordinal());
+            out.writeShort(2); // 2 entries: air, fallbackBlockName
+            out.writeUTF("air");
+            out.writeUTF(fallbackBlockName);
+        }
+
+        ByteArrayOutputStream mapBaos = new ByteArrayOutputStream();
+        try(DataOutputStream out = new DataOutputStream(mapBaos)){
+            out.writeShort(4);
+            out.writeShort(4);
+            // 16 floor tiles
+            for(int i = 0; i < 16; i++){
+                out.writeShort(0);
+                out.writeShort(0);
+                out.writeByte(0);
+            }
+            // Block 0: tile index 0 has blockId 1 (fallbackBlockName) with building entity
+            out.writeShort(1);
+            out.writeShort(2); // entity length 2
+            out.writeShort(0); // entity payload
+            // Remaining 15 tiles: blockId 0 ("air", no building), 14 consecutive
+            out.writeShort(0);
+            out.writeByte(14);
+        }
+
+        return createMapBytes(name, 3, 4, 4, contentBaos.toByteArray(), mapBaos.toByteArray(),
+            createEntityPayload(3), defaultTrailingChunks(3));
     }
 
     /** Builds a map with explicit map/entity region payloads for malformed-structure tests. */

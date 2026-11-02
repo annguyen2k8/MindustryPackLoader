@@ -47,6 +47,9 @@ public final class FakeGame{
             file.copyTo(destination);
 
             PackFormat.MapInfo info = PackFormat.validateMap(destination.read());
+            if(!info.hasNameTag){
+                throw new IOException("Map name cannot be empty!");
+            }
             StringMap tags = new StringMap();
             tags.put("name", info.name);
             Map map = new Map(destination, info.width, info.height, tags, true);

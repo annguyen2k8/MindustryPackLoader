@@ -4,6 +4,7 @@ import mindustry.Vars;
 import mindustry.ctype.ContentType;
 import mindustry.game.Schematic;
 import mindustry.game.Schematics;
+import mindustry.io.SaveFileReader;
 import mindustry.io.SaveIO;
 import mindustry.world.Block;
 
@@ -52,12 +53,18 @@ public final class PackFormat{
         public final int width;
         public final int height;
         public final int version;
+        public final boolean hasNameTag;
 
         public MapInfo(String name, int width, int height, int version){
+            this(name, width, height, version, true);
+        }
+
+        public MapInfo(String name, int width, int height, int version, boolean hasNameTag){
             this.name = name;
             this.width = width;
             this.height = height;
             this.version = version;
+            this.hasNameTag = hasNameTag;
         }
     }
 
@@ -103,6 +110,9 @@ public final class PackFormat{
             if(metaLength > MAX_META_BYTES) throw new IOException("Map metadata chunk is too large");
             LinkedHashMap<String, String> tags = parseMeta(readPayload(in, metaLength));
             tags.put("name", newName);
+            if(tags.containsKey("mapname")){
+                tags.put("mapname", newName);
+            }
             byte[] meta = serializeMeta(tags);
             out.writeInt(meta.length);
             out.write(meta);
@@ -137,7 +147,9 @@ public final class PackFormat{
             if(metaLength > MAX_META_BYTES) throw new IOException("Map metadata chunk is too large");
             LinkedHashMap<String, String> tags = parseMeta(readPayload(in, metaLength));
 
-            String name = tags.get("name");
+            String rawName = tags.get("name");
+            boolean hasNameTag = rawName != null && !rawName.trim().isEmpty();
+            String name = hasNameTag ? rawName : tags.get("mapname");
             if(name == null || name.trim().isEmpty()){
                 throw new IOException("Map has no name in its metadata");
             }
@@ -214,7 +226,7 @@ public final class PackFormat{
                 throw new IOException("Map contains trailing compressed data");
             }
 
-            return new MapInfo(name, width, height, version);
+            return new MapInfo(name, width, height, version, hasNameTag);
         }catch(IOException e){
             throw e;
         }catch(RuntimeException e){
@@ -858,7 +870,12 @@ public final class PackFormat{
 
             String name = names[type][blockId];
             try{
-                Block block = Vars.content == null ? null : Vars.content.block(name);
+                if(Vars.content == null) return false;
+                String resolved = SaveFileReader.mapFallback(name);
+                Block block = Vars.content.block(resolved);
+                if(block == null && !name.equals(resolved)){
+                    block = Vars.content.block(name);
+                }
                 return block != null && block.hasBuilding();
             }catch(Throwable ignored){
                 return false;

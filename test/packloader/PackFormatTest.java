@@ -1,6 +1,9 @@
 package packloader;
 
+import mindustry.Vars;
+import mindustry.core.ContentLoader;
 import mindustry.game.Schematic;
+import mindustry.world.Block;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import packloader.core.PackFormat;
@@ -28,6 +31,41 @@ public class PackFormatTest{
         assertEquals(128, info.width);
         assertEquals(96, info.height);
         assertEquals(13, info.version);
+        assertTrue(info.hasNameTag);
+    }
+
+    @Test
+    public void testMapWithOnlyMapNameMetadataIsAccepted() throws IOException{
+        PackFormat.MapInfo info = PackFormat.validateMap(new ByteArrayInputStream(
+            TestHelper.createMapWithMapNameOnlyBytes("Exported Campaign Save")));
+
+        assertEquals("Exported Campaign Save", info.name);
+        assertEquals(4, info.width);
+        assertEquals(4, info.height);
+        assertEquals(13, info.version);
+        assertFalse(info.hasNameTag);
+    }
+
+    @Test
+    public void testLegacyBlockFallbackResolution() throws IOException{
+        ContentLoader prevContent = Vars.content;
+        try{
+            Vars.content = new ContentLoader();
+            new Block("steam-generator"){
+                {
+                    update = true;
+                    destructible = true;
+                }
+            };
+
+            PackFormat.MapInfo info = PackFormat.validateMap(new ByteArrayInputStream(
+                TestHelper.createLegacyMapWithFallbackBlock("Legacy Power", "turbine-generator")));
+
+            assertEquals("Legacy Power", info.name);
+            assertEquals(3, info.version);
+        }finally{
+            Vars.content = prevContent;
+        }
     }
 
     @Test

@@ -190,6 +190,18 @@ public class PackImporter{
                 }
             }
 
+            // Maps.importMap requires a "name" tag in map metadata; savegames and exported saves
+            // often only contain "mapname". Ensure "name" is injected before game import.
+            if(!info.hasNameTag && "work.tmp".equals(staged.name())){
+                Fi normalized = entryDir.child("normalized.tmp");
+                try(InputStream in = staged.read();
+                    OutputStream out = normalized.write(false, 8192)){
+                    PackFormat.renameMap(in, out, expectedName);
+                }
+                staged.delete();
+                staged = normalized;
+            }
+
             // Maps.importMap uses file.name() as the destination base and appends .msav.
             // Stage a file whose name is exactly the sanitized base name (no extension).
             Fi importFile = entryDir.child(baseName);
