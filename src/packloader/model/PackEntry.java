@@ -2,6 +2,7 @@ package packloader.model;
 
 import arc.files.Fi;
 import arc.util.Strings;
+import mindustry.game.Schematic;
 
 import java.io.*;
 import java.util.zip.ZipEntry;
@@ -33,6 +34,8 @@ public class PackEntry{
     /** Materialized SAF ZIP that must stay alive until this entry has been imported. */
     public Fi temporaryZipFile;
     public byte[] cachedData;
+    /** Cached parsed schematic object to avoid redundant disk I/O when viewing info or importing. */
+    public Schematic schematic;
 
     public PackEntry(PackType type, String sourcePath, String rawFileName, long size){
         this.type = type;

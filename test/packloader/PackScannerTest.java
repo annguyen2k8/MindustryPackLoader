@@ -586,6 +586,48 @@ public class PackScannerTest{
         assertEquals(8, remaining.length);
     }
 
+    @Test
+    public void testSchematicCachedInPackEntryDuringScan() throws IOException{
+        byte[] schemData = TestHelper.createValidSchematicBytes("CachedReactor");
+        File zipFile = new File(tempDir, "schem_cache.zip");
+        TestHelper.createTestZip(zipFile,
+            new TestHelper.ZipEntryBuilder("reactor.msch", schemData)
+        );
+
+        Seq<PackEntry> entries = scanner.scanZip(new Fi(zipFile), PackType.SCHEMATIC, null);
+        assertEquals(1, entries.size);
+        PackEntry entry = entries.first();
+
+        assertTrue(entry.isValid);
+        assertEquals("CachedReactor", entry.displayName);
+        assertNotNull(entry.schematic, "PackScanner must cache parsed schematic on entry");
+        assertEquals("CachedReactor", entry.schematic.name());
+        assertEquals(2, entry.schematic.width);
+        assertEquals(2, entry.schematic.height);
+    }
+
+    @Test
+    public void testGetExistingFileNamesAndFastDuplicateCheck() throws IOException{
+        Fi existing1 = schemDir.child("drill.msch");
+        Fi existing2 = schemDir.child("Reactor_Base.msch");
+        existing1.writeBytes(new byte[]{1, 2, 3});
+        existing2.writeBytes(new byte[]{1, 2, 3});
+
+        java.util.Set<String> existingNames = scanner.getExistingFileNames(schemDir);
+        assertEquals(2, existingNames.size());
+        assertTrue(existingNames.contains("drill.msch"));
+        assertTrue(existingNames.contains("reactor_base.msch"));
+
+        PackEntry entryDup = new PackEntry(PackType.SCHEMATIC, "drill.msch", "DRILL.msch", 100);
+        PackEntry entryNew = new PackEntry(PackType.SCHEMATIC, "turret.msch", "turret.msch", 100);
+
+        scanner.checkDuplicate(entryDup, existingNames);
+        assertTrue(entryDup.isDuplicate);
+
+        scanner.checkDuplicate(entryNew, existingNames);
+        assertFalse(entryNew.isDuplicate);
+    }
+
     private static byte[] createZipBytes(TestHelper.ZipEntryBuilder... builders) throws IOException{
         File zip = Files.createTempFile("packloader_test_zip", ".zip").toFile();
         try{

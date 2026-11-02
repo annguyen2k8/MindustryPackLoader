@@ -3,6 +3,9 @@ package packloader.ui;
 import arc.Core;
 import arc.files.Fi;
 import arc.graphics.Color;
+import arc.input.KeyCode;
+import arc.scene.event.InputEvent;
+import arc.scene.event.InputListener;
 import arc.scene.event.Touchable;
 import arc.scene.style.Drawable;
 import arc.scene.ui.Button;
@@ -14,12 +17,14 @@ import arc.struct.Seq;
 import arc.util.Log;
 import arc.util.Threads;
 import mindustry.Vars;
+import mindustry.game.Schematic;
 import mindustry.gen.Icon;
 import mindustry.gen.Tex;
 import mindustry.graphics.Pal;
 import mindustry.ui.FileChooser;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
+import packloader.core.PackFormat;
 import packloader.core.PackImporter;
 import packloader.core.PackImporter.ImportProgress;
 import packloader.core.PackScanner;
@@ -38,6 +43,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static packloader.util.Localization.getLocalizedText;
 
 public class PackLoaderDialog extends BaseDialog{
+    public static final String ISSUES_URL = "https://github.com/annguyen2k8/MindustryPackLoader/issues";
+
     private final PackScanner scanner = new PackScanner();
     private final PackImporter importer = new PackImporter();
 
@@ -76,7 +83,49 @@ public class PackLoaderDialog extends BaseDialog{
         if(entries.isEmpty() && sourceName.isEmpty()){
             this.targetType = null;
         }
-        return super.show();
+        arc.scene.ui.Dialog d = super.show();
+        checkFirstRunFeedback();
+        return d;
+    }
+
+    private void checkFirstRunFeedback(){
+        if(!Core.settings.getBool("packloader.first-run.shown", false)){
+            Core.settings.put("packloader.first-run.shown", true);
+            Core.settings.manualSave();
+
+            BaseDialog welcomeDialog = new BaseDialog(getLocalizedText("packloader.welcome.title"));
+            welcomeDialog.cont.margin(16f);
+            welcomeDialog.cont.defaults().pad(6f);
+
+            welcomeDialog.cont.image(Icon.info).size(48f).color(Pal.accent).padBottom(10f).row();
+
+            float maxW = Math.min(Core.graphics.getWidth() * 0.9f, 480f);
+            welcomeDialog.cont.add(getLocalizedText("packloader.welcome.message"))
+                .style(Styles.defaultLabel)
+                .color(Color.white)
+                .width(maxW)
+                .wrap()
+                .padBottom(8f)
+                .row();
+
+            welcomeDialog.cont.add(getLocalizedText("packloader.welcome.hint"))
+                .style(Styles.defaultLabel)
+                .color(Pal.lightishGray)
+                .width(maxW)
+                .wrap()
+                .padBottom(12f)
+                .row();
+
+            welcomeDialog.buttons.defaults().size(180f, 54f).pad(4f);
+
+            UIUtils.pad(welcomeDialog.buttons.button(getLocalizedText("packloader.welcome.issues"), Icon.link, () -> {
+                Core.app.openURI(ISSUES_URL);
+            }).get());
+
+            UIUtils.pad(welcomeDialog.buttons.button(getLocalizedText("packloader.welcome.close"), Icon.ok, welcomeDialog::hide).get());
+
+            welcomeDialog.show();
+        }
     }
 
     public void showMenu(){
@@ -245,6 +294,13 @@ public class PackLoaderDialog extends BaseDialog{
 
         buttons.clear();
         addCloseButton();
+        if(Vars.mobile){
+            buttons.button(Icon.link, Styles.flati, () -> Core.app.openURI(ISSUES_URL)).size(64f, 64f);
+        }else{
+            UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
+                Core.app.openURI(ISSUES_URL);
+            }).size(210f, 64f).get());
+        }
     }
 
     /** View 1: Source Selection (When a specific pack type is active) */
@@ -357,6 +413,9 @@ public class PackLoaderDialog extends BaseDialog{
         UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, () -> {
             targetType = null;
             rebuild();
+        }).size(210f, 64f).get());
+        UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
+            Core.app.openURI(ISSUES_URL);
         }).size(210f, 64f).get());
     }
 
@@ -580,6 +639,13 @@ public class PackLoaderDialog extends BaseDialog{
         // Bottom Action Bar
         buttons.clear();
         addCloseButton();
+        if(Vars.mobile){
+            buttons.button(Icon.link, Styles.flati, () -> Core.app.openURI(ISSUES_URL)).size(64f, 64f);
+        }else{
+            UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
+                Core.app.openURI(ISSUES_URL);
+            }).size(210f, 64f).get());
+        }
 
         int selectedCount = visibleSelectedCount();
         String initialImportText = getLocalizedText("packloader.import.action", selectedCount);
@@ -691,6 +757,33 @@ public class PackLoaderDialog extends BaseDialog{
                 t.add(infoBuilder.toString()).color(entry.isDuplicate ? Color.orange : entry.isValid ? Pal.lightishGray : Pal.remove)
                  .ellipsis(true).growX().minWidth(0f).left().padTop(2f);
             }).growX().minWidth(0f).left().padLeft(8f);
+
+            // Schematic actions: Info & In-World Placement
+            if(entry.type == PackType.SCHEMATIC && entry.isValid){
+                Button infoBtn = row.button(Icon.info, Styles.clearNonei, () -> {
+                    showSchematicInfo(entry);
+                }).size(36f).padLeft(2f).padRight(2f).get();
+                infoBtn.addListener(new InputListener(){
+                    @Override
+                    public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
+                        event.stop();
+                        return true;
+                    }
+                });
+
+                if(Vars.state != null && Vars.state.isGame()){
+                    Button placeBtn = row.button(Icon.play, Styles.clearNonei, () -> {
+                        placeSchematic(entry);
+                    }).size(36f).padLeft(2f).padRight(2f).get();
+                    placeBtn.addListener(new InputListener(){
+                        @Override
+                        public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
+                            event.stop();
+                            return true;
+                        }
+                    });
+                }
+            }
 
             table.add(row).growX().minWidth(0f).pad(2f).row();
         }
@@ -809,7 +902,8 @@ public class PackLoaderDialog extends BaseDialog{
         lastImportProgressPost = now;
 
         String current = progress.currentFile == null || progress.currentFile.isEmpty() ?
-            getLocalizedText("packloader.import.finishing") : progress.currentFile;
+            getLocalizedText("packloader.import.finishing") :
+            truncateFileName(progress.currentFile, 36);
         Vars.ui.loadfrag.setText(getLocalizedText("packloader.import.progress.detail",
             current, progress.processed, progress.total, progress.success, progress.failed));
 
@@ -819,6 +913,63 @@ public class PackLoaderDialog extends BaseDialog{
             lastImportProgress = value;
             Vars.ui.loadfrag.setProgress(value);
         }
+    }
+
+    public void showSchematicInfo(PackEntry entry){
+        if(entry == null) return;
+        Schematic s = entry.schematic;
+        if(s == null){
+            try(java.io.InputStream in = entry.openStream()){
+                s = PackFormat.readSchematic(in);
+                entry.schematic = s;
+            }catch(Throwable t){
+                Log.err("[PackLoader] Failed to read schematic for info", t);
+                if(Vars.ui != null){
+                    Vars.ui.showErrorMessage(getLocalizedText("packloader.error.invalid-schematic"));
+                }
+                return;
+            }
+        }
+        if(s != null && Vars.ui != null && Vars.ui.schematics != null){
+            Vars.ui.schematics.showInfo(s);
+        }
+    }
+
+    public void placeSchematic(PackEntry entry){
+        if(entry == null) return;
+        Schematic s = entry.schematic;
+        if(s == null){
+            try(java.io.InputStream in = entry.openStream()){
+                s = PackFormat.readSchematic(in);
+                entry.schematic = s;
+            }catch(Throwable t){
+                Log.err("[PackLoader] Failed to read schematic for placement", t);
+                if(Vars.ui != null){
+                    Vars.ui.showErrorMessage(getLocalizedText("packloader.error.invalid-schematic"));
+                }
+                return;
+            }
+        }
+        if(s != null && Vars.control != null && Vars.control.input != null){
+            Vars.control.input.useSchematic(s);
+            hide();
+            if(Vars.ui != null){
+                Vars.ui.showInfoToast(getLocalizedText("packloader.schematic.placed", s.name()), 2.5f);
+            }
+        }
+    }
+
+    public static String truncateFileName(String name, int maxLength){
+        if(name == null || name.length() <= maxLength) return name;
+        int extIdx = name.lastIndexOf('.');
+        if(extIdx > 0 && name.length() - extIdx <= 8){
+            String ext = name.substring(extIdx);
+            int keepBase = maxLength - ext.length() - 3;
+            if(keepBase > 3){
+                return name.substring(0, keepBase) + "..." + ext;
+            }
+        }
+        return name.substring(0, maxLength - 3) + "...";
     }
 
     private static String safeMessage(Throwable t){
@@ -910,7 +1061,20 @@ public class PackLoaderDialog extends BaseDialog{
         BaseDialog pathDialog = new BaseDialog(getLocalizedText("packloader.source.path.title"));
         pathDialog.addCloseButton();
 
-        TextField field = new TextField("/sdcard/Download");
+        // Prioritize recent sources or leave empty with placeholder guidance
+        String defaultPath = "";
+        Seq<RecentSources.SourceItem> recents = RecentSources.getForType(targetType);
+        if(!recents.isEmpty()){
+            for(RecentSources.SourceItem item : recents){
+                if(Core.files.absolute(item.path).exists()){
+                    defaultPath = item.path;
+                    break;
+                }
+            }
+        }
+
+        TextField field = new TextField(defaultPath);
+        field.setMessageText(getLocalizedText("packloader.source.path.placeholder"));
         field.setSize(340f, 50f);
 
         pathDialog.cont.add(getLocalizedText("packloader.source.path.prompt")).pad(10f).row();
@@ -918,23 +1082,32 @@ public class PackLoaderDialog extends BaseDialog{
 
         pathDialog.buttons.button(getLocalizedText("packloader.source.path.scan"), Icon.ok, () -> {
             String path = field.getText().trim();
-            if(!path.isEmpty()){
-                String[] parts = path.split("[,;\\r?\\n]+");
-                Seq<Fi> sources = new Seq<>();
-                for(String p : parts){
-                    String trimmed = p.trim();
-                    if(trimmed.isEmpty()) continue;
-                    Fi file = Core.files.absolute(trimmed);
-                    if(file.exists()){
-                        sources.add(file);
-                    }else if(Vars.ui != null){
+            if(path.isEmpty()){
+                if(Vars.ui != null){
+                    Vars.ui.showErrorMessage(getLocalizedText("packloader.source.path.empty"));
+                }
+                return;
+            }
+
+            String[] parts = path.split("[,;\\r?\\n]+");
+            Seq<Fi> sources = new Seq<>();
+            for(String p : parts){
+                String trimmed = p.trim();
+                if(trimmed.isEmpty()) continue;
+                Fi file = Core.files.absolute(trimmed);
+                if(!file.exists()){
+                    if(Vars.ui != null){
                         Vars.ui.showErrorMessage(getLocalizedText("packloader.source.path.notfound", trimmed));
                     }
+                }else if(file.isDirectory() && PackScanner.isScopedStorageRestricted(file)){
+                    showScopedStorageDialog(targetType);
+                }else{
+                    sources.add(file);
                 }
-                if(!sources.isEmpty()){
-                    pathDialog.hide();
-                    scanAsync(targetType, append, sources.toArray(Fi.class));
-                }
+            }
+            if(!sources.isEmpty()){
+                pathDialog.hide();
+                scanAsync(targetType, append, sources.toArray(Fi.class));
             }
         }).size(130f, 50f);
 
@@ -1019,7 +1192,7 @@ public class PackLoaderDialog extends BaseDialog{
 
                 MainThread.post(() -> {
                     if(!scanGeneration.isCurrent(token) || Vars.ui == null || Vars.ui.loadfrag == null) return;
-                    String fileName = currentFile == null ? "" : currentFile;
+                    String fileName = currentFile == null ? "" : truncateFileName(currentFile, 36);
                     if(totalKnown){
                         Vars.ui.loadfrag.setText(getLocalizedText("packloader.scan.progress.total",
                             Math.min(found, total), total, fileName));

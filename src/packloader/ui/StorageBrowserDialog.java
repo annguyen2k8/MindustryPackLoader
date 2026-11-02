@@ -20,6 +20,7 @@ import mindustry.graphics.Pal;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
 import packloader.model.PackType;
+import packloader.util.RecentSources;
 import packloader.util.StorageSources;
 
 import static packloader.util.Localization.getLocalizedText;
@@ -58,6 +59,19 @@ public class StorageBrowserDialog extends BaseDialog{
     }
 
     private Fi getInitialDirectory(){
+        // Prioritize recent sources for the active targetType
+        Seq<RecentSources.SourceItem> recents = RecentSources.getForType(targetType);
+        if(!recents.isEmpty()){
+            for(RecentSources.SourceItem item : recents){
+                try{
+                    Fi f = Core.files.absolute(item.path);
+                    if(f.exists()){
+                        return f.isDirectory() ? f : f.parent();
+                    }
+                }catch(Throwable ignored){}
+            }
+        }
+
         try{
             String ext = Core.files.getExternalStoragePath();
             if(ext != null && !ext.isEmpty()){
@@ -68,10 +82,20 @@ public class StorageBrowserDialog extends BaseDialog{
             }
         }catch(Throwable ignored){}
 
+        try{
+            String home = System.getProperty("user.home", "");
+            if(!home.isEmpty()){
+                Fi homeFi = Core.files.absolute(home);
+                Fi homeDl = homeFi.child("Downloads");
+                if(homeDl.exists() && homeDl.isDirectory()) return homeDl;
+                if(homeFi.exists() && homeFi.isDirectory()) return homeFi;
+            }
+        }catch(Throwable ignored){}
+
         Fi sdDownload = Core.files.absolute("/sdcard/Download");
         if(sdDownload.exists() && sdDownload.isDirectory()) return sdDownload;
 
-        return Core.files.absolute(System.getProperty("user.home", "/"));
+        return Core.files.absolute("/");
     }
 
     private void setupUI(){
@@ -136,50 +160,56 @@ public class StorageBrowserDialog extends BaseDialog{
                 }
             }
         }else{
-            shortcuts.button(b -> {
-                b.margin(4f, 10f, 4f, 10f);
-                b.image(Icon.download).size(18f).color(Pal.accent).padRight(10f);
-                b.add("Download").color(Color.white);
-            }, Styles.flatt, () -> {
-                try{
-                    String ext = Core.files.getExternalStoragePath();
+            Fi dlCandidate = null;
+            try{
+                String ext = Core.files.getExternalStoragePath();
+                if(ext != null){
                     Fi dl = Core.files.absolute(ext).child("Download");
-                    if(dl.exists()){
-                        currentDirectory = dl;
-                        selectedDirectory = null;
-                        rebuild();
-                        return;
-                    }
-                }catch(Throwable ignored){}
+                    if(dl.exists()) dlCandidate = dl;
+                }
+            }catch(Throwable ignored){}
+            if(dlCandidate == null){
                 Fi dl = Core.files.absolute("/sdcard/Download");
-                if(dl.exists()){
-                    currentDirectory = dl;
-                    selectedDirectory = null;
-                    rebuild();
-                }
-            });
+                if(dl.exists()) dlCandidate = dl;
+            }
 
-            shortcuts.button(b -> {
-                b.margin(4f, 10f, 4f, 10f);
-                b.image(Icon.folder).size(18f).color(Pal.accent).padRight(10f);
-                b.add("SDCard").color(Color.white);
-            }, Styles.flatt, () -> {
-                try{
-                    String extPath = Core.files.getExternalStoragePath();
-                    if(extPath != null && Core.files.absolute(extPath).exists()){
-                        currentDirectory = Core.files.absolute(extPath);
-                        selectedDirectory = null;
-                        rebuild();
-                        return;
-                    }
-                }catch(Throwable ignored){}
-                Fi sd = Core.files.absolute("/sdcard");
-                if(sd.exists()){
-                    currentDirectory = sd;
+            if(dlCandidate != null){
+                final Fi dlTarget = dlCandidate;
+                shortcuts.button(b -> {
+                    b.margin(4f, 10f, 4f, 10f);
+                    b.image(Icon.download).size(18f).color(Pal.accent).padRight(10f);
+                    b.add("Download").color(Color.white);
+                }, Styles.flatt, () -> {
+                    currentDirectory = dlTarget;
                     selectedDirectory = null;
                     rebuild();
+                });
+            }
+
+            Fi storageCandidate = null;
+            try{
+                String extPath = Core.files.getExternalStoragePath();
+                if(extPath != null && Core.files.absolute(extPath).exists()){
+                    storageCandidate = Core.files.absolute(extPath);
                 }
-            });
+            }catch(Throwable ignored){}
+            if(storageCandidate == null){
+                Fi sd = Core.files.absolute("/sdcard");
+                if(sd.exists()) storageCandidate = sd;
+            }
+
+            if(storageCandidate != null){
+                final Fi storageTarget = storageCandidate;
+                shortcuts.button(b -> {
+                    b.margin(4f, 10f, 4f, 10f);
+                    b.image(Icon.folder).size(18f).color(Pal.accent).padRight(10f);
+                    b.add("SDCard").color(Color.white);
+                }, Styles.flatt, () -> {
+                    currentDirectory = storageTarget;
+                    selectedDirectory = null;
+                    rebuild();
+                });
+            }
         }
 
         // Keep shortcuts scrollable so a long Windows drive list cannot widen the dialog.

@@ -256,6 +256,8 @@ tasks.jar{
 
 tasks.test{
     useJUnitPlatform()
+    maxHeapSize = "256m"
+    jvmArgs("-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1")
 }
 
 val verifyJar = tasks.register("verifyJar"){

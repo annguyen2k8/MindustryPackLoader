@@ -271,6 +271,7 @@ public class PackScanner{
             throw new FileNotFoundException(getLocalizedText("packloader.error.notfound", "null"));
         }
 
+        long scanStartTime = System.currentTimeMillis();
         ResolvedZip resolved = resolveZip(zipFile);
         File file = resolved.zip.file();
         Seq<PackEntry> entries = new Seq<>();
@@ -282,6 +283,10 @@ public class PackScanner{
             throw new IOException(getLocalizedText("packloader.error.zip-too-large",
                 MAX_ZIP_ARCHIVE_BYTES / (1024 * 1024)));
         }
+
+        // Cache existing filesystem names to avoid repeated stat syscalls during candidate checks
+        Set<String> existingMapFiles = getExistingFileNames(mapDirectory);
+        Set<String> existingSchemFiles = getExistingFileNames(schematicDirectory);
 
         try(ZipFile zf = new ZipFile(file)){
             Seq<ZipEntry> candidates = new Seq<>();
@@ -347,9 +352,14 @@ public class PackScanner{
                     entry.isValid = false;
                     entry.errorReason = getLocalizedText("packloader.error.zipbomb", entry.getMaxAllowedBytes() / (1024 * 1024));
                 }else{
-                    validateAndInspectEntry(entry);
+                    // Reuse open ZipFile stream directly instead of reopening ZipFile for each entry
+                    try(InputStream in = new BufferedInputStream(zf.getInputStream(ze), 16384)){
+                        validateAndInspectEntry(entry, in);
+                    }catch(Throwable t){
+                        handleValidationError(entry, t);
+                    }
                 }
-                checkDuplicate(entry);
+                checkDuplicate(entry, entry.type == PackType.MAP ? existingMapFiles : existingSchemFiles);
 
                 entries.add(entry);
             }
@@ -368,6 +378,10 @@ public class PackScanner{
         if(entries.isEmpty()){
             discardTemp(resolved.temporary);
         }
+
+        long scanElapsed = System.currentTimeMillis() - scanStartTime;
+        Log.info("[PackLoader] ZIP scan completed: @ entries found in @ ms (@ ms/entry)",
+            entries.size, scanElapsed, entries.isEmpty() ? 0 : scanElapsed / Math.max(1, entries.size));
         return entries;
     }
 
@@ -398,8 +412,11 @@ public class PackScanner{
         }
 
         Seq<PackEntry> entries = new Seq<>();
+        long startTime = System.currentTimeMillis();
         try{
             scanDirectoryRecursive(dir, dir, entries, targetType, listener, 0, new HashSet<>());
+            long elapsed = System.currentTimeMillis() - startTime;
+            Log.info("[PackLoader] Directory scan completed: @ entries found in @ ms", entries.size, elapsed);
             return entries;
         }catch(Throwable t){
             // Entries from already-scanned nested ZIPs own materialized SAF temp files;
@@ -532,6 +549,7 @@ public class PackScanner{
         Seq<PackEntry> entries = new Seq<>();
         if(files == null) return entries;
 
+        long startTime = System.currentTimeMillis();
         try{
             for(Fi file : files){
                 checkCancelled(listener);
@@ -551,6 +569,8 @@ public class PackScanner{
                     }
                 }
             }
+            long elapsed = System.currentTimeMillis() - startTime;
+            Log.info("[PackLoader] File scan completed: @ entries found in @ ms", entries.size, elapsed);
             return entries;
         }catch(Throwable t){
             cleanupTemporaryZips(entries);
@@ -582,87 +602,149 @@ public class PackScanner{
         return entry;
     }
 
-    /** Validates file structure and extracts display name metadata. */
+    /** Validates file structure and extracts display name metadata using the entry stream. */
     public void validateAndInspectEntry(PackEntry entry){
+        try(InputStream in = new BufferedInputStream(entry.openStream(), 16384)){
+            validateAndInspectEntry(entry, in);
+        }catch(Throwable t){
+            handleValidationError(entry, t);
+        }
+    }
+
+    /** Validates file structure and extracts metadata using an already-open stream. */
+    public void validateAndInspectEntry(PackEntry entry, InputStream in){
         entry.isValid = true;
         entry.errorReason = "";
         try{
             if(entry.type == PackType.SCHEMATIC){
-                validateSchematic(entry);
+                validateSchematic(entry, in);
             }else if(entry.type == PackType.MAP){
-                validateMap(entry);
+                validateMap(entry, in);
             }
         }catch(Throwable t){
-            entry.isValid = false;
-            String msg = (t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
-            String lower = msg.toLowerCase();
-            if(entry.type == PackType.MAP){
-                entry.errorReason = (lower.contains("header") || lower.contains("msav")) ?
-                    getLocalizedText("packloader.error.invalid-map") :
-                    getLocalizedText("packloader.error.uncompress-map", msg);
-            }else{
-                entry.errorReason = lower.contains("header") ?
-                    getLocalizedText("packloader.error.invalid-schematic") :
-                    getLocalizedText("packloader.error.validation", msg);
-            }
+            handleValidationError(entry, t);
         }
     }
 
-    private void validateSchematic(PackEntry entry) throws IOException{
-        try(InputStream in = entry.openStream()){
-            Schematic s = PackFormat.readSchematic(in);
-            // Schematic.name() falls back to "unknown"; only use an explicit metadata name.
-            if(s != null && s.tags.containsKey("name") && !s.name().trim().isEmpty()){
-                entry.displayName = s.name();
-            }
+    private void handleValidationError(PackEntry entry, Throwable t){
+        entry.isValid = false;
+        String msg = (t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
+        String lower = msg.toLowerCase(Locale.ROOT);
+        if(entry.type == PackType.MAP){
+            entry.errorReason = (lower.contains("header") || lower.contains("msav")) ?
+                getLocalizedText("packloader.error.invalid-map") :
+                getLocalizedText("packloader.error.uncompress-map", msg);
+        }else{
+            entry.errorReason = lower.contains("header") ?
+                getLocalizedText("packloader.error.invalid-schematic") :
+                getLocalizedText("packloader.error.validation", msg);
         }
     }
 
-    private void validateMap(PackEntry entry) throws IOException{
-        try(InputStream in = entry.openStream()){
-            PackFormat.MapInfo info = PackFormat.validateMap(in);
-            entry.displayName = info.name;
+    private void validateSchematic(PackEntry entry, InputStream in) throws IOException{
+        Schematic s = PackFormat.readSchematic(in);
+        entry.schematic = s;
+        // Schematic.name() falls back to "unknown"; only use an explicit metadata name.
+        if(s != null && s.tags.containsKey("name") && !s.name().trim().isEmpty()){
+            entry.displayName = s.name();
         }
+    }
+
+    private void validateMap(PackEntry entry, InputStream in) throws IOException{
+        PackFormat.MapInfo info = PackFormat.validateMap(in);
+        entry.displayName = info.name;
     }
 
     /**
      * Refreshes duplicate badges against the live game registries. This must be called
      * on the main thread because {@code Vars.maps}/{@code Vars.schematics} are game state.
+     * Uses in-memory hash maps to evaluate O(N) entries in O(1) per lookup.
      */
     public void checkGameDuplicates(Seq<PackEntry> entries){
         if(entries == null) return;
         if(!MainThread.isMainThread()) return;
 
+        // Pre-index existing game maps in O(M) time to prevent O(N * M) main-thread lockups
+        java.util.Map<String, Map> mapsByName = new HashMap<>();
+        java.util.Map<String, Map> mapsByFile = new HashMap<>();
+        try{
+            if(Vars.maps != null && Vars.maps.all() != null){
+                for(Map m : Vars.maps.all()){
+                    if(m.name() != null) mapsByName.put(m.name().toLowerCase(Locale.ROOT), m);
+                    if(m.file != null) mapsByFile.put(m.file.name().toLowerCase(Locale.ROOT), m);
+                }
+            }
+        }catch(Throwable ignored){}
+
+        // Pre-index existing schematics
+        java.util.Map<String, Schematic> schemsByName = new HashMap<>();
+        java.util.Map<String, Schematic> schemsByFile = new HashMap<>();
+        try{
+            if(Vars.schematics != null && Vars.schematics.all() != null){
+                for(Schematic s : Vars.schematics.all()){
+                    if(s.name() != null) schemsByName.put(s.name().toLowerCase(Locale.ROOT), s);
+                    if(s.file != null) schemsByFile.put(s.file.name().toLowerCase(Locale.ROOT), s);
+                }
+            }
+        }catch(Throwable ignored){}
+
         for(PackEntry entry : entries){
             if(entry.isDuplicate) continue;
             try{
-                if(entry.type == PackType.MAP && Vars.maps != null){
-                    Map existing = Vars.maps.all().find(m ->
-                        (m.name() != null && m.name().equalsIgnoreCase(entry.displayName)) ||
-                        (m.file != null && m.file.name().equalsIgnoreCase(entry.sanitizedFileName))
-                    );
+                if(entry.type == PackType.MAP && !mapsByName.isEmpty()){
+                    String nameKey = entry.displayName.toLowerCase(Locale.ROOT);
+                    String fileKey = entry.sanitizedFileName.toLowerCase(Locale.ROOT);
+                    Map existing = mapsByName.get(nameKey);
+                    if(existing == null) existing = mapsByFile.get(fileKey);
                     if(existing != null){
                         entry.isDuplicate = true;
                         entry.duplicateReason = getLocalizedText("packloader.duplicate.map", existing.name());
                     }
-                }else if(entry.type == PackType.SCHEMATIC && Vars.schematics != null){
-                    Schematic existing = Vars.schematics.all().find(s ->
-                        (s.name() != null && s.name().equalsIgnoreCase(entry.displayName)) ||
-                        (s.file != null && s.file.name().equalsIgnoreCase(entry.sanitizedFileName))
-                    );
+                }else if(entry.type == PackType.SCHEMATIC && !schemsByName.isEmpty()){
+                    String nameKey = entry.displayName.toLowerCase(Locale.ROOT);
+                    String fileKey = entry.sanitizedFileName.toLowerCase(Locale.ROOT);
+                    Schematic existing = schemsByName.get(nameKey);
+                    if(existing == null) existing = schemsByFile.get(fileKey);
                     if(existing != null){
                         entry.isDuplicate = true;
                         entry.duplicateReason = getLocalizedText("packloader.duplicate.schematic", existing.name());
                     }
                 }
-            }catch(Throwable ignored){
-                // Registries may be unavailable during early startup or unit tests.
-            }
+            }catch(Throwable ignored){}
         }
+    }
+
+    /** Returns a set of lowercase file names existing in the specified directory. */
+    public Set<String> getExistingFileNames(Fi directory){
+        Set<String> set = new HashSet<>();
+        if(directory != null && directory.exists() && directory.isDirectory()){
+            try{
+                Fi[] list = directory.list();
+                if(list != null){
+                    for(Fi f : list){
+                        set.add(f.name().toLowerCase(Locale.ROOT));
+                    }
+                }
+            }catch(Throwable ignored){}
+        }
+        return set;
     }
 
     /** Checks whether the entry collides with an existing file in the target directory. */
     public void checkDuplicate(PackEntry entry){
+        checkDuplicate(entry, null);
+    }
+
+    /** Checks collision using a cached set of existing file names if available, falling back to disk. */
+    public void checkDuplicate(PackEntry entry, Set<String> existingFileNames){
+        if(existingFileNames != null){
+            if(existingFileNames.contains(entry.sanitizedFileName.toLowerCase(Locale.ROOT))){
+                entry.isDuplicate = true;
+                entry.duplicateReason = getLocalizedText("packloader.duplicate.file", entry.sanitizedFileName);
+            }
+            return;
+        }
+
         Fi targetDir = (entry.type == PackType.MAP) ? mapDirectory : schematicDirectory;
         if(targetDir == null) return;
 
