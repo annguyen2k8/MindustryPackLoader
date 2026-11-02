@@ -3,24 +3,23 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-02 15:58 +07:00
+- **Last updated:** 2026-11-02 17:28 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** Compatibility audit, smoke tests, bug fixes (mapname fallback and legacy block entity resolution), regression tests, and self-commit on MindustryPackLoader.
-- **Branch:** master; commit `8ae7e21`.
+- **Task:** Complete P1 compatibility audit & verification, implement P2 UX improvements (Quick Import, Smart Selection, Recent Sources, Multi-Source Queue) with tests and self-commit.
+- **Branch:** master; commits `8ae7e21` (P1 fix), `a98b247` (P1 handoff), `e27a407` (P2 feat).
 
 ## Results
 
-- [verified] Audited `PackFormat` against Mindustry v160.7 source and bytecode (`mindustry.io.SaveFileReader`, `SaveVersion`, `Maps`, `MapIO`, `Map`, `ContentLoader`, `Block`).
-- [verified] Fixed map parser bug: maps without `"name"` tag but containing `"mapname"` (savegames and exported saves) are now accepted by `PackFormat.validateMap`, with `info.name` populated from `"mapname"` and `hasNameTag` tracked.
-- [verified] Fixed native import crash: staged maps without `"name"` tag are automatically normalized with `"name"` tag via `PackFormat.renameMap` before calling `Vars.maps.importMap`, preventing `IOException("Map name cannot be empty!")`.
-- [verified] Fixed legacy map parser entity desync: `ContentNames.isBuilding` resolves legacy block aliases through `SaveFileReader.mapFallback` (e.g., `"turbine-generator"` -> `"steam-generator"`), preventing tile entity lengths from being misread as consecutive block runs in v1-v3 maps.
-- [verified] Synchronized `"mapname"` tag update alongside `"name"` in `PackFormat.renameMap`.
-- [verified] Hardened `FakeGame.FakeMaps.importMap` to enforce `"name"` tag check mirroring real Mindustry behavior.
-- [verified] Added 3 regression tests across `PackFormatTest` and `PackImporterTest` (total test suite increased from 102 to 105 tests).
-- [verified] Audited Android/SAF storage and temporary file cleanup mechanisms (SAF materialized ZIPs, cooperative cancellation, path traversal protection).
-- [verified] Audited UI / threading model (background worker dispatch for scanning/importing, MainThread posting for GL/UI mutations, throttled progress updates).
-- [verified] Removed temporary extracted inspection directories (`mindustry/` and `arc/`). Verified `session.json` is untouched.
-- [verified] Created Conventional Commit `8ae7e21` (`fix(core): support mapname fallback tag and legacy block entity resolution`). No push executed.
+- [verified] P1 Compatibility: Audited parser against Mindustry v160.7 (`.msav`/`.msch`), native import, rollback, Android SAF temporary file pruning, and MainThread UI posting.
+- [verified] P2.1 Quick Import: Implemented `PackLoaderSettings` with persistent `quick-import` and `duplicate-policy` preferences, auto-selection, and fast-path execution on scan completion.
+- [verified] P2.2 Smart Selection: Added `selectNewOnly` (selects non-duplicate valid items, deselects duplicates), `selectDuplicatesOnly`, `invertVisibleSelected`, and live search input field (`Icon.zoom`, `TextField`, clear button) in `PackLoaderDialog`.
+- [verified] P2.3 Recent Sources: Implemented `RecentSources` manager with persistent storage via `Core.settings`, JSON serialization (`Jval`), LRU bumping to front, cap limit (6 items), type filtering, and UI card rendering with 1-click re-scanning.
+- [verified] P2.4 Multi-Source Queue: Added "+ Add Source" in review header, `scanAsync(type, append, sources)` supporting queue accumulation across multiple ZIPs/folders, automatic badge and duplicate re-evaluations, and unified batch import execution.
+- [verified] Multi-path input support: `openPathInputDialog` supports multiple comma/semicolon/newline-delimited paths on Desktop.
+- [verified] Full EN/VI localization parity: All new UX keys added to both `bundle.properties` and `bundle_vi.properties` and verified via `BundleTest`.
+- [verified] Test suite expanded from 105 to 118 unit & integration tests (`EntryFilterTest`, `RecentSourcesTest`, `MultiSourceQueueTest`), all passing with 0 failures and 0 skipped.
+- [verified] Packaged Desktop JAR bundle verified via `.\gradlew.bat verifyJar`.
+- [verified] Committed changes as `e27a407` (`feat(ux): implement quick import, smart selection, recent sources, and multi-source queue`). No push executed.
 
 ## Remaining
 
@@ -35,12 +34,12 @@
 
 ## Open questions
 
-- None for core parser and import pipeline.
+- None for core features or UX pipelines.
 
 ## Verification
 
-- `.\gradlew.bat test` — BUILD SUCCESSFUL (105 tests, 0 failures, 0 skipped).
-- `.\gradlew.bat check` — BUILD SUCCESSFUL (105 tests passed, desktop JAR verified).
-- `.\gradlew.bat verifyJar` — BUILD SUCCESSFUL (packaged bundle paths verified).
-- `git status` — clean working tree; commit `8ae7e21`.
+- `.\gradlew.bat test` — BUILD SUCCESSFUL (118 tests, 0 failures, 0 skipped).
+- `.\gradlew.bat check` — BUILD SUCCESSFUL (118 tests passed, desktop JAR verified).
+- `.\gradlew.bat verifyJar` — BUILD SUCCESSFUL (packaged bundle paths verified at `bundles/*`).
+- `git status` — commit `e27a407`.
 - `session.json` — verified unaffected.
