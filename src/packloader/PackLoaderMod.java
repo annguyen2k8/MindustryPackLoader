@@ -14,6 +14,7 @@ import mindustry.gen.Icon;
 import mindustry.graphics.Pal;
 import mindustry.mod.Mod;
 import packloader.model.PackType;
+import packloader.ui.FileDropHandler;
 import packloader.ui.PackLoaderDialog;
 import packloader.ui.UIUtils;
 
@@ -24,6 +25,7 @@ import static packloader.util.Localization.getLocalizedText;
 
 public class PackLoaderMod extends Mod{
     public static PackLoaderDialog dialog;
+    public static FileDropHandler dropHandler;
 
     public PackLoaderMod(){
         initColors();
@@ -62,6 +64,19 @@ public class PackLoaderMod extends Mod{
         try{
             if(dialog == null){
                 dialog = new PackLoaderDialog();
+            }
+
+            if(dropHandler == null && !Vars.mobile && Core.app != null){
+                dropHandler = new FileDropHandler(dialog);
+                Core.app.addListener(new arc.ApplicationListener(){
+                    @Override
+                    public void fileDropped(arc.files.Fi file){
+                        if(dropHandler != null){
+                            dropHandler.onFileDropped(file);
+                        }
+                    }
+                });
+                Log.info("[PackLoader] Desktop drag-and-drop listener registered.");
             }
 
             String menuButtonText = getLocalizedText("packloader.button.menu");

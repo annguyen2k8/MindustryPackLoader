@@ -48,7 +48,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static packloader.util.Localization.getLocalizedText;
 
-public class PackLoaderDialog extends BaseDialog{
+public class PackLoaderDialog extends BaseDialog implements FileDropHandler.DropTarget{
     public static final String ISSUES_URL = "https://github.com/annguyen2k8/MindustryPackLoader/issues";
 
     private final PackScanner scanner = new PackScanner();
@@ -150,6 +150,14 @@ public class PackLoaderDialog extends BaseDialog{
         this.sourceName = "";
         resetFilters();
         super.show();
+    }
+
+    public boolean isInReviewMode(){
+        return isShown() && !entries.isEmpty();
+    }
+
+    public PackType getTargetType(){
+        return targetType;
     }
 
     @Override
