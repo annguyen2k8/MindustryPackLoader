@@ -1,7 +1,6 @@
 package packloader.ui;
 
 import arc.Core;
-import arc.graphics.Color;
 import arc.graphics.g2d.Font;
 import arc.graphics.g2d.TextureRegion;
 import arc.mock.MockApplication;
@@ -10,15 +9,12 @@ import arc.mock.MockGraphics;
 import arc.mock.MockSettings;
 import arc.scene.Element;
 import arc.scene.Scene;
-import arc.scene.event.ClickListener;
-import arc.scene.event.InputEvent;
 import arc.scene.event.Touchable;
 import arc.scene.ui.Button;
 import arc.scene.ui.CheckBox;
 import arc.scene.ui.CheckBox.CheckBoxStyle;
 import arc.scene.ui.Label;
 import arc.scene.ui.layout.Table;
-import mindustry.graphics.Pal;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,126 +68,126 @@ public class CheckboxRowInteractionTest{
     }
 
     @Test
-    public void testBugDemonstrationDoubleToggleWhenBoxTouchableEnabled(){
+    public void testNativeHoverAndDiscreteClickHandlingForQuickImport(){
         Table row = new Table();
         row.setSize(300f, 40f);
-        row.touchable = Touchable.enabled;
 
-        CheckBox box = new CheckBox("", style);
-        box.setSize(24f, 24f);
-        box.setChecked(false);
-        assertTrue(box.touchable == Touchable.enabled);
+        CheckBox quickBox = new CheckBox("", style);
+        quickBox.setSize(24f, 24f);
+        quickBox.setChecked(false);
+        UIUtils.squareCheck(quickBox, 24f);
 
-        AtomicInteger boxToggles = new AtomicInteger(0);
-        box.changed(boxToggles::incrementAndGet);
-
-        AtomicInteger rowClicks = new AtomicInteger(0);
-        row.clicked(() -> {
-            rowClicks.incrementAndGet();
-            box.setChecked(!box.isChecked());
+        AtomicInteger settingSaves = new AtomicInteger(0);
+        quickBox.changed(() -> {
+            PackLoaderSettings.setQuickImport(quickBox.isChecked());
+            settingSaves.incrementAndGet();
         });
 
-        row.add(box).size(24f);
-        Core.scene.add(row);
-
-        Element hitTarget = row.hit(10f, 10f, true);
-        assertEquals(box, hitTarget, "When box.touchable is enabled, hit directly returns the CheckBox");
-    }
-
-    @Test
-    public void testFixedRowHandlingDirectBoxClickAndLabelClickToggleCleanly(){
-        Table row = new Table();
-        row.setSize(300f, 40f);
-        row.touchable = Touchable.enabled;
-
-        CheckBox box = new CheckBox("", style);
-        box.setSize(24f, 24f);
-        box.setChecked(false);
-        box.touchable = Touchable.disabled;
-        UIUtils.squareCheck(box, 24f);
-
-        row.add(box).size(24f).padRight(10f);
+        row.add(quickBox).size(24f).padRight(10f).center();
 
         Table textTable = new Table();
-        textTable.touchable = Touchable.disabled;
+        textTable.touchable = Touchable.enabled;
         Label label = new Label("Quick Import");
         label.touchable = Touchable.disabled;
         textTable.add(label);
-        row.add(textTable).growX();
 
-        AtomicInteger toggleCount = new AtomicInteger(0);
-        row.clicked(() -> {
-            box.setChecked(!box.isChecked());
-            PackLoaderSettings.setQuickImport(box.isChecked());
-            toggleCount.incrementAndGet();
+        textTable.clicked(() -> {
+            quickBox.toggle();
+            PackLoaderSettings.setQuickImport(quickBox.isChecked());
+            settingSaves.incrementAndGet();
         });
 
+        row.add(textTable).growX().left().center();
         row.layout();
         Core.scene.add(row);
 
+        // 1. Hit test on checkbox region (x=10, y=10) returns quickBox or its child Image,
+        // allowing Arc's native isOver() and hover drawables (Tex.checkOver) to work directly.
         Element hitBox = row.hit(10f, 10f, true);
-        assertEquals(row, hitBox, "Hit on checkbox area must resolve to row");
+        assertNotNull(hitBox);
+        assertTrue(hitBox == quickBox || hitBox.isDescendantOf(quickBox), "Hit on checkbox must resolve to quickBox or its child Image for native hover");
 
-        Element hitText = row.hit(100f, 10f, true);
-        assertEquals(row, hitText, "Hit on text area must resolve to row");
+        // 2. Hit test on text region inside textTable's Y bounds (x=100, y=textTable.y + textTable.height/2)
+        Element hitText = row.hit(100f, textTable.y + textTable.getHeight() / 2f, true);
+        assertNotNull(hitText);
+        assertTrue(hitText == textTable || hitText.isDescendantOf(textTable), "Hit on label text must resolve to textTable");
+        assertTrue(hitText == textTable || hitText.isDescendantOf(textTable), "Hit on label text must resolve to textTable");
 
-        assertFalse(box.isChecked());
+        // 3. Direct click on CheckBox toggles state once
+        assertFalse(quickBox.isChecked());
+        quickBox.fireClick();
+        assertTrue(quickBox.isChecked(), "Clicking checkbox directly toggles to true");
+        assertTrue(PackLoaderSettings.isQuickImport());
+        assertEquals(1, settingSaves.get());
+
+        // 4. Click on label text toggles state once
+        textTable.fireClick();
+        assertFalse(quickBox.isChecked(), "Clicking label text toggles to false");
         assertFalse(PackLoaderSettings.isQuickImport());
+        assertEquals(2, settingSaves.get());
 
-        row.fireClick();
-        assertTrue(box.isChecked(), "First click must toggle box to true");
-        assertTrue(PackLoaderSettings.isQuickImport(), "Setting must be persisted as true");
-        assertEquals(1, toggleCount.get());
+        // 5. Subsequent clicks toggle cleanly without double-firing
+        quickBox.fireClick();
+        assertTrue(quickBox.isChecked());
+        assertEquals(3, settingSaves.get());
 
-        row.fireClick();
-        assertFalse(box.isChecked(), "Second click must toggle box to false");
-        assertFalse(PackLoaderSettings.isQuickImport(), "Setting must be persisted as false");
-        assertEquals(2, toggleCount.get());
-
-        row.fireClick();
-        assertTrue(box.isChecked(), "Third click must toggle box back to true");
-        assertTrue(PackLoaderSettings.isQuickImport(), "Setting must be persisted as true");
-        assertEquals(3, toggleCount.get());
+        textTable.fireClick();
+        assertFalse(quickBox.isChecked());
+        assertEquals(4, settingSaves.get());
     }
 
     @Test
-    public void testSkipIdenticalContentRowHitboxAndToggle(){
+    public void testNativeHoverAndDiscreteClickHandlingForSkipIdentical(){
         Table skipRow = new Table();
         skipRow.setSize(260f, 30f);
-        skipRow.touchable = Touchable.enabled;
 
         CheckBox skipBox = new CheckBox("", style);
         skipBox.setSize(24f, 24f);
         skipBox.setChecked(PackLoaderSettings.isSkipIdenticalContent());
-        skipBox.touchable = Touchable.disabled;
         UIUtils.squareCheck(skipBox, 24f);
 
-        skipRow.add(skipBox).size(24f).padRight(10f);
-
-        Table skipTextTable = new Table();
-        skipTextTable.touchable = Touchable.disabled;
-        skipTextTable.add(new Label("Skip identical content"));
-        skipRow.add(skipTextTable).growX();
-
-        skipRow.clicked(() -> {
-            skipBox.setChecked(!skipBox.isChecked());
+        AtomicInteger settingSaves = new AtomicInteger(0);
+        skipBox.changed(() -> {
             PackLoaderSettings.setSkipIdenticalContent(skipBox.isChecked());
+            settingSaves.incrementAndGet();
         });
 
+        skipRow.add(skipBox).size(24f).padRight(10f).center();
+
+        Table skipTextTable = new Table();
+        skipTextTable.touchable = Touchable.enabled;
+        skipTextTable.add(new Label("Skip identical content"));
+        skipTextTable.clicked(() -> {
+            skipBox.toggle();
+            PackLoaderSettings.setSkipIdenticalContent(skipBox.isChecked());
+            settingSaves.incrementAndGet();
+        });
+
+        skipRow.add(skipTextTable).growX().left().center();
         skipRow.layout();
         Core.scene.add(skipRow);
 
-        assertEquals(skipRow, skipRow.hit(10f, 10f, true), "Hit on skipBox area must resolve to skipRow");
-        assertEquals(skipRow, skipRow.hit(100f, 10f, true), "Hit on skipText area must resolve to skipRow");
+        Element hitBox = skipRow.hit(10f, 10f, true);
+        assertNotNull(hitBox);
+        assertTrue(hitBox == skipBox || hitBox.isDescendantOf(skipBox), "Hit on checkbox returns skipBox or its child Image for native hover");
+
+        Element hitText = skipRow.hit(100f, skipTextTable.y + skipTextTable.getHeight() / 2f, true);
+        assertNotNull(hitText);
+        assertTrue(hitText == skipTextTable || hitText.isDescendantOf(skipTextTable), "Hit on text returns skipTextTable");
 
         boolean initial = PackLoaderSettings.isSkipIdenticalContent();
-        skipRow.fireClick();
+
+        // Click on skipBox
+        skipBox.fireClick();
         assertEquals(!initial, skipBox.isChecked());
         assertEquals(!initial, PackLoaderSettings.isSkipIdenticalContent());
+        assertEquals(1, settingSaves.get());
 
-        skipRow.fireClick();
+        // Click on label
+        skipTextTable.fireClick();
         assertEquals(initial, skipBox.isChecked());
         assertEquals(initial, PackLoaderSettings.isSkipIdenticalContent());
+        assertEquals(2, settingSaves.get());
     }
 
     @Test
@@ -201,7 +197,6 @@ public class CheckboxRowInteractionTest{
 
         Table row1 = new Table();
         CheckBox box1 = new CheckBox("", style);
-        box1.touchable = Touchable.disabled;
         UIUtils.squareCheck(box1, 24f);
         row1.add(box1).size(24f).padRight(10f);
         Table textTable1 = new Table();
@@ -210,7 +205,6 @@ public class CheckboxRowInteractionTest{
 
         Table row2 = new Table();
         CheckBox box2 = new CheckBox("", style);
-        box2.touchable = Touchable.disabled;
         UIUtils.squareCheck(box2, 24f);
         row2.add(box2).size(24f).padRight(10f);
         Table textTable2 = new Table();
@@ -222,59 +216,9 @@ public class CheckboxRowInteractionTest{
 
         container.layout();
 
-        // Both checkboxes must have identical X positions (x = 0)
-        assertEquals(box1.x, box2.x, 0.001f, "Both checkboxes must start at identical X position");
-        // Both text tables must have identical X positions (x = 24 + 10 = 34)
-        assertEquals(textTable1.x, textTable2.x, 0.001f, "Both label tables must start at identical X position");
-    }
-
-    @Test
-    public void testHoverAndPressedColorFeedbackDoesNotShiftLayout(){
-        Table row = new Table();
-        row.setSize(300f, 40f);
-
-        CheckBox box = new CheckBox("", style);
-        box.touchable = Touchable.disabled;
-        box.color.set(Color.white);
-        UIUtils.squareCheck(box, 24f);
-        row.add(box).size(24f).padRight(10f);
-
-        Label label = new Label("Quick Import");
-        label.color.set(Color.white);
-        row.add(label).growX();
-
-        row.layout();
-
-        float initialBoxX = box.x;
-        float initialBoxY = box.y;
-        float initialBoxW = box.getWidth();
-        float initialBoxH = box.getHeight();
-
-        float initialLabelX = label.x;
-        float initialLabelY = label.y;
-        float initialLabelW = label.getWidth();
-        float initialLabelH = label.getHeight();
-
-        // Simulate hover update
-        box.color.set(Pal.accent);
-        label.color.set(Pal.accent);
-
-        // Layout / dimensions must NOT change when color changes
-        assertEquals(initialBoxX, box.x, 0.001f);
-        assertEquals(initialBoxY, box.y, 0.001f);
-        assertEquals(initialBoxW, box.getWidth(), 0.001f);
-        assertEquals(initialBoxH, box.getHeight(), 0.001f);
-
-        assertEquals(initialLabelX, label.x, 0.001f);
-        assertEquals(initialLabelY, label.y, 0.001f);
-        assertEquals(initialLabelW, label.getWidth(), 0.001f);
-        assertEquals(initialLabelH, label.getHeight(), 0.001f);
-
-        // Simulate pressed update
-        box.color.set(Pal.accent).mul(0.85f);
-        label.color.set(Pal.accent).mul(0.85f);
-
-        assertEquals(initialBoxX, box.x, 0.001f);
-        assertEquals(initialLabelX, label.x, 0.001f);
+        // Both checkboxes start at identical X position (x = 0)
+        assertEquals(box1.x, box2.x, 0.001f);
+        // Both text tables start at identical X position (x = 24 + 10 = 34)
+        assertEquals(textTable1.x, textTable2.x, 0.001f);
     }
 }
