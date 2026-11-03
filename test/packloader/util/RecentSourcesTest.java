@@ -77,6 +77,42 @@ public class RecentSourcesTest{
     }
 
     @Test
+    public void testDeduplicationDistinguishesType(){
+        RecentSources.add("Downloads", "Downloads", PackType.SCHEMATIC, true);
+        RecentSources.add("Downloads", "Downloads", PackType.MAP, true);
+
+        Seq<RecentSources.SourceItem> list = RecentSources.load();
+        assertEquals(2, list.size, "Same path with different types must coexist");
+        assertEquals(PackType.MAP, list.get(0).type);
+        assertEquals(PackType.SCHEMATIC, list.get(1).type);
+
+        // Re-adding SCHEMATIC bumps it to front without removing MAP
+        RecentSources.add("Downloads", "Downloads", PackType.SCHEMATIC, true);
+        list = RecentSources.load();
+        assertEquals(2, list.size);
+        assertEquals(PackType.SCHEMATIC, list.get(0).type);
+        assertEquals(PackType.MAP, list.get(1).type);
+    }
+
+    @Test
+    public void testRemoveByType(){
+        RecentSources.add("Downloads", "Downloads", PackType.SCHEMATIC, true);
+        RecentSources.add("Downloads", "Downloads", PackType.MAP, true);
+
+        // Remove only MAP entry
+        RecentSources.remove("Downloads", PackType.MAP);
+        Seq<RecentSources.SourceItem> list = RecentSources.load();
+        assertEquals(1, list.size);
+        assertEquals(PackType.SCHEMATIC, list.get(0).type);
+
+        // Legacy remove(path) removes all entries matching path
+        RecentSources.add("Downloads", "Downloads", PackType.MAP, true);
+        assertEquals(2, RecentSources.load().size);
+        RecentSources.remove("Downloads");
+        assertTrue(RecentSources.load().isEmpty());
+    }
+
+    @Test
     public void testFilterByType(){
         RecentSources.add("maps.zip", "maps.zip", PackType.MAP, false);
         RecentSources.add("schems.zip", "schems.zip", PackType.SCHEMATIC, false);

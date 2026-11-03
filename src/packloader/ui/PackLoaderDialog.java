@@ -256,41 +256,7 @@ public class PackLoaderDialog extends BaseDialog{
             root.add(recentsHeader).pad(4f).padTop(12f).padBottom(4f).row();
 
             for(RecentSources.SourceItem item : recents){
-                Button card = new Button(UIUtils.cardStyle());
-                card.margin(6f);
-                card.clicked(() -> {
-                    Fi file = Core.files.absolute(item.path);
-                    if(!file.exists()){
-                        RecentSources.remove(item.path);
-                        if(Vars.ui != null){
-                            Vars.ui.showErrorMessage(getLocalizedText("packloader.source.path.notfound", item.path));
-                        }
-                        rebuild();
-                        return;
-                    }
-                    scanAsync(item.type, false, file);
-                });
-
-                card.image(item.isDirectory ? Icon.folder : Icon.download).size(28f).color(Pal.accent).pad(4f);
-                card.table(t -> {
-                    t.left().defaults().left().growX();
-                    t.add(item.name).style(Styles.defaultLabel).color(Color.white).ellipsis(true).row();
-                    t.add(item.path).style(Styles.defaultLabel).color(Pal.lightishGray).ellipsis(true);
-                }).growX().left().padLeft(6f);
-
-                Button removeBtn = card.button(Icon.cancel, Styles.clearNonei, () -> {
-                    RecentSources.remove(item.path);
-                    rebuild();
-                }).size(32f).pad(2f).get();
-                removeBtn.addListener(new InputListener(){
-                    @Override
-                    public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
-                        event.stop();
-                        return true;
-                    }
-                });
-
-                root.add(card).minHeight(56f).pad(4f).row();
+                root.add(createRecentSourceCard(item, null)).minHeight(56f).pad(4f).row();
             }
         }
 
@@ -380,41 +346,7 @@ public class PackLoaderDialog extends BaseDialog{
             root.add(recentsHeader).pad(4f).padTop(12f).padBottom(4f).row();
 
             for(RecentSources.SourceItem item : recents){
-                Button card = new Button(UIUtils.cardStyle());
-                card.margin(6f);
-                card.clicked(() -> {
-                    Fi file = Core.files.absolute(item.path);
-                    if(!file.exists()){
-                        RecentSources.remove(item.path);
-                        if(Vars.ui != null){
-                            Vars.ui.showErrorMessage(getLocalizedText("packloader.source.path.notfound", item.path));
-                        }
-                        rebuild();
-                        return;
-                    }
-                    scanAsync(targetType, false, file);
-                });
-
-                card.image(item.isDirectory ? Icon.folder : Icon.download).size(28f).color(Pal.accent).pad(4f);
-                card.table(t -> {
-                    t.left().defaults().left().growX();
-                    t.add(item.name).style(Styles.defaultLabel).color(Color.white).ellipsis(true).row();
-                    t.add(item.path).style(Styles.defaultLabel).color(Pal.lightishGray).ellipsis(true);
-                }).growX().left().padLeft(6f);
-
-                Button removeBtn = card.button(Icon.cancel, Styles.clearNonei, () -> {
-                    RecentSources.remove(item.path);
-                    rebuild();
-                }).size(32f).pad(2f).get();
-                removeBtn.addListener(new InputListener(){
-                    @Override
-                    public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
-                        event.stop();
-                        return true;
-                    }
-                });
-
-                root.add(card).minHeight(56f).pad(4f).row();
+                root.add(createRecentSourceCard(item, targetType)).minHeight(56f).pad(4f).row();
             }
         }
 
@@ -431,6 +363,58 @@ public class PackLoaderDialog extends BaseDialog{
         UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
             Core.app.openURI(ISSUES_URL);
         }).size(210f, 64f).get());
+    }
+
+    private Button createRecentSourceCard(RecentSources.SourceItem item, PackType activeType){
+        Button card = new Button(UIUtils.cardStyle());
+        card.margin(6f);
+        card.clicked(() -> {
+            Fi file = Core.files.absolute(item.path);
+            if(!file.exists()){
+                RecentSources.remove(item.path, item.type);
+                if(Vars.ui != null){
+                    Vars.ui.showErrorMessage(getLocalizedText("packloader.source.path.notfound", item.path));
+                }
+                rebuild();
+                return;
+            }
+            scanAsync(activeType != null ? activeType : item.type, false, file);
+        });
+
+        boolean isMap = (item.type != null ? item.type : activeType) == PackType.MAP;
+        Color typeColor = isMap ? Pal.heal : Pal.accent;
+
+        card.image(item.isDirectory ? Icon.folder : Icon.download).size(28f).color(typeColor).pad(4f);
+        card.table(t -> {
+            t.left().defaults().left().growX();
+            t.table(header -> {
+                header.left().defaults().left();
+                header.add(item.name).style(Styles.defaultLabel).color(Color.white).ellipsis(true).minWidth(0f).growX();
+                if(item.type != null){
+                    header.table(badge -> {
+                        badge.left().defaults().left();
+                        badge.image(item.type == PackType.MAP ? Icon.terrain : Icon.paste).size(14f).color(typeColor).padRight(3f);
+                        badge.add(item.type.localizedName()).style(Styles.defaultLabel).color(typeColor);
+                    }).padLeft(6f).padRight(4f);
+                }
+            }).growX().minWidth(0f).left().row();
+
+            t.add(item.path).style(Styles.defaultLabel).color(Pal.lightishGray).ellipsis(true).growX().minWidth(0f);
+        }).growX().minWidth(0f).left().padLeft(6f);
+
+        Button removeBtn = card.button(Icon.cancel, Styles.clearNonei, () -> {
+            RecentSources.remove(item.path, item.type);
+            rebuild();
+        }).size(32f).pad(2f).get();
+        removeBtn.addListener(new InputListener(){
+            @Override
+            public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
+                event.stop();
+                return true;
+            }
+        });
+
+        return card;
     }
 
     private Table createSourceOptionButton(Drawable icon, String title, String desc, Runnable clicked, float buttonWidth){

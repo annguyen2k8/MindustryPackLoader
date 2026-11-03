@@ -87,8 +87,8 @@ public final class RecentSources{
         if(path == null || path.trim().isEmpty() || name == null || name.trim().isEmpty()) return;
         Seq<SourceItem> items = load();
 
-        // Remove existing entry for the same path
-        items.removeAll(it -> it.path.equalsIgnoreCase(path));
+        // Remove existing entry for the same path and type
+        items.removeAll(it -> it.path.equalsIgnoreCase(path) && it.type == type);
 
         // Add to front
         items.insert(0, new SourceItem(path, name, type, isDirectory, System.currentTimeMillis()));
@@ -102,10 +102,18 @@ public final class RecentSources{
     }
 
     public static void remove(String path){
+        remove(path, null);
+    }
+
+    public static void remove(String path, PackType type){
         if(path == null || path.trim().isEmpty()) return;
         Seq<SourceItem> items = load();
         int initial = items.size;
-        items.removeAll(it -> it.path.equalsIgnoreCase(path));
+        if(type == null){
+            items.removeAll(it -> it.path.equalsIgnoreCase(path));
+        }else{
+            items.removeAll(it -> it.path.equalsIgnoreCase(path) && it.type == type);
+        }
         if(items.size != initial){
             save(items);
         }
