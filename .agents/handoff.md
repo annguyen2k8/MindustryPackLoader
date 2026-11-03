@@ -3,28 +3,26 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-03 11:25 +07:00
+- **Last updated:** 2026-11-03 12:05 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** UI Text Formatting & Localization Audit: register Mindustry palette and semantic markup tags (`heal`, `remove`, `success`, `failed`, `error`) in Arc `Colors` so tags like `[heal]` are rendered in native colors rather than leaked as literal text; close color spans with `[]` in item cards to eliminate color bleed; verify 100% placeholder and markup parity across EN and VI bundles.
+- **Task:** UI/UX Optimization: resolve Quick Import description text wrap and orphan word overflow; expand row hit area to full table; polish prompt label to native Pal.accent outline style; differentiate Schematics/Maps card descriptions; unify option card minHeight (72f); prevent recent source deletion event bubbling.
 - **Branch:** master; working tree clean post-commit.
 
 ## Results
 
-- [verified] Root Cause & Color Registration:
-  - Disassembled and audited Arc's `GlyphLayout.parseColorMarkup`: Arc resolves `[colorName]` via `Colors.get(colorName)`. If null, it returns `-1` and renders `[colorName]` as literal text.
-  - Mindustry's `UI.loadColors()` only registers `accent`, `unlaunched`, `highlight`, `stat`, and `negstat`. `Pal.heal` and `Pal.remove` exist in code but were never registered into Arc's `Colors` map.
-  - Implemented `PackLoaderMod.initColors()` registering `heal` (`Pal.heal`), `remove` (`Pal.remove`), `accent`, `stat`, `negstat`, `highlight`, and semantic aliases `success`, `failed`, `error`.
-  - Wired `initColors()` into `PackLoaderMod` constructor, `initUI()`, and `Localization` static initializer.
-- [verified] UI Markup Isolation & Closing Tags:
-  - In `PackLoaderDialog.java`, added closing tags `[]` to `[gold]...[]` and `[scarlet]...[]` on entry badge labels.
-  - Added closing tags `[]` to `[lightgray]...[]`, `[gold]...[]`, and `[scarlet]...[]` on secondary info lines to eliminate color bleeding into separators (`  •  `) and subsequent labels.
-- [verified] Localization Parity & Validation:
-  - Verified 176/176 keys across both `bundle.properties` and `bundle_vi.properties` with 100% placeholder index parity (`{0}`, `{1}`, etc.).
-  - Added unit test `testColorTagsRegistrationAndMarkupValidity` verifying all registered colors in Arc's `Colors`.
-  - Added unit test `testImportProgressDetailMarkupTagsAreRegistered` verifying EN/VI progress strings parse with registered colors and don't leak literal `[heal]`.
-  - Added unit test `testBundlePlaceholdersParity` guaranteeing continuous placeholder parity between EN and VI bundles.
+- [verified] Quick Import Layout & Typography:
+  - Concise description wording in EN ("Skip review and auto-import after scan") and VI ("Tự động nhập ngay sau khi quét") eliminating the orphan word ("scan") on a 3rd line.
+  - Enabled full-row hit area (`row.touchable = Touchable.enabled`) so tapping anywhere on the Quick Import row toggles the checkbox.
+  - Adjusted row padding (`pad(4f, 6f, 4f, 6f).padTop(10f).padBottom(8f)`) to match card border insets.
+- [verified] Visual Polish & Spacing:
+  - Styled `packloader.mode.prompt` with `Pal.accent` and `Styles.outlineLabel` to match "Recent Sources" and native Mindustry section headers.
+  - Differentiated mode selection descriptions for Schematics and Maps to remove duplicated wording.
+  - Standardized option card `minHeight` across views to 72f for consistent layout.
+  - Adjusted desktop dialog max width to 520f (keeping 480f on mobile) providing clean breathing room for text.
+- [verified] Interaction Safety:
+  - Added `event.stop()` to the recent source remove button (`Icon.cancel`) input listener, preventing accidental triggering of `card.clicked()` and unintended source scanning.
 - [verified] Automated Tests & Packaging:
-  - All unit tests passed (`.\gradlew.bat test --rerun` BUILD SUCCESSFUL).
+  - All unit tests passed (`.\gradlew.bat test` BUILD SUCCESSFUL).
   - `.\gradlew.bat check` and `.\gradlew.bat verifyJar` BUILD SUCCESSFUL.
   - Untracked artifacts (`session.json`) completely preserved.
 
@@ -39,7 +37,7 @@
 2. Desktop In-Game Smoke Test:
    - Copy `build/libs/MindustryPackLoaderDesktop.jar` into portable Mindustry mod folder `D:\Anzuno\Mindustry\MindustryData\mods\` (or `%APPDATA%\Mindustry\mods\`).
    - Launch `D:\Anzuno\Mindustry\Mindustry.exe`.
-   - Verify: Import progress dialog shows `Success: X` in soft green (`Pal.heal`) without any literal `[heal]` text.
+   - Verify: Mode selection dialog, Quick Import row, and Recent Sources render with balanced text, crisp headers, and unified card sizing.
 
 ## Open questions
 
@@ -47,7 +45,7 @@
 
 ## Verification
 
-- `.\gradlew.bat test --rerun` — BUILD SUCCESSFUL (all unit tests passed).
+- `.\gradlew.bat test` — BUILD SUCCESSFUL (all unit tests passed).
 - `.\gradlew.bat check` — BUILD SUCCESSFUL (desktop JAR verified).
 - `.\gradlew.bat verifyJar` — BUILD SUCCESSFUL (packaged bundle paths verified at `bundles/*`).
 - `session.json` — verified unaffected.

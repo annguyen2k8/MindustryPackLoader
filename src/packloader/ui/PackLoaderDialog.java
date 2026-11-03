@@ -210,12 +210,12 @@ public class PackLoaderDialog extends BaseDialog{
     /** View 0: Initial Mode Selection (Choose Load Schematics vs Load Maps) */
     private void buildModeSelection(){
         Table root = new Table();
-        float maxW = Math.min(Core.graphics.getWidth() * 0.92f, 480f);
+        float maxW = Math.min(Core.graphics.getWidth() * 0.92f, Vars.mobile ? 480f : 520f);
         root.defaults().pad(4f).width(maxW);
 
         // Prompt subtitle
         root.add(getLocalizedText("packloader.mode.prompt"))
-            .color(Pal.lightishGray).style(Styles.defaultLabel).padTop(4f).padBottom(10f).row();
+            .color(Pal.accent).style(Styles.outlineLabel).padTop(6f).padBottom(10f).row();
 
         // Choice 1: Schematics (.msch)
         root.add(createSourceOptionButton(
@@ -227,7 +227,7 @@ public class PackLoaderDialog extends BaseDialog{
                 rebuild();
             },
             maxW
-        )).minHeight(76f).pad(4f).row();
+        )).minHeight(72f).pad(4f).row();
 
         // Choice 2: Maps (.msav)
         root.add(createSourceOptionButton(
@@ -239,10 +239,10 @@ public class PackLoaderDialog extends BaseDialog{
                 rebuild();
             },
             maxW
-        )).minHeight(76f).pad(4f).row();
+        )).minHeight(72f).pad(4f).row();
 
         // Quick Import Option Toggle (no border, aligned with options above)
-        root.add(createQuickImportRow(maxW)).pad(4f).padTop(8f).padBottom(6f).row();
+        root.add(createQuickImportRow(maxW)).pad(4f, 6f, 4f, 6f).padTop(10f).padBottom(8f).row();
 
         // Recent Sources
         Seq<RecentSources.SourceItem> recents = RecentSources.load();
@@ -278,10 +278,17 @@ public class PackLoaderDialog extends BaseDialog{
                     t.add(item.path).style(Styles.defaultLabel).color(Pal.lightishGray).ellipsis(true);
                 }).growX().left().padLeft(6f);
 
-                card.button(Icon.cancel, Styles.clearNonei, () -> {
+                Button removeBtn = card.button(Icon.cancel, Styles.clearNonei, () -> {
                     RecentSources.remove(item.path);
                     rebuild();
-                }).size(32f).pad(2f);
+                }).size(32f).pad(2f).get();
+                removeBtn.addListener(new InputListener(){
+                    @Override
+                    public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
+                        event.stop();
+                        return true;
+                    }
+                });
 
                 root.add(card).minHeight(56f).pad(4f).row();
             }
@@ -306,7 +313,7 @@ public class PackLoaderDialog extends BaseDialog{
     /** View 1: Source Selection (When a specific pack type is active) */
     private void buildSourceSelection(){
         Table root = new Table();
-        float maxW = Math.min(Core.graphics.getWidth() * 0.92f, 480f);
+        float maxW = Math.min(Core.graphics.getWidth() * 0.92f, Vars.mobile ? 480f : 520f);
         root.defaults().pad(4f).width(maxW);
 
         // Schematics Section
@@ -317,7 +324,7 @@ public class PackLoaderDialog extends BaseDialog{
                 getLocalizedText("packloader.source.scan-folder.schem.desc"),
                 () -> openFolderPicker(PackType.SCHEMATIC),
                 maxW
-            )).minHeight(68f).pad(4f).padTop(8f).row();
+            )).minHeight(72f).pad(4f).padTop(6f).row();
 
             root.add(createSourceOptionButton(
                 Icon.download,
@@ -325,7 +332,7 @@ public class PackLoaderDialog extends BaseDialog{
                 getLocalizedText("packloader.source.zip.schem.desc"),
                 () -> pickZip(PackType.SCHEMATIC),
                 maxW
-            )).minHeight(68f).pad(4f).row();
+            )).minHeight(72f).pad(4f).row();
         }
 
         // Maps Section
@@ -336,7 +343,7 @@ public class PackLoaderDialog extends BaseDialog{
                 getLocalizedText("packloader.source.scan-folder.map.desc"),
                 () -> openFolderPicker(PackType.MAP),
                 maxW
-            )).minHeight(68f).pad(4f).padTop(8f).row();
+            )).minHeight(72f).pad(4f).padTop(6f).row();
 
             root.add(createSourceOptionButton(
                 Icon.download,
@@ -344,7 +351,7 @@ public class PackLoaderDialog extends BaseDialog{
                 getLocalizedText("packloader.source.zip.map.desc"),
                 () -> pickZip(PackType.MAP),
                 maxW
-            )).minHeight(68f).pad(4f).row();
+            )).minHeight(72f).pad(4f).row();
         }
 
         // Option: Manual Path Input (Desktop power users)
@@ -355,11 +362,11 @@ public class PackLoaderDialog extends BaseDialog{
                 getLocalizedText("packloader.source.path.desc"),
                 this::openPathInputDialog,
                 maxW
-            )).minHeight(68f).pad(4f).row();
+            )).minHeight(72f).pad(4f).row();
         }
 
         // Quick Import Option Toggle (no border, aligned with options above)
-        root.add(createQuickImportRow(maxW)).pad(4f).padTop(8f).padBottom(6f).row();
+        root.add(createQuickImportRow(maxW)).pad(4f, 6f, 4f, 6f).padTop(10f).padBottom(8f).row();
 
         // Recent Sources
         Seq<RecentSources.SourceItem> recents = RecentSources.getForType(targetType);
@@ -395,10 +402,17 @@ public class PackLoaderDialog extends BaseDialog{
                     t.add(item.path).style(Styles.defaultLabel).color(Pal.lightishGray).ellipsis(true);
                 }).growX().left().padLeft(6f);
 
-                card.button(Icon.cancel, Styles.clearNonei, () -> {
+                Button removeBtn = card.button(Icon.cancel, Styles.clearNonei, () -> {
                     RecentSources.remove(item.path);
                     rebuild();
-                }).size(32f).pad(2f);
+                }).size(32f).pad(2f).get();
+                removeBtn.addListener(new InputListener(){
+                    @Override
+                    public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
+                        event.stop();
+                        return true;
+                    }
+                });
 
                 root.add(card).minHeight(56f).pad(4f).row();
             }
@@ -449,14 +463,15 @@ public class PackLoaderDialog extends BaseDialog{
         quickBox.changed(() -> PackLoaderSettings.setQuickImport(quickBox.isChecked()));
         UIUtils.squareCheck(quickBox, 26f);
 
-        row.add(quickBox).size(26f).padRight(8f).center();
+        row.add(quickBox).size(26f).padRight(10f).center();
 
-        float textWidth = Math.max(160f, rowWidth - 44f);
+        float textWidth = Math.max(160f, rowWidth - 46f);
         Table textTable = new Table();
         textTable.left().defaults().left().growX();
         textTable.add(getLocalizedText("packloader.quick-import"))
             .style(Styles.defaultLabel)
             .color(Color.white)
+            .padBottom(2f)
             .row();
         textTable.add(getLocalizedText("packloader.quick-import.desc"))
             .style(Styles.defaultLabel)
@@ -464,9 +479,9 @@ public class PackLoaderDialog extends BaseDialog{
             .width(textWidth)
             .wrap();
 
-        // Tapping label area also toggles the checkbox
-        textTable.touchable = Touchable.enabled;
-        textTable.clicked(() -> {
+        // Tapping anywhere on the Quick Import row toggles the checkbox
+        row.touchable = Touchable.enabled;
+        row.clicked(() -> {
             quickBox.setChecked(!quickBox.isChecked());
             PackLoaderSettings.setQuickImport(quickBox.isChecked());
         });
