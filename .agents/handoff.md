@@ -3,26 +3,26 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-03 12:22 +07:00
+- **Last updated:** 2026-11-03 12:34 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** Implement Option A ("Phương án A") to distinguish Recent Sources between Schematics and Maps: visual badge & icon colors per type, independent storage by (path, type) key, targeted deletion, and unit tests.
+- **Task:** Fix Recent Source badge icon sizing and text overlap in screenshot: switch to native small glyph icons (Icon.pasteSmall/Icon.terrainSmall), move badge to a dedicated vertically-centered card column, separate text block cleanly, and verify desktop build.
 - **Branch:** master; working tree ready to commit.
 
 ## Results
 
-- [verified] RecentSources Type Differentiation:
-  - Deduplication in `RecentSources.add` now checks both `path` and `type` (`it.path.equalsIgnoreCase(path) && it.type == type`), allowing the same directory/archive to coexist independently as a Schematics source and a Maps source.
-  - Added overloaded `RecentSources.remove(String path, PackType type)` to delete only the specified `(path, type)` pair, while maintaining `remove(String path)` for backward compatibility.
-- [verified] Visual Polish & Type Badges:
-  - Refactored duplicated recent source card rendering in `buildModeSelection()` and `buildSourceSelection()` into a unified helper `createRecentSourceCard(SourceItem item, PackType activeType)`.
-  - Icon & color distinctions:
-    - For `PackType.MAP`: card icon and badge colored `Pal.heal`, showing mini `Icon.terrain` with localized name ("Map" / "Bản đồ").
-    - For `PackType.SCHEMATIC`: card icon and badge colored `Pal.accent`, showing mini `Icon.paste` with localized name ("Schematic").
-  - Clean layout: badge placed on the right of the header row with `growX().minWidth(0f)` on the title label, ensuring long titles truncate cleanly with ellipsis without pushing the badge or delete button out.
+- [verified] Badge Icon Sizing & Text Overlap Fix:
+  - Root cause: Mindustry font-glyph icons (`Icon.paste`, `Icon.terrain`) created by `Fonts.getGlyph(Fonts.icon, ...)` draw at their fixed 28-32px glyph size regardless of Cell bounds, causing large icons to overflow into the text label and distort the row.
+  - Replaced with native inline small font-glyph drawables: `Icon.pasteSmall` and `Icon.terrainSmall` (sourced from `Fonts.def`, 12-14px glyphs), with defensive fallback to regular icons if small icons are not initialized.
+- [verified] Card 4-Column Balanced Layout:
+  - Restructured `createRecentSourceCard` into 4 clean, dedicated horizontal columns:
+    1. Source format icon (`Icon.folder` / `Icon.download`, 28f, `typeColor`).
+    2. Primary text table (`name` on line 1, `path` on line 2, both `growX().minWidth(0f).ellipsis(true)`).
+    3. Type badge (`Icon.*Small` + localized type name in `Styles.outlineLabel` with `typeColor`, vertically centered, padded `4f, 6f`).
+    4. Remove button (`Icon.cancel`, 32f, cleanly anchored on the far right).
+  - Both text lines now have full expanding width and never collide with or distort the badge.
 - [verified] Automated Tests & Packaging:
-  - Added `testDeduplicationDistinguishesType()` and `testRemoveByType()` to `RecentSourcesTest.java`.
   - `.\gradlew.bat test` — BUILD SUCCESSFUL (all unit tests passed).
-  - `.\gradlew.bat check` and `.\gradlew.bat verifyJar` — BUILD SUCCESSFUL (JAR packaging verified).
+  - `.\gradlew.bat jar check verifyJar` — BUILD SUCCESSFUL (packaged bundle paths verified at `bundles/*`).
   - Untracked artifacts (`session.json`) completely preserved.
 
 ## Remaining

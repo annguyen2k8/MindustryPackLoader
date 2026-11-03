@@ -381,27 +381,34 @@ public class PackLoaderDialog extends BaseDialog{
             scanAsync(activeType != null ? activeType : item.type, false, file);
         });
 
-        boolean isMap = (item.type != null ? item.type : activeType) == PackType.MAP;
+        PackType displayType = item.type != null ? item.type : activeType;
+        boolean isMap = displayType == PackType.MAP;
         Color typeColor = isMap ? Pal.heal : Pal.accent;
 
+        // Column 1: Source format icon (Folder vs Archive)
         card.image(item.isDirectory ? Icon.folder : Icon.download).size(28f).color(typeColor).pad(4f);
+
+        // Column 2: Name and path info block
         card.table(t -> {
             t.left().defaults().left().growX();
-            t.table(header -> {
-                header.left().defaults().left();
-                header.add(item.name).style(Styles.defaultLabel).color(Color.white).ellipsis(true).minWidth(0f).growX();
-                if(item.type != null){
-                    header.table(badge -> {
-                        badge.left().defaults().left();
-                        badge.image(item.type == PackType.MAP ? Icon.terrain : Icon.paste).size(14f).color(typeColor).padRight(3f);
-                        badge.add(item.type.localizedName()).style(Styles.defaultLabel).color(typeColor);
-                    }).padLeft(6f).padRight(4f);
-                }
-            }).growX().minWidth(0f).left().row();
-
+            t.add(item.name).style(Styles.defaultLabel).color(Color.white).ellipsis(true).growX().minWidth(0f).row();
             t.add(item.path).style(Styles.defaultLabel).color(Pal.lightishGray).ellipsis(true).growX().minWidth(0f);
         }).growX().minWidth(0f).left().padLeft(6f);
 
+        // Column 3: Type badge (Map vs Schematic)
+        if(displayType != null){
+            Drawable typeIcon = isMap ?
+                (Icon.terrainSmall != null ? Icon.terrainSmall : Icon.terrain) :
+                (Icon.pasteSmall != null ? Icon.pasteSmall : Icon.paste);
+
+            card.table(badge -> {
+                badge.right().defaults().right();
+                badge.image(typeIcon).size(16f).color(typeColor).padRight(4f);
+                badge.add(displayType.localizedName()).style(Styles.outlineLabel).color(typeColor);
+            }).padLeft(4f).padRight(6f);
+        }
+
+        // Column 4: Remove button
         Button removeBtn = card.button(Icon.cancel, Styles.clearNonei, () -> {
             RecentSources.remove(item.path, item.type);
             rebuild();
