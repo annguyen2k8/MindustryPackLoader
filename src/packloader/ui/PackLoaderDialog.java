@@ -487,7 +487,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
         CheckBox quickBox = new CheckBox("");
         quickBox.setChecked(PackLoaderSettings.isQuickImport());
-        quickBox.changed(() -> PackLoaderSettings.setQuickImport(quickBox.isChecked()));
+        quickBox.touchable = Touchable.disabled;
         UIUtils.squareCheck(quickBox, 26f);
 
         row.add(quickBox).size(26f).padRight(10f).center();
@@ -495,6 +495,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         float textWidth = Math.max(160f, rowWidth - 46f);
         Table textTable = new Table();
         textTable.left().defaults().left().growX();
+        textTable.touchable = Touchable.disabled;
         textTable.add(getLocalizedText("packloader.quick-import"))
             .style(Styles.defaultLabel)
             .color(Color.white)
@@ -522,12 +523,13 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
         CheckBox skipBox = new CheckBox("");
         skipBox.setChecked(PackLoaderSettings.isSkipIdenticalContent());
-        skipBox.changed(() -> PackLoaderSettings.setSkipIdenticalContent(skipBox.isChecked()));
+        skipBox.touchable = Touchable.disabled;
         UIUtils.squareCheck(skipBox, 22f);
         skipRow.add(skipBox).size(22f).padRight(8f).center();
 
         Table skipTextTable = new Table();
         skipTextTable.left().defaults().left().growX();
+        skipTextTable.touchable = Touchable.disabled;
         skipTextTable.add(getLocalizedText("packloader.quick-import.skip-identical"))
             .style(Styles.defaultLabel)
             .color(Color.lightGray);
