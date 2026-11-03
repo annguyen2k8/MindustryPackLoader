@@ -736,27 +736,43 @@ public class PackImporter{
         return target;
     }
 
-    public static String findUniqueSchematicName(String baseName){
+    public static String findUniqueSchematicName(String baseName, java.util.Set<String> extraTakenNames){
         int index = 1;
         String name = baseName + " " + index;
-        while(isSchematicNameTaken(name)){
+        while(isSchematicNameTaken(name) || containsIgnoreCase(extraTakenNames, name)){
             index++;
             name = baseName + " " + index;
         }
         return name;
     }
 
-    public static String findUniqueMapName(String baseName){
+    public static String findUniqueSchematicName(String baseName){
+        return findUniqueSchematicName(baseName, null);
+    }
+
+    public static String findUniqueMapName(String baseName, java.util.Set<String> extraTakenNames){
         int index = 1;
         String name = baseName + "_" + index;
-        while(isMapNameTaken(name)){
+        while(isMapNameTaken(name) || containsIgnoreCase(extraTakenNames, name)){
             index++;
             name = baseName + "_" + index;
         }
         return name;
     }
 
-    private static boolean isSchematicNameTaken(String name){
+    public static String findUniqueMapName(String baseName){
+        return findUniqueMapName(baseName, null);
+    }
+
+    public static boolean containsIgnoreCase(java.util.Set<String> set, String target){
+        if(set == null || target == null || set.isEmpty()) return false;
+        for(String s : set){
+            if(s != null && s.equalsIgnoreCase(target)) return true;
+        }
+        return false;
+    }
+
+    public static boolean isSchematicNameTaken(String name){
         if(Vars.schematics == null) return false;
         for(Schematic sc : Vars.schematics.all()){
             if(sc.name().equalsIgnoreCase(name)) return true;
@@ -764,7 +780,7 @@ public class PackImporter{
         return false;
     }
 
-    private static boolean isMapNameTaken(String name){
+    public static boolean isMapNameTaken(String name){
         if(Vars.maps == null) return false;
         for(Map map : Vars.maps.all()){
             if(map.name() != null && map.name().equalsIgnoreCase(name)) return true;

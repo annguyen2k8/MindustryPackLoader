@@ -10,6 +10,7 @@ import arc.scene.event.Touchable;
 import arc.scene.style.Drawable;
 import arc.scene.ui.Button;
 import arc.scene.ui.CheckBox;
+import arc.scene.ui.Label;
 import arc.scene.ui.ScrollPane;
 import arc.scene.ui.TextField;
 import arc.scene.ui.layout.Table;
@@ -28,6 +29,8 @@ import packloader.core.PackFormat;
 import packloader.core.PackImporter;
 import packloader.core.PackImporter.ImportProgress;
 import packloader.core.PackScanner;
+import packloader.model.DryRunAction;
+import packloader.model.DryRunPlan;
 import packloader.model.DuplicatePolicy;
 import packloader.model.EntryFilter;
 import packloader.model.ImportReport;
@@ -59,6 +62,7 @@ public class PackLoaderDialog extends BaseDialog{
     private enum FilterMode{ ALL, MAPS, SCHEMATICS }
     private FilterMode filterMode = FilterMode.ALL;
     private String searchText = "";
+    private Label previewSummaryLabel;
 
     private final TaskGeneration scanGeneration = new TaskGeneration();
     private final TaskGeneration importGeneration = new TaskGeneration();
@@ -712,6 +716,15 @@ public class PackLoaderDialog extends BaseDialog{
 
         cont.add(conflictRow).growX().pad(4f).row();
 
+        // Live Dry-Run Preview Summary Row
+        Table previewRow = new Table(Tex.pane);
+        previewRow.margin(6f);
+        previewRow.image(Icon.eye).size(18f).color(Pal.accent).padRight(6f);
+        DryRunPlan initialPlan = calculateDryRunPlan();
+        previewSummaryLabel = previewRow.add(formatDryRunSummary(initialPlan))
+            .color(Pal.lightishGray).style(Styles.outlineLabel).growX().left().get();
+        cont.add(previewRow).growX().pad(2f, 4f, 4f, 4f).row();
+
         // Scrollable Entries List Container
         cont.table(this::buildListTable).grow().minWidth(0f).pad(4f).name("listContainer").row();
 
@@ -723,18 +736,54 @@ public class PackLoaderDialog extends BaseDialog{
         }else{
             UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
                 Core.app.openURI(ISSUES_URL);
-            }).size(210f, 64f).get());
+            }).size(180f, 64f).get());
+        }
+
+        var previewBtn = UIUtils.pad(buttons.button(
+            getLocalizedText("packloader.dryrun.button.preview"),
+            Icon.eye,
+            this::showDryRunDialog
+        ).size(Vars.mobile ? 140f : 170f, 64f).get());
+        if(previewBtn != null){
+            previewBtn.update(() -> {
+                previewBtn.setDisabled(visibleSelectedCount() == 0 || importRunning);
+            });
         }
 
         int selectedCount = visibleSelectedCount();
         String initialImportText = getLocalizedText("packloader.import.action", selectedCount);
-        var importBtn = UIUtils.pad(buttons.button(initialImportText, Icon.download, this::executeImport).size(210f, 64f).get());
+        var importBtn = UIUtils.pad(buttons.button(initialImportText, Icon.download, this::executeImport).size(Vars.mobile ? 160f : 200f, 64f).get());
         importBtn.update(() -> {
             int count = visibleSelectedCount();
             String text = getLocalizedText("packloader.import.action", count);
             importBtn.setText(text);
             importBtn.setDisabled(count == 0 || importRunning);
         });
+    }
+
+    private void showDryRunDialog(){
+        DryRunPlan plan = calculateDryRunPlan();
+        new DryRunDialog(plan, this::executeImport).show();
+    }
+
+    private void updatePreviewSummary(){
+        if(previewSummaryLabel != null){
+            DryRunPlan plan = calculateDryRunPlan();
+            previewSummaryLabel.setText(formatDryRunSummary(plan));
+        }
+    }
+
+    private String formatDryRunSummary(DryRunPlan plan){
+        return getLocalizedText("packloader.dryrun.summary",
+            "[heal]" + plan.newCount + "[]",
+            "[accent]" + plan.overwriteCount + "[]",
+            "[gold]" + plan.renameCount + "[]",
+            "[lightgray]" + plan.skipCount + "[]"
+        );
+    }
+
+    public DryRunPlan calculateDryRunPlan(){
+        return DryRunPlan.calculate(entries, targetType, getPolicyForType(PackType.MAP), getPolicyForType(PackType.SCHEMATIC));
     }
 
     private Table listTableRef;
@@ -751,6 +800,7 @@ public class PackLoaderDialog extends BaseDialog{
     }
 
     private void rebuildEntriesList(){
+        updatePreviewSummary();
         if(listTableRef != null){
             listTableRef.clear();
             populateListTable(listTableRef);
@@ -774,7 +824,11 @@ public class PackLoaderDialog extends BaseDialog{
             return;
         }
 
+        DryRunPlan plan = calculateDryRunPlan();
+
         for(PackEntry entry : filtered){
+            DryRunPlan.DryRunItem dryItem = plan.getItem(entry);
+
             // Button rows get hover/pressed feedback while keeping the pane-like look.
             Button row = new Button(UIUtils.rowStyle());
             row.margin(6f);
@@ -791,6 +845,7 @@ public class PackLoaderDialog extends BaseDialog{
             row.clicked(() -> {
                 entry.selected = !entry.selected;
                 box.setChecked(entry.selected);
+                updatePreviewSummary();
             });
 
             // Type Icon
@@ -812,6 +867,12 @@ public class PackLoaderDialog extends BaseDialog{
 
                 if(entry.isDuplicate){
                     titleBuilder.append("  [gold]").append(getLocalizedText("packloader.badge.duplicate")).append("[]");
+                    if(dryItem != null){
+                        String actionColor = dryItem.action == DryRunAction.NEW ? "heal" :
+                                             dryItem.action == DryRunAction.OVERWRITE ? "accent" :
+                                             dryItem.action == DryRunAction.RENAME ? "gold" : "lightgray";
+                        titleBuilder.append(" -> [").append(actionColor).append("]").append(dryItem.action.localized()).append("[]");
+                    }
                 }
                 if(!entry.isValid){
                     titleBuilder.append("  [scarlet]").append(getLocalizedText("packloader.badge.invalid")).append("[]");
@@ -827,7 +888,9 @@ public class PackLoaderDialog extends BaseDialog{
                     infoBuilder.append("  •  [lightgray]").append(entry.sanitizedFileName).append("[]");
                 }
 
-                if(entry.isDuplicate && !entry.duplicateReason.isEmpty()){
+                if(dryItem != null && dryItem.isRenamed()){
+                    infoBuilder.append("  •  [gold]").append(getLocalizedText("packloader.dryrun.target.renamed", dryItem.plannedTargetName)).append("[]");
+                }else if(entry.isDuplicate && !entry.duplicateReason.isEmpty()){
                     infoBuilder.append("  •  [gold]").append(entry.duplicateReason).append("[]");
                 }
                 if(!entry.isValid && !entry.errorReason.isEmpty()){

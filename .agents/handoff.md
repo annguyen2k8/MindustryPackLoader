@@ -3,34 +3,44 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-03 12:58 +07:00
+- **Last updated:** 2026-11-03 13:25 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** Implement P2 — Per-type Conflict Policy Presets: independent conflict policy presets (SKIP/OVERWRITE/RENAME) for Maps and Schematics, per-type settings persistence and legacy migration, unified Quick Import and review pipeline, contextual UI in source selection and review screens.
+- **Task:** Implement P2 — Dry-run Conflict Preview: non-destructive import preview classifying entries into NEW, SKIP, OVERWRITE, and RENAME with per-type policy support, live in-place summary and badges, and dedicated modal DryRunDialog with action breakdown and confirmation.
 - **Branch:** master; working tree ready to commit.
 
 ## Results
 
-- [verified] Per-Type Settings Persistence & Migration:
-  - Added dedicated keys: `packloader.duplicate-policy.map` and `packloader.duplicate-policy.schematic` in `PackLoaderSettings`.
-  - Implemented `getDuplicatePolicy(PackType)` and `setDuplicatePolicy(PackType, DuplicatePolicy)` with full backward compatibility: falls back to legacy `packloader.duplicate-policy` if per-type key has not been set yet, preserving user preferences across updates.
-  - Setting policy for one type is strictly independent and does not affect the other.
-- [verified] Pipeline & Quick Import Integration:
-  - Overloaded `EntryFilter.selectEligibleForQuickImport(entries, targetType, mapPolicy, schemPolicy)` to evaluate duplicate eligibility per entry type.
-  - Overloaded `PackImporter.importEntries(entries, mapPolicy, schemPolicy, listener)` to dispatch appropriate duplicate policy (`SKIP`, `OVERWRITE`, `RENAME`) depending on `entry.type`.
-  - Quick Import in `scanAsync` automatically retrieves and applies both presets without manual intervention.
-- [verified] Contextual Mindustry UI:
-  - Added conflict policy preset selector on `buildSourceSelection(targetType)` allowing power users to preview and adjust policy directly before scanning or using Quick Import.
-  - In `buildEntriesView()`, dynamically renders a single conflict row when a single type is active (`targetType != null` or only one type scanned) and dual rows in mixed mode (`targetType == null` with both types present).
-  - Added localized strings `packloader.conflict.label.map` and `packloader.conflict.label.schem` in both EN and VI bundles.
+- [verified] Dry-run Classification & Simulation (`DryRunPlan`, `DryRunAction`):
+  - Defined 4 planned actions with native Mindustry palette colors: `NEW` (`Pal.heal`), `SKIP` (`Pal.lightishGray`), `OVERWRITE` (`Pal.accent`), `RENAME` (`Color.gold`).
+  - Implemented `DryRunPlan.calculate(...)` evaluating entries non-destructively:
+    - Independent policy presets applied per content type (`PackType.MAP` vs `PackType.SCHEMATIC`).
+    - Accurately distinguishes non-conflicting entries (`NEW`) from existing duplicates.
+    - Simulates intra-batch sequential naming without mutating live game registries or filesystem (e.g. `Map`, `Map_1`, `Map_2`).
+    - Respects entry selection: only selected entries count towards totals and sequential renames; unselected entries have display status without reserving batch names.
+    - Aggregates action counters: `newCount`, `overwriteCount`, `renameCount`, `skipCount`, `totalSelected`.
+  - Overloaded `PackImporter.findUniqueMapName` and `PackImporter.findUniqueSchematicName` with `extraTakenNames` to maintain identical rename naming conventions between preview and live import.
+- [verified] Live Review & Contextual UI (`PackLoaderDialog`, `DryRunDialog`):
+  - Added live preview summary row below conflict policies in `buildEntriesView()`:
+    - Dynamically displays formatted counters: `Preview: X New • Y Overwrite • Z Rename • W Skip` with colored tags.
+    - Updates in real-time on selection toggle, filter mode change, search input, or conflict policy change.
+  - Contextual resolution tags on entry rows:
+    - Duplicates display planned action badge (e.g. `[gold]Duplicate -> [accent]Overwrite[]`, `[gold]Duplicate -> [lightgray]Skip[]`).
+    - Renamed duplicates explicitly display targeted unique name in subtitle (e.g. `Renamed to: map_1`).
+  - Added "Preview" (`Icon.eye`) action button in bottom toolbar opening modal `DryRunDialog`.
+  - Created `DryRunDialog`:
+    - Shows 4 action stat cards with outline numbers and labels.
+    - Scrollable list of items planned for import with content type icon, name, rename target, and colored action badge.
+    - Disclaimer note informing users that preview is an estimate subject to intervening external filesystem changes.
+    - "Back" and "Confirm Import (N)" buttons.
+- [verified] Full Localization Parity:
+  - Added all 15 dry-run keys to both `bundle.properties` and `bundle_vi.properties`.
+  - Verified placeholder and key parity via automated tests.
 - [verified] Automated Tests & Packaging:
-  - Added `testPerTypeConflictPolicyPresets()` and `testLegacyPolicyMigrationAndFallback()` in `RecentSourcesTest.java`.
-  - Added `testSelectEligibleForQuickImportPerTypePolicies()` in `EntryFilterTest.java`.
-  - Added `testImportEntriesWithPerTypePolicies()` in `PackImporterTest.java`.
-  - Added bundle key parity assertions in `BundleTest.java`.
-  - `.\gradlew.bat test` — BUILD SUCCESSFUL (all unit tests passed).
-  - `.\gradlew.bat jar check verifyJar` — BUILD SUCCESSFUL (packaged desktop JAR verified).
+  - Created `test/packloader/model/DryRunPlanTest.java` (7 test cases covering null/empty, all 4 actions, mixed batches, intra-batch rename sequence, zero side-effects disk check, selection filtering).
+  - All tests passed: `.\gradlew.bat test` — BUILD SUCCESSFUL.
+  - `.\gradlew.bat jar check verifyJar` — BUILD SUCCESSFUL (desktop JAR verified).
   - Deployed updated JAR to `D:\Anzuno\Mindustry\MindustryData\mods\MindustryPackLoaderDesktop.jar`.
-  - Untracked artifacts (`session.json`) completely preserved.
+  - Preserved untracked/local artifacts (`session.json`).
 
 ## Remaining
 
@@ -42,7 +52,11 @@
 1. Read `.agents/handoff.md` from disk at task start.
 2. Desktop In-Game Smoke Test:
    - Launch `D:\Anzuno\Mindustry\Mindustry.exe`.
-   - Verify: Mode selection dialog -> Schematics / Maps source selection displays independent conflict policy rows; changing one type does not affect the other; Quick Import respects per-type preset.
+   - Open MindustryPackLoader review screen.
+   - Verify:
+     - Live preview summary bar reflects selections and per-type policies.
+     - Row badges show duplicate resolution actions and simulated rename targets.
+     - Clicking "Preview" opens `DryRunDialog` with 4 stat cards, scrollable item list, disclaimer, and "Confirm Import".
 
 ## Open questions
 
@@ -51,5 +65,5 @@
 ## Verification
 
 - `.\gradlew.bat test` — BUILD SUCCESSFUL (all unit tests passed).
-- `.\gradlew.bat check` — BUILD SUCCESSFUL (desktop JAR verified).
+- `.\gradlew.bat check` — BUILD SUCCESSFUL (all checks passed).
 - `.\gradlew.bat verifyJar` — BUILD SUCCESSFUL (packaged bundle paths verified at `bundles/*`).
