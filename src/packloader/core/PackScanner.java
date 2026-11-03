@@ -41,6 +41,7 @@ public class PackScanner{
 
     private final Fi mapDirectory;
     private final Fi schematicDirectory;
+    private final ContentHashIndex hashIndex;
     private final Object tempLock = new Object();
     private final Seq<Fi> temporaryZips = new Seq<>();
     private final Seq<String> warnings = new Seq<>();
@@ -72,6 +73,11 @@ public class PackScanner{
     public PackScanner(Fi mapDirectory, Fi schematicDirectory){
         this.mapDirectory = mapDirectory;
         this.schematicDirectory = schematicDirectory;
+        this.hashIndex = new ContentHashIndex(mapDirectory, schematicDirectory);
+    }
+
+    public ContentHashIndex getHashIndex(){
+        return hashIndex;
     }
 
     /** Clears warnings collected by previous scans. Call before starting a new scan session. */
@@ -382,6 +388,7 @@ public class PackScanner{
         long scanElapsed = System.currentTimeMillis() - scanStartTime;
         Log.info("[PackLoader] ZIP scan completed: @ entries found in @ ms (@ ms/entry)",
             entries.size, scanElapsed, entries.isEmpty() ? 0 : scanElapsed / Math.max(1, entries.size));
+        checkContentDuplicates(entries);
         return entries;
     }
 
@@ -417,6 +424,7 @@ public class PackScanner{
             scanDirectoryRecursive(dir, dir, entries, targetType, listener, 0, new HashSet<>());
             long elapsed = System.currentTimeMillis() - startTime;
             Log.info("[PackLoader] Directory scan completed: @ entries found in @ ms", entries.size, elapsed);
+            checkContentDuplicates(entries);
             return entries;
         }catch(Throwable t){
             // Entries from already-scanned nested ZIPs own materialized SAF temp files;
@@ -571,11 +579,21 @@ public class PackScanner{
             }
             long elapsed = System.currentTimeMillis() - startTime;
             Log.info("[PackLoader] File scan completed: @ entries found in @ ms", entries.size, elapsed);
+            checkContentDuplicates(entries);
             return entries;
         }catch(Throwable t){
             cleanupTemporaryZips(entries);
             throw t;
         }
+    }
+
+    public PackEntry scanFile(Fi file) throws IOException{
+        return scanFile(file, null);
+    }
+
+    public PackEntry scanFile(Fi file, PackType targetType) throws IOException{
+        Seq<PackEntry> res = scanFiles(targetType, file);
+        return res.isEmpty() ? null : res.first();
     }
 
     private PackEntry createEntryIfSupported(Fi file, String path, PackType targetType){
@@ -711,6 +729,54 @@ public class PackScanner{
                     }
                 }
             }catch(Throwable ignored){}
+        }
+    }
+
+    /**
+     * Inspects entries for identical content hashes (SHA-256).
+     * Distinguishes content duplicates from name conflicts without modifying name conflict flags.
+     * Evaluates both existing game library files and intra-batch/multi-source entries.
+     */
+    public void checkContentDuplicates(Seq<PackEntry> entries){
+        if(entries == null || entries.isEmpty()) return;
+
+        hashIndex.refresh();
+
+        java.util.Map<String, PackEntry> batchMaps = new HashMap<>();
+        java.util.Map<String, PackEntry> batchSchems = new HashMap<>();
+
+        for(PackEntry entry : entries){
+            entry.isContentDuplicate = false;
+            entry.isIntraBatchContentDuplicate = false;
+            entry.contentDuplicateMatch = "";
+            entry.contentDuplicateReason = "";
+
+            if(!entry.isValid || entry.size <= 0) continue;
+
+            String hash = entry.getOrComputeSha256();
+            if(hash.isEmpty()) continue;
+
+            // 1. Check against existing files in game library
+            ContentHashIndex.FileRecord existing = hashIndex.findMatch(hash, entry.type);
+            if(existing != null){
+                entry.isContentDuplicate = true;
+                entry.isIntraBatchContentDuplicate = false;
+                entry.contentDuplicateMatch = existing.name;
+                entry.contentDuplicateReason = getLocalizedText("packloader.duplicate.content", existing.name);
+                continue;
+            }
+
+            // 2. Check against earlier entries in this batch/queue
+            java.util.Map<String, PackEntry> batchSeen = (entry.type == PackType.MAP) ? batchMaps : batchSchems;
+            PackEntry earlier = batchSeen.get(hash);
+            if(earlier != null){
+                entry.isContentDuplicate = true;
+                entry.isIntraBatchContentDuplicate = true;
+                entry.contentDuplicateMatch = earlier.sanitizedFileName;
+                entry.contentDuplicateReason = getLocalizedText("packloader.duplicate.content.batch", earlier.sanitizedFileName);
+            }else{
+                batchSeen.put(hash, entry);
+            }
         }
     }
 

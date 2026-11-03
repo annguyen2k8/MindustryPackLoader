@@ -7,6 +7,7 @@ import arc.util.serialization.Jval;
 import mindustry.Vars;
 import mindustry.game.Schematic;
 import mindustry.maps.Map;
+import packloader.core.ContentHash;
 import packloader.core.PackFormat;
 import packloader.core.PackImporter;
 import packloader.model.PackEntry;
@@ -555,25 +556,6 @@ public class UndoManager{
     // ---------------------------------------------------------------------
 
     public static String computeSha256(Fi file){
-        if(file == null || !file.exists() || file.isDirectory()) return "";
-        try{
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            try(InputStream in = file.read()){
-                byte[] buf = new byte[8192];
-                int n;
-                while((n = in.read(buf)) != -1){
-                    digest.update(buf, 0, n);
-                }
-            }
-            byte[] hash = digest.digest();
-            StringBuilder sb = new StringBuilder(hash.length * 2);
-            for(byte b : hash){
-                sb.append(Character.forDigit((b >> 4) & 0xF, 16));
-                sb.append(Character.forDigit(b & 0xF, 16));
-            }
-            return sb.toString();
-        }catch(Throwable t){
-            return "";
-        }
+        return ContentHash.computeSha256(file);
     }
 }

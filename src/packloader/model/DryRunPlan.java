@@ -3,6 +3,7 @@ package packloader.model;
 import arc.struct.ObjectMap;
 import arc.struct.Seq;
 import packloader.core.PackImporter;
+import packloader.util.PackLoaderSettings;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -19,11 +20,21 @@ public class DryRunPlan{
         public final PackEntry entry;
         public final DryRunAction action;
         public final String plannedTargetName;
+        public final boolean isContentDuplicate;
+        public final String contentDuplicateMatch;
 
         public DryRunItem(PackEntry entry, DryRunAction action, String plannedTargetName){
+            this(entry, action, plannedTargetName, entry != null && entry.isContentDuplicate,
+                entry != null ? entry.contentDuplicateMatch : "");
+        }
+
+        public DryRunItem(PackEntry entry, DryRunAction action, String plannedTargetName,
+                          boolean isContentDuplicate, String contentDuplicateMatch){
             this.entry = entry;
             this.action = action;
             this.plannedTargetName = plannedTargetName;
+            this.isContentDuplicate = isContentDuplicate;
+            this.contentDuplicateMatch = contentDuplicateMatch == null ? "" : contentDuplicateMatch;
         }
 
         public boolean isRenamed(){
@@ -41,6 +52,7 @@ public class DryRunPlan{
     public int overwriteCount = 0;
     public int renameCount = 0;
     public int skipCount = 0;
+    public int contentDuplicateCount = 0;
     public int totalSelected = 0;
 
     public DryRunItem getItem(PackEntry entry){
@@ -49,6 +61,12 @@ public class DryRunPlan{
 
     public static DryRunPlan calculate(Seq<PackEntry> entries, PackType targetType,
                                       DuplicatePolicy mapPolicy, DuplicatePolicy schemPolicy){
+        return calculate(entries, targetType, mapPolicy, schemPolicy, PackLoaderSettings.isSkipIdenticalContent());
+    }
+
+    public static DryRunPlan calculate(Seq<PackEntry> entries, PackType targetType,
+                                      DuplicatePolicy mapPolicy, DuplicatePolicy schemPolicy,
+                                      boolean skipIdenticalContent){
         DryRunPlan plan = new DryRunPlan();
         if(entries == null || entries.isEmpty()) return plan;
 
@@ -79,7 +97,16 @@ public class DryRunPlan{
             DryRunAction action;
             String plannedName = entry.displayName;
 
-            if(!hasConflict){
+            if(entry.isContentDuplicate){
+                plan.contentDuplicateCount++;
+            }
+
+            boolean isContentSkip = skipIdenticalContent && entry.isContentDuplicate;
+
+            if(isContentSkip){
+                action = DryRunAction.SKIP;
+                plan.skipCount++;
+            }else if(!hasConflict){
                 action = DryRunAction.NEW;
                 takenNames.add(entry.displayName);
                 takenFiles.add(entry.sanitizedFileName);
@@ -120,6 +147,8 @@ public class DryRunPlan{
             String plannedName = entry.displayName;
 
             if(!entry.isValid){
+                action = DryRunAction.SKIP;
+            }else if(PackLoaderSettings.isSkipIdenticalContent() && entry.isContentDuplicate){
                 action = DryRunAction.SKIP;
             }else if(!entry.isDuplicate){
                 action = DryRunAction.NEW;

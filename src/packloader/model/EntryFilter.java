@@ -1,6 +1,7 @@
 package packloader.model;
 
 import arc.struct.Seq;
+import packloader.util.PackLoaderSettings;
 
 /** Shared, allocation-free filtering and selection helpers for the entry list. */
 public final class EntryFilter{
@@ -53,6 +54,18 @@ public final class EntryFilter{
         }
     }
 
+    /** Selects only visible valid entries whose content is unique (not content duplicates). */
+    public static void selectUniqueContentOnly(Seq<PackEntry> entries, PackType targetType, PackType filterType,
+                                               String searchText){
+        if(entries == null) return;
+        for(int i = 0; i < entries.size; i++){
+            PackEntry entry = entries.get(i);
+            if(matches(entry, targetType, filterType, searchText)){
+                entry.selected = !entry.isContentDuplicate && entry.isValid;
+            }
+        }
+    }
+
     /** Selects only duplicate visible entries, deselecting new ones. */
     public static void selectDuplicatesOnly(Seq<PackEntry> entries, PackType targetType, PackType filterType,
                                             String searchText){
@@ -81,6 +94,16 @@ public final class EntryFilter{
      */
     public static int selectEligibleForQuickImport(Seq<PackEntry> entries, PackType targetType,
                                                   DuplicatePolicy mapPolicy, DuplicatePolicy schemPolicy){
+        return selectEligibleForQuickImport(entries, targetType, mapPolicy, schemPolicy,
+            PackLoaderSettings.isSkipIdenticalContent());
+    }
+
+    /**
+     * Overload supporting independent per-type conflict policy presets and explicit identical-content skipping.
+     */
+    public static int selectEligibleForQuickImport(Seq<PackEntry> entries, PackType targetType,
+                                                  DuplicatePolicy mapPolicy, DuplicatePolicy schemPolicy,
+                                                  boolean skipIdenticalContent){
         if(entries == null) return 0;
         int count = 0;
         for(int i = 0; i < entries.size; i++){
@@ -90,6 +113,10 @@ public final class EntryFilter{
                 continue;
             }
             if(!entry.isValid){
+                entry.selected = false;
+                continue;
+            }
+            if(skipIdenticalContent && entry.isContentDuplicate){
                 entry.selected = false;
                 continue;
             }

@@ -44,6 +44,9 @@ public class DryRunDialog extends BaseDialog{
         addStatCard(statsTable, getLocalizedText("packloader.dryrun.stat.overwrite"), plan.overwriteCount, Pal.accent);
         addStatCard(statsTable, getLocalizedText("packloader.dryrun.stat.rename"), plan.renameCount, Color.gold);
         addStatCard(statsTable, getLocalizedText("packloader.dryrun.stat.skip"), plan.skipCount, Pal.lightishGray);
+        if(plan.contentDuplicateCount > 0){
+            addStatCard(statsTable, getLocalizedText("packloader.dryrun.stat.content-duplicates"), plan.contentDuplicateCount, Color.cyan);
+        }
 
         cont.add(statsTable).growX().pad(4f, 8f, 4f, 8f).row();
 
@@ -81,6 +84,9 @@ public class DryRunDialog extends BaseDialog{
                     info.append("[lightgray]").append(item.entry.sanitizedFileName).append("[]");
                     if(item.entry.isDuplicate && !item.entry.duplicateReason.isEmpty()){
                         info.append("  •  [gold]").append(item.entry.duplicateReason).append("[]");
+                    }
+                    if(item.entry.isContentDuplicate && !item.entry.contentDuplicateReason.isEmpty()){
+                        info.append("  •  [cyan]").append(item.entry.contentDuplicateReason).append("[]");
                     }
                     t.add(info.toString()).ellipsis(true).growX().minWidth(0f).padTop(2f);
                 }).growX().minWidth(0f).left().padLeft(6f);

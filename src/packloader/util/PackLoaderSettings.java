@@ -6,6 +6,7 @@ import packloader.model.PackType;
 
 public final class PackLoaderSettings{
     public static final String KEY_QUICK_IMPORT = "packloader.quick-import";
+    public static final String KEY_SKIP_IDENTICAL_CONTENT = "packloader.skip-identical-content";
     public static final String KEY_DUPLICATE_POLICY = "packloader.duplicate-policy";
     public static final String KEY_DUPLICATE_POLICY_MAP = "packloader.duplicate-policy.map";
     public static final String KEY_DUPLICATE_POLICY_SCHEM = "packloader.duplicate-policy.schematic";
@@ -19,6 +20,16 @@ public final class PackLoaderSettings{
     public static void setQuickImport(boolean quick){
         if(Core.settings != null){
             Core.settings.put(KEY_QUICK_IMPORT, quick);
+        }
+    }
+
+    public static boolean isSkipIdenticalContent(){
+        return Core.settings != null && Core.settings.getBool(KEY_SKIP_IDENTICAL_CONTENT, false);
+    }
+
+    public static void setSkipIdenticalContent(boolean skip){
+        if(Core.settings != null){
+            Core.settings.put(KEY_SKIP_IDENTICAL_CONTENT, skip);
         }
     }
 

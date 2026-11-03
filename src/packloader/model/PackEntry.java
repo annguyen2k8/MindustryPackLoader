@@ -3,6 +3,7 @@ package packloader.model;
 import arc.files.Fi;
 import arc.util.Strings;
 import mindustry.game.Schematic;
+import packloader.core.ContentHash;
 
 import java.io.*;
 import java.util.zip.ZipEntry;
@@ -23,6 +24,14 @@ public class PackEntry{
 
     public boolean isDuplicate;
     public String duplicateReason = "";
+
+    // Content-hash duplicate detection
+    public String sha256 = "";
+    public boolean isContentDuplicate;
+    public boolean isIntraBatchContentDuplicate;
+    public String contentDuplicateMatch = "";
+    public String contentDuplicateReason = "";
+
     public boolean selected = true;
     public boolean isValid = true;
     public String errorReason = "";
@@ -151,5 +160,22 @@ public class PackEntry{
             };
         }
         throw new IOException(getLocalizedText("packloader.error.notfound", sourcePath));
+    }
+
+    /** Returns the cached SHA-256 hash or computes it using ContentHash. */
+    public String getOrComputeSha256(){
+        if(sha256 == null || sha256.isEmpty()){
+            sha256 = ContentHash.computeSha256(this);
+        }
+        return sha256;
+    }
+
+    /** Clears the cached hash and duplicate state (e.g. if the source file was edited). */
+    public void clearHash(){
+        this.sha256 = "";
+        this.isContentDuplicate = false;
+        this.isIntraBatchContentDuplicate = false;
+        this.contentDuplicateMatch = "";
+        this.contentDuplicateReason = "";
     }
 }

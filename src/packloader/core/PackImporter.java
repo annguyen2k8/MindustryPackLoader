@@ -18,6 +18,7 @@ import packloader.undo.ImportTransaction;
 import packloader.undo.TransactionAction;
 import packloader.undo.UndoManager;
 import packloader.util.MainThread;
+import packloader.util.PackLoaderSettings;
 
 import java.io.File;
 import java.io.IOException;
@@ -135,6 +136,15 @@ public class PackImporter{
                     report.addResult(ImportItemResult.failed(entry,
                         entry.errorReason == null || entry.errorReason.isEmpty() ?
                             getLocalizedText("packloader.error.validation", "invalid file") : entry.errorReason));
+                    notifyProgress(listener, entry, toImport.size, report);
+                    continue;
+                }
+
+                if(PackLoaderSettings.isSkipIdenticalContent() && entry.isContentDuplicate){
+                    report.addResult(ImportItemResult.skipped(entry,
+                        getLocalizedText("packloader.result.msg.skipped.content",
+                            entry.contentDuplicateMatch.isEmpty() ? entry.displayName : entry.contentDuplicateMatch)));
+                    if(tx != null) undoManager.recordEntry(tx, entry, TransactionAction.SKIP, null, null, null, 0);
                     notifyProgress(listener, entry, toImport.size, report);
                     continue;
                 }

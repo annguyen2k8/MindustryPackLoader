@@ -16,6 +16,7 @@ import arc.scene.ui.TextField;
 import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
 import arc.util.Log;
+import arc.util.Scaling;
 import arc.util.Threads;
 import mindustry.Vars;
 import mindustry.game.Schematic;
@@ -426,10 +427,10 @@ public class PackLoaderDialog extends BaseDialog{
                 (Icon.pasteSmall != null ? Icon.pasteSmall : Icon.paste);
 
             card.table(badge -> {
-                badge.right().defaults().right();
-                badge.image(typeIcon).size(16f).color(typeColor).padRight(4f);
+                badge.right();
+                badge.image(typeIcon).size(14f).scaling(Scaling.fit).color(typeColor).padRight(6f);
                 badge.add(displayType.localizedName()).style(Styles.outlineLabel).color(typeColor);
-            }).padLeft(4f).padRight(6f);
+            }).padLeft(6f).padRight(6f);
         }
 
         // Column 4: Remove button
@@ -470,6 +471,9 @@ public class PackLoaderDialog extends BaseDialog{
     }
 
     private Table createQuickImportRow(float rowWidth){
+        Table container = new Table();
+        container.left().defaults().left().growX();
+
         Table row = new Table();
         row.left();
 
@@ -502,8 +506,34 @@ public class PackLoaderDialog extends BaseDialog{
         });
 
         row.add(textTable).growX().left().center();
+        container.add(row).growX().row();
 
-        return row;
+        // Sub-option: Skip identical content
+        Table skipRow = new Table();
+        skipRow.left();
+
+        CheckBox skipBox = new CheckBox("");
+        skipBox.setChecked(PackLoaderSettings.isSkipIdenticalContent());
+        skipBox.changed(() -> PackLoaderSettings.setSkipIdenticalContent(skipBox.isChecked()));
+        UIUtils.squareCheck(skipBox, 22f);
+        skipRow.add(skipBox).size(22f).padRight(8f).center();
+
+        Table skipTextTable = new Table();
+        skipTextTable.left().defaults().left().growX();
+        skipTextTable.add(getLocalizedText("packloader.quick-import.skip-identical"))
+            .style(Styles.defaultLabel)
+            .color(Color.lightGray);
+        skipRow.add(skipTextTable).growX().left().center();
+
+        skipRow.touchable = Touchable.enabled;
+        skipRow.clicked(() -> {
+            skipBox.setChecked(!skipBox.isChecked());
+            PackLoaderSettings.setSkipIdenticalContent(skipBox.isChecked());
+        });
+
+        container.add(skipRow).growX().padTop(6f).padLeft(36f).row();
+
+        return container;
     }
 
     private Table createConflictPolicyPresetRow(PackType type, float rowWidth){
@@ -692,6 +722,16 @@ public class PackLoaderDialog extends BaseDialog{
             }).height(38f).pad(2f).get());
         if(selectNewBtn != null){
             selectNewBtn.margin(4f, 8f, 4f, 8f);
+        }
+
+        var selectUniqueBtn = UIUtils.pad(toolbar.button(
+            getLocalizedText("packloader.select.unique"),
+            Icon.star, Styles.flatt, () -> {
+                EntryFilter.selectUniqueContentOnly(entries, targetType, filterType(), searchText);
+                rebuildEntriesList();
+            }).height(38f).pad(2f).get());
+        if(selectUniqueBtn != null){
+            selectUniqueBtn.margin(4f, 8f, 4f, 8f);
         }
 
         var invertBtn = UIUtils.pad(toolbar.button(
@@ -891,6 +931,9 @@ public class PackLoaderDialog extends BaseDialog{
                         titleBuilder.append(" -> [").append(actionColor).append("]").append(dryItem.action.localized()).append("[]");
                     }
                 }
+                if(entry.isContentDuplicate){
+                    titleBuilder.append("  [cyan]").append(getLocalizedText("packloader.badge.content-duplicate")).append("[]");
+                }
                 if(!entry.isValid){
                     titleBuilder.append("  [scarlet]").append(getLocalizedText("packloader.badge.invalid")).append("[]");
                 }
@@ -909,6 +952,9 @@ public class PackLoaderDialog extends BaseDialog{
                     infoBuilder.append("  •  [gold]").append(getLocalizedText("packloader.dryrun.target.renamed", dryItem.plannedTargetName)).append("[]");
                 }else if(entry.isDuplicate && !entry.duplicateReason.isEmpty()){
                     infoBuilder.append("  •  [gold]").append(entry.duplicateReason).append("[]");
+                }
+                if(entry.isContentDuplicate && !entry.contentDuplicateReason.isEmpty()){
+                    infoBuilder.append("  •  [cyan]").append(entry.contentDuplicateReason).append("[]");
                 }
                 if(!entry.isValid && !entry.errorReason.isEmpty()){
                     infoBuilder.append("  •  [scarlet]").append(entry.errorReason).append("[]");
@@ -1463,6 +1509,7 @@ public class PackLoaderDialog extends BaseDialog{
 
                         // Duplicate badges read live game registries, so refresh them on the main thread.
                         scanner.checkGameDuplicates(entries);
+                        scanner.checkContentDuplicates(entries);
                         resetFilters();
 
                         mapDuplicatePolicy = PackLoaderSettings.getDuplicatePolicy(PackType.MAP);

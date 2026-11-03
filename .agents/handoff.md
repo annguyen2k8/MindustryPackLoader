@@ -3,54 +3,48 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-03 14:15 +07:00
+- **Last updated:** 2026-11-03 17:35 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** Implement P2 — Safe In-place Map/Schematic Undo & Backup: durable pre-write backups surviving restart, SHA-256 conflict detection for post-import modifications, rollback on catastrophic failures, quota management, and native confirmation/result UI.
+- **Task:** Implement P2 — Content-hash Duplicate Detection: SHA-256 duplicate detection distinct from filename conflicts, metadata-cached indexing, intra-batch and multi-source queue duplicate detection, UI badges, Quick Import filtering, and Dry-run integration.
 - **Branch:** master; working tree ready to commit.
 
 ## Results
 
-- [verified] Persistent Transaction Architecture & Pre-write Backups (`UndoManager`, `ImportTransaction`, `TransactionEntry`, `TransactionAction`):
-  - Defined 4 transaction actions: `NEW`, `OVERWRITE`, `RENAME`, `SKIP`.
-  - Transaction lifecycle:
-    - Pre-write backups created in `packloader_backups/tx_<timestamp>_<rand>/` before mutating destination files during `OVERWRITE`.
-    - Computed SHA-256 integrity hashes for imported files and backups.
-    - Transaction committed atomically via `manifest.json.tmp` -> `manifest.json`.
-    - Automatic rollback of partial writes and restore of pre-write backups if unhandled catastrophic exceptions occur.
-    - Safe quota pruning: retains up to 5 transactions, protects active undone transactions from deletion.
-  - Pre-undo integrity verification (`UndoVerification`):
-    - Confirms destination file SHA-256 matches imported state. If modified by user, marks `CONFLICT_MODIFIED` and prevents deletion or restoration.
-    - Validates backup presence and hash (`CONFLICT_BACKUP_MISSING`, `CONFLICT_BACKUP_CORRUPTED`).
-    - Enforces directory boundaries preventing path traversal (`SECURITY_PATH_ESCAPE`).
-  - Safe in-place execution:
-    - `NEW`: deletes newly imported file.
-    - `OVERWRITE`: restores original bytes from validated backup.
-    - `RENAME`: deletes renamed file while preserving original.
-    - `SKIP`: leaves untouched.
-    - Hot-reloads map and schematic registries automatically.
-- [verified] Native Mindustry UI Integration:
-  - Added "Undo Import" button in `PackResultDialog` immediately after import completion.
-  - Added "Undo Last Import" button in `PackLoaderDialog` mode selection home view when an active undoable transaction exists.
-  - Created `UndoConfirmDialog`: shows breakdown stat cards (To Delete, To Restore, Conflicts), conflict warning banner, scrollable entries list with status badges, and Back/Confirm buttons. Disables confirm if no files can be safely reverted.
-  - Created `UndoResultDialog`: displays execution outcome, deleted/restored counts, and conflict reports.
-- [verified] Full Localization Parity:
-  - Added 20 undo keys (`packloader.undo.*`) to both `bundle.properties` and `bundle_vi.properties`.
-- [verified] Automated Tests & Packaging:
-  - Created `test/packloader/undo/UndoManagerTest.java` with 10 comprehensive tests covering:
-    - Undo NEW (file deletion, registry sync).
-    - Undo OVERWRITE (file restoration from backup, byte parity).
-    - Undo RENAME (renamed file deleted, original preserved).
-    - Undo SKIP (no-op).
-    - Mixed batch (maps + schematics).
-    - Persistence across simulated restart (new `UndoManager` instance reading disk manifest).
-    - Post-import modification conflict (modified file protected and not deleted).
-    - Corrupted and missing backup detection.
-    - Consecutive transactions and quota pruning (active transaction preserved).
-    - Rollback on partial transaction failure.
-  - Ran `.\gradlew.bat test` — BUILD SUCCESSFUL (all 156 unit tests passed).
+- [verified] Core SHA-256 Hashing & Metadata Cache (`ContentHash`, `ContentHashIndex`):
+  - Stream-based 8KB-buffered SHA-256 computation with decompression limits protecting against zip bombs.
+  - Reused hash infrastructure across `UndoManager`, `PackScanner`, and `PackImporter`.
+  - Type isolation: separate indexes for Maps (`.msav`) and Schematics (`.msch`). Maps and Schematics never match even with identical byte streams.
+  - Thread-safe metadata caching (`size` + `lastModified`): eliminates redundant disk I/O while detecting on-disk mutations immediately.
+- [verified] Scan & Pipeline Integration (`PackEntry`, `PackScanner`, `PackImporter`, `EntryFilter`):
+  - Strictly distinguishes filename collision (`isDuplicate`) from content duplicate (`isContentDuplicate`).
+  - Detects duplicate content against existing game files as well as intra-batch/multi-source queue entries.
+  - Added smart selection helper `EntryFilter.selectUniqueContentOnly()`.
+  - Added `PackLoaderSettings.isSkipIdenticalContent()` setting with Quick Import toggle.
+  - Automatically skips identical files during import when configured without breaking existing SKIP/OVERWRITE/RENAME semantics.
+- [verified] UI & Localization (`PackLoaderDialog`, `DryRunDialog`, `DryRunPlan`, `bundle.properties`, `bundle_vi.properties`):
+  - Added `[cyan]Identical Content[]` badge and reference details (`• Identical to: <source>`) in review list and dry-run dialog.
+  - Added "Unique Content" smart selection button in review toolbar.
+  - Added sub-checkbox "Skip identical content" under Quick Import in home screen and source selection screens.
+  - Fixed Recent Sources type badge layout to ensure 6px padding with `Scaling.fit`, preventing icon overlap on `Schematic` outline labels.
+  - Added all 8 localization keys with full EN/VI parity.
+- [verified] Automated Tests & Verification:
+  - Created `test/packloader/core/ContentHashTest.java` with 11 comprehensive unit tests covering:
+    - SHA-256 algorithm correctness vs Java `MessageDigest`.
+    - Identical content, different file names (`isContentDuplicate == true`, `isDuplicate == false`).
+    - Different content, identical file name (`isDuplicate == true`, `isContentDuplicate == false`).
+    - Intra-batch duplicate detection and reference matching.
+    - Multi-source queue duplicates across different sources.
+    - Type isolation between Maps and Schematics.
+    - Metadata caching and stale cache invalidation upon file mutation.
+    - Zero disk side-effects during scan.
+    - Empty and malformed file resilience.
+    - Quick Import eligibility with `skipIdenticalContent` true/false.
+    - Dry-run preview reflection of content duplicates and actions.
+  - Ran `.\gradlew.bat test` — BUILD SUCCESSFUL (all 167 unit tests passed).
   - Ran `.\gradlew.bat jar check verifyJar` — BUILD SUCCESSFUL.
-  - Deployed updated JAR to `D:\Anzuno\Mindustry\MindustryData\mods\MindustryPackLoaderDesktop.jar`.
-  - Preserved personal files (`session.json`).
+  - Deployed JAR to `D:\Anzuno\Mindustry\MindustryData\mods\MindustryPackLoaderDesktop.jar`.
+  - Updated tracker `D:\Users\Desktop\PROGRESS.md` ticking `[x] Content-hash duplicate detection.`.
+  - Preserved `session.json` and personal files.
 
 ## Remaining
 
@@ -62,9 +56,9 @@
 1. Read `.agents/handoff.md` from disk at task start.
 2. In-Game Smoke Test:
    - Launch `D:\Anzuno\Mindustry\Mindustry.exe`.
-   - Import maps/schematics with OVERWRITE policy.
-   - Click "Undo Import" in result dialog or return to home screen and click "Undo Last Import".
-   - Confirm undo in `UndoConfirmDialog` and verify previous version is restored in-game.
+   - Verify Recent Sources badge spacing has no visual overlap.
+   - Scan a folder or ZIP containing duplicate content with different names.
+   - Verify `[cyan]Identical Content[]` badge and "Unique Content" button.
 
 ## Open questions
 
@@ -72,6 +66,6 @@
 
 ## Verification
 
-- `.\gradlew.bat test` — BUILD SUCCESSFUL (156/156 unit tests passed).
-- `.\gradlew.bat check` — BUILD SUCCESSFUL (all checks passed).
-- `.\gradlew.bat verifyJar` — BUILD SUCCESSFUL (bundles packaged properly).
+- `.\gradlew.bat test` — BUILD SUCCESSFUL (167/167 unit tests passed).
+- `.\gradlew.bat check` — BUILD SUCCESSFUL.
+- `.\gradlew.bat verifyJar` — BUILD SUCCESSFUL.
