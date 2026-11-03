@@ -157,4 +157,5 @@ Thumbs.db
 android/libs/
 bin/
 .gemini/
+packloader_backups/
 

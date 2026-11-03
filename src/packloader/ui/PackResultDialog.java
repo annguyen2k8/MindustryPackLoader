@@ -11,15 +11,22 @@ import mindustry.ui.dialogs.BaseDialog;
 import packloader.model.ImportItemResult;
 import packloader.model.ImportReport;
 import packloader.model.PackType;
+import packloader.undo.UndoManager;
 
 import static packloader.util.Localization.getLocalizedText;
 
 public class PackResultDialog extends BaseDialog{
     private final ImportReport report;
+    private final UndoManager undoManager;
 
     public PackResultDialog(ImportReport report){
+        this(report, new UndoManager());
+    }
+
+    public PackResultDialog(ImportReport report, UndoManager undoManager){
         super(getLocalizedText("packloader.result.title"));
         this.report = report;
+        this.undoManager = undoManager != null ? undoManager : new UndoManager();
 
         setFillParent(true);
         setupUI();
@@ -138,6 +145,12 @@ public class PackResultDialog extends BaseDialog{
                     Vars.ui.schematics.show();
                 }).size(210f, 64f).pad(4f).get());
             }
+        }
+
+        if(report.transaction != null && report.transaction.getActiveItemCount() > 0 && !report.transaction.undone){
+            UIUtils.pad(buttons.button(getLocalizedText("packloader.undo.button"), Icon.undo, () -> {
+                new UndoConfirmDialog(undoManager, report.transaction, this::hide).show();
+            }).size(180f, 64f).pad(4f).get());
         }
 
         UIUtils.pad(buttons.button(getLocalizedText("packloader.result.close"), Icon.cancel, this::hide).size(210f, 64f).pad(4f).get());

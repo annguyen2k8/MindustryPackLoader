@@ -41,6 +41,7 @@ A Mindustry Java mod that bulk-imports maps (`.msav`) and schematics (`.msch`) f
 
 - 2026-11-02: Keep import writes staged and atomic, with rollback on failure. Native registration and fallback extraction are both supported.
 - 2026-11-02: Target Mindustry v160 and Java 17, matching `build.gradle.kts`.
+- 2026-11-03: Implement durable pre-write backups, SHA-256 integrity verification, and safe in-place undo for maps and schematics.
 
 ## Shared context
 

@@ -1,9 +1,11 @@
 package packloader.model;
 
 import arc.struct.Seq;
+import packloader.undo.ImportTransaction;
 
 public class ImportReport{
     public final Seq<ImportItemResult> results = new Seq<>();
+    public ImportTransaction transaction;
     public int totalSelected;
     public int totalSuccess;
     public int totalOverwritten;

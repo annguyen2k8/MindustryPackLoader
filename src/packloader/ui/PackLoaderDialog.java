@@ -36,6 +36,8 @@ import packloader.model.EntryFilter;
 import packloader.model.ImportReport;
 import packloader.model.PackEntry;
 import packloader.model.PackType;
+import packloader.undo.ImportTransaction;
+import packloader.undo.UndoManager;
 import packloader.util.MainThread;
 import packloader.util.PackLoaderSettings;
 import packloader.util.RecentSources;
@@ -272,6 +274,20 @@ public class PackLoaderDialog extends BaseDialog{
 
         buttons.clear();
         addCloseButton();
+
+        ImportTransaction latestTx = importer.undoManager.getLatestTransaction();
+        if(latestTx != null && !latestTx.undone && latestTx.getActiveItemCount() > 0){
+            if(Vars.mobile){
+                buttons.button(Icon.undo, Styles.flati, () -> {
+                    new UndoConfirmDialog(importer.undoManager, latestTx, this::rebuild).show();
+                }).size(64f, 64f).pad(4f);
+            }else{
+                UIUtils.pad(buttons.button(getLocalizedText("packloader.undo.button.last"), Icon.undo, () -> {
+                    new UndoConfirmDialog(importer.undoManager, latestTx, this::rebuild).show();
+                }).size(210f, 64f).pad(4f).get());
+            }
+        }
+
         if(Vars.mobile){
             buttons.button(Icon.link, Styles.flati, () -> Core.app.openURI(ISSUES_URL)).size(64f, 64f);
         }else{
@@ -731,6 +747,7 @@ public class PackLoaderDialog extends BaseDialog{
         // Bottom Action Bar
         buttons.clear();
         addCloseButton();
+
         if(Vars.mobile){
             buttons.button(Icon.link, Styles.flati, () -> Core.app.openURI(ISSUES_URL)).size(64f, 64f);
         }else{
@@ -994,10 +1011,12 @@ public class PackLoaderDialog extends BaseDialog{
             }
         };
 
+        String finalSourceName = (sourceName != null && !sourceName.isEmpty()) ? sourceName : "Batch Import";
+
         Threads.daemon("PackLoader-Import", () -> {
             ImportReport report;
             try{
-                report = importer.importEntries(toImport, mapPolicy, schemPolicy, listener);
+                report = importer.importEntries(toImport, mapPolicy, schemPolicy, finalSourceName, listener);
             }catch(Throwable t){
                 Log.err("[PackLoader] Import error:", t);
                 MainThread.post(() -> {
@@ -1030,7 +1049,7 @@ public class PackLoaderDialog extends BaseDialog{
                     resetFilters();
                     // hide() also releases materialized SAF ZIPs once importing has finished.
                     hide();
-                    new PackResultDialog(report).show();
+                    new PackResultDialog(report, importer.undoManager).show();
                 }
                 runDeferredCleanup();
             });

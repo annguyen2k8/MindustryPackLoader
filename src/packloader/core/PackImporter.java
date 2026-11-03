@@ -14,6 +14,9 @@ import packloader.model.ImportItemResult;
 import packloader.model.ImportReport;
 import packloader.model.PackEntry;
 import packloader.model.PackType;
+import packloader.undo.ImportTransaction;
+import packloader.undo.TransactionAction;
+import packloader.undo.UndoManager;
 import packloader.util.MainThread;
 
 import java.io.File;
@@ -27,6 +30,7 @@ import static packloader.util.Localization.getLocalizedText;
 public class PackImporter{
     private final Fi mapDirectory;
     private final Fi schematicDirectory;
+    public final UndoManager undoManager;
 
     /** Receives progress snapshots from the import worker. Callbacks are posted to the main thread. */
     public interface ImportListener{
@@ -63,8 +67,17 @@ public class PackImporter{
     }
 
     public PackImporter(Fi mapDirectory, Fi schematicDirectory){
+        this(mapDirectory, schematicDirectory, null);
+    }
+
+    public PackImporter(Fi mapDirectory, Fi schematicDirectory, Fi backupDirectory){
         this.mapDirectory = mapDirectory;
         this.schematicDirectory = schematicDirectory;
+        this.undoManager = new UndoManager(backupDirectory, mapDirectory, schematicDirectory);
+    }
+
+    public UndoManager getUndoManager(){
+        return undoManager;
     }
 
     /**
@@ -81,6 +94,11 @@ public class PackImporter{
      */
     public ImportReport importEntries(Seq<PackEntry> entries, DuplicatePolicy mapPolicy, DuplicatePolicy schemPolicy,
                                       ImportListener listener){
+        return importEntries(entries, mapPolicy, schemPolicy, "", listener);
+    }
+
+    public ImportReport importEntries(Seq<PackEntry> entries, DuplicatePolicy mapPolicy, DuplicatePolicy schemPolicy,
+                                      String sourceName, ImportListener listener){
         ImportReport report = new ImportReport();
         long startTime = System.currentTimeMillis();
 
@@ -95,6 +113,9 @@ public class PackImporter{
             report.elapsedMillis = 0;
             return report;
         }
+
+        ImportTransaction tx = undoManager.createTransaction(sourceName);
+        report.transaction = tx;
 
         boolean anyMapsImported = false;
         boolean anySchematicsImported = false;
@@ -123,13 +144,13 @@ public class PackImporter{
 
                 boolean imported = false;
                 if(entry.type == PackType.MAP && isNativeMapTarget()){
-                    imported = importNativeMap(entry, policy, report, stagingRoot, i);
+                    imported = importNativeMap(entry, policy, report, stagingRoot, i, tx);
                     anyMapsImported |= imported && report.results.peek().status != ImportItemResult.Status.FAILED;
                 }else if(entry.type == PackType.SCHEMATIC && isNativeSchematicTarget()){
-                    imported = importNativeSchematic(entry, policy, report, stagingRoot, i);
+                    imported = importNativeSchematic(entry, policy, report, stagingRoot, i, tx);
                     anySchematicsImported |= imported && report.results.peek().status != ImportItemResult.Status.FAILED;
                 }else{
-                    imported = importFallback(entry, policy, report);
+                    imported = importFallback(entry, policy, report, tx, i);
                     if(imported && report.results.peek().status != ImportItemResult.Status.FAILED &&
                        report.results.peek().status != ImportItemResult.Status.SKIPPED){
                         if(entry.type == PackType.MAP) anyMapsImported = true;
@@ -139,6 +160,15 @@ public class PackImporter{
 
                 notifyProgress(listener, entry, toImport.size, report);
             }
+
+            if(report.hasSuccess()){
+                undoManager.commitTransaction(tx);
+            }else{
+                undoManager.rollbackPartialTransaction(tx);
+            }
+        }catch(Throwable t){
+            undoManager.rollbackPartialTransaction(tx);
+            throw t instanceof RuntimeException re ? re : new RuntimeException(t);
         }finally{
             try{
                 if(stagingRoot.exists()) stagingRoot.deleteDirectory();
@@ -159,7 +189,7 @@ public class PackImporter{
     // Native map/schematic imports (main-thread game registry access)
     // ---------------------------------------------------------------------
 
-    private boolean importNativeMap(PackEntry entry, DuplicatePolicy policy, ImportReport report, Fi stagingRoot, int index){
+    private boolean importNativeMap(PackEntry entry, DuplicatePolicy policy, ImportReport report, Fi stagingRoot, int index, ImportTransaction tx){
         Fi entryDir = prepareEntryDir(stagingRoot, index);
         Fi staged = entryDir.child("work.tmp");
         try{
@@ -174,11 +204,13 @@ public class PackImporter{
 
             NativeResult conflict = MainThread.call(() -> findMapConflict(info.name));
             Map overwriteTarget = null;
+            boolean isRenamedMap = false;
 
             if(conflict != null && conflict.map != null){
                 if(policy == DuplicatePolicy.SKIP){
                     report.addResult(ImportItemResult.skipped(entry,
                         getLocalizedText("packloader.result.msg.skipped", info.name)));
+                    if(tx != null) undoManager.recordEntry(tx, entry, TransactionAction.SKIP, null, null, null, 0);
                     return false;
                 }else if(policy == DuplicatePolicy.OVERWRITE){
                     if(!canReplaceMap(conflict.map)){
@@ -188,6 +220,7 @@ public class PackImporter{
                     }
                     overwriteTarget = conflict.map;
                 }else if(policy == DuplicatePolicy.RENAME){
+                    isRenamedMap = true;
                     expectedName = MainThread.call(() -> findUniqueMapName(info.name));
                     Fi renamed = entryDir.child("renamed.tmp");
                     try(InputStream in = staged.read();
@@ -198,6 +231,17 @@ public class PackImporter{
                     staged = renamed;
                     PackFormat.MapInfo renamedInfo = PackFormat.validateMap(staged.read());
                     baseName = mapBaseName(renamedInfo.name);
+                }
+            }
+
+            // Pre-write backup if overwriting existing map
+            UndoManager.BackupRecord backup = null;
+            if(overwriteTarget != null && overwriteTarget.file != null && tx != null){
+                try{
+                    backup = undoManager.backupFile(tx, index, overwriteTarget.file, PackType.MAP);
+                }catch(Throwable t){
+                    recordFailure(report, entry, "Backup failed", t);
+                    return false;
                 }
             }
 
@@ -257,8 +301,19 @@ public class PackImporter{
 
             if(target != null){
                 report.addResult(ImportItemResult.overwritten(entry, importedFile));
+                if(tx != null){
+                    undoManager.recordEntry(tx, entry, TransactionAction.OVERWRITE, importedFile,
+                        backup != null ? backup.fileName : null,
+                        backup != null ? backup.sha256 : null,
+                        backup != null ? backup.size : 0);
+                }
             }else{
                 report.addResult(ImportItemResult.success(entry, importedFile));
+                if(tx != null){
+                    boolean isRenamed = isRenamedMap || !importedFile.name().equals(entry.sanitizedFileName);
+                    undoManager.recordEntry(tx, entry, isRenamed ? TransactionAction.RENAME : TransactionAction.NEW,
+                        importedFile, null, null, 0);
+                }
             }
             return true;
         }catch(Throwable t){
@@ -271,7 +326,7 @@ public class PackImporter{
         }
     }
 
-    private boolean importNativeSchematic(PackEntry entry, DuplicatePolicy policy, ImportReport report, Fi stagingRoot, int index){
+    private boolean importNativeSchematic(PackEntry entry, DuplicatePolicy policy, ImportReport report, Fi stagingRoot, int index, ImportTransaction tx){
         Fi entryDir = prepareEntryDir(stagingRoot, index);
         Fi staged = entryDir.child("work.tmp");
         try{
@@ -291,15 +346,33 @@ public class PackImporter{
             String originalName = schematic.name();
 
             NativeResult result = MainThread.call(() ->
-                addNativeSchematic(entry, schematic, originalName, policy));
+                addNativeSchematic(entry, schematic, originalName, policy, tx, index));
 
             switch(result.status){
-                case SKIPPED -> report.addResult(ImportItemResult.skipped(entry,
-                    getLocalizedText("packloader.result.msg.skipped", originalName)));
+                case SKIPPED -> {
+                    report.addResult(ImportItemResult.skipped(entry,
+                        getLocalizedText("packloader.result.msg.skipped", originalName)));
+                    if(tx != null) undoManager.recordEntry(tx, entry, TransactionAction.SKIP, null, null, null, 0);
+                }
                 case FAILED -> report.addResult(ImportItemResult.failed(entry,
                     result.message == null ? getLocalizedText("packloader.result.msg.failed", originalName) : result.message));
-                case OVERWRITTEN -> report.addResult(ImportItemResult.overwritten(entry, result.destination));
-                default -> report.addResult(ImportItemResult.success(entry, result.destination));
+                case OVERWRITTEN -> {
+                    report.addResult(ImportItemResult.overwritten(entry, result.destination));
+                    if(tx != null){
+                        undoManager.recordEntry(tx, entry, TransactionAction.OVERWRITE, result.destination,
+                            result.backup != null ? result.backup.fileName : null,
+                            result.backup != null ? result.backup.sha256 : null,
+                            result.backup != null ? result.backup.size : 0);
+                    }
+                }
+                default -> {
+                    report.addResult(ImportItemResult.success(entry, result.destination));
+                    if(tx != null){
+                        boolean isRenamed = !result.destination.name().equals(entry.sanitizedFileName);
+                        undoManager.recordEntry(tx, entry, isRenamed ? TransactionAction.RENAME : TransactionAction.NEW,
+                            result.destination, null, null, 0);
+                    }
+                }
             }
             return result.status != ImportItemResult.Status.FAILED && result.status != ImportItemResult.Status.SKIPPED;
         }catch(Throwable t){
@@ -312,7 +385,7 @@ public class PackImporter{
         }
     }
 
-    private NativeResult addNativeSchematic(PackEntry entry, Schematic schematic, String originalName, DuplicatePolicy policy){
+    private NativeResult addNativeSchematic(PackEntry entry, Schematic schematic, String originalName, DuplicatePolicy policy, ImportTransaction tx, int index){
         if(Vars.schematics == null){
             return NativeResult.failed(getLocalizedText("packloader.error.target-unavailable"));
         }
@@ -330,6 +403,16 @@ public class PackImporter{
                 overwriteTarget = conflict;
             }else if(policy == DuplicatePolicy.RENAME){
                 schematic.tags.put("name", findUniqueSchematicName(originalName));
+            }
+        }
+
+        UndoManager.BackupRecord backup = null;
+        if(overwriteTarget != null && overwriteTarget.file != null && tx != null){
+            try{
+                backup = undoManager.backupFile(tx, index, overwriteTarget.file, PackType.SCHEMATIC);
+            }catch(Throwable t){
+                Log.err("[PackLoader] Failed to create backup before schematic overwrite: @", originalName, t);
+                return NativeResult.failed("Backup failed: " + t.getMessage());
             }
         }
 
@@ -371,7 +454,7 @@ public class PackImporter{
                 return NativeResult.failed(getLocalizedText("packloader.result.msg.failed",
                     t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage()));
             }
-            return NativeResult.overwritten(schematic.file);
+            return NativeResult.overwritten(schematic.file, backup);
         }
         return NativeResult.success(schematic.file);
     }
@@ -452,7 +535,7 @@ public class PackImporter{
     // Fallback (headless tests / custom target directories)
     // ---------------------------------------------------------------------
 
-    private boolean importFallback(PackEntry entry, DuplicatePolicy policy, ImportReport report){
+    private boolean importFallback(PackEntry entry, DuplicatePolicy policy, ImportReport report, ImportTransaction tx, int index){
         Fi targetDir = (entry.type == PackType.MAP) ? mapDirectory : schematicDirectory;
         if(targetDir == null){
             report.addResult(ImportItemResult.failed(entry, getLocalizedText("packloader.error.target-unavailable")));
@@ -480,6 +563,7 @@ public class PackImporter{
                 if(policy == DuplicatePolicy.SKIP){
                     report.addResult(ImportItemResult.skipped(entry,
                         getLocalizedText("packloader.result.msg.skipped", targetFileName)));
+                    if(tx != null) undoManager.recordEntry(tx, entry, TransactionAction.SKIP, null, null, null, 0);
                     return true;
                 }else if(policy == DuplicatePolicy.RENAME){
                     String baseName = PackEntry.extractBaseName(entry.sanitizedFileName);
@@ -490,12 +574,27 @@ public class PackImporter{
             }
 
             boolean isOverwrite = fileExists && policy == DuplicatePolicy.OVERWRITE;
+            UndoManager.BackupRecord backup = null;
+            if(isOverwrite && targetFile.exists() && tx != null){
+                backup = undoManager.backupFile(tx, index, targetFile, entry.type);
+            }
+
             safeExtract(entry, targetFile, isOverwrite);
 
             if(isOverwrite){
                 report.addResult(ImportItemResult.overwritten(entry, targetFile));
+                if(tx != null){
+                    undoManager.recordEntry(tx, entry, TransactionAction.OVERWRITE, targetFile,
+                        backup != null ? backup.fileName : null,
+                        backup != null ? backup.sha256 : null,
+                        backup != null ? backup.size : 0);
+                }
             }else{
                 report.addResult(ImportItemResult.success(entry, targetFile));
+                if(tx != null){
+                    TransactionAction action = isConflict ? TransactionAction.RENAME : TransactionAction.NEW;
+                    undoManager.recordEntry(tx, entry, action, targetFile, null, null, 0);
+                }
             }
             return true;
         }catch(Throwable t){
@@ -865,32 +964,34 @@ public class PackImporter{
         final Fi destination;
         final String message;
         final Map map;
+        final UndoManager.BackupRecord backup;
 
-        private NativeResult(ImportItemResult.Status status, Fi destination, String message, Map map){
+        private NativeResult(ImportItemResult.Status status, Fi destination, String message, Map map, UndoManager.BackupRecord backup){
             this.status = status;
             this.destination = destination;
             this.message = message;
             this.map = map;
+            this.backup = backup;
         }
 
         static NativeResult success(Fi destination){
-            return new NativeResult(ImportItemResult.Status.SUCCESS, destination, null, null);
+            return new NativeResult(ImportItemResult.Status.SUCCESS, destination, null, null, null);
         }
 
-        static NativeResult overwritten(Fi destination){
-            return new NativeResult(ImportItemResult.Status.OVERWRITTEN, destination, null, null);
+        static NativeResult overwritten(Fi destination, UndoManager.BackupRecord backup){
+            return new NativeResult(ImportItemResult.Status.OVERWRITTEN, destination, null, null, backup);
         }
 
         static NativeResult skipped(String name){
-            return new NativeResult(ImportItemResult.Status.SKIPPED, null, name, null);
+            return new NativeResult(ImportItemResult.Status.SKIPPED, null, name, null, null);
         }
 
         static NativeResult failed(String message){
-            return new NativeResult(ImportItemResult.Status.FAILED, null, message, null);
+            return new NativeResult(ImportItemResult.Status.FAILED, null, message, null, null);
         }
 
         static NativeResult conflict(Map map){
-            return new NativeResult(ImportItemResult.Status.SUCCESS, null, null, map);
+            return new NativeResult(ImportItemResult.Status.SUCCESS, null, null, map, null);
         }
     }
 }
