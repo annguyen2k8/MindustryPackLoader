@@ -80,6 +80,9 @@ public class BundleTest{
         String fileDup = Core.bundle.format("packloader.duplicate.file", "test.msav");
         assertEquals("File already exists: test.msav", fileDup);
 
+        String renamed = Core.bundle.format("packloader.result.msg.renamed", "map_1.msav");
+        assertEquals("Renamed to: map_1.msav", renamed);
+
         assertEquals("Report a Bug", Core.bundle.get("packloader.bug.report"));
         assertEquals("Welcome to PackLoader", Core.bundle.get("packloader.welcome.title"));
         assertEquals("Info", Core.bundle.get("packloader.action.info"));
@@ -106,6 +109,9 @@ public class BundleTest{
 
         String fileDup = Core.bundle.format("packloader.duplicate.file", "test.msav");
         assertEquals("Tệp đã tồn tại trong thư mục: test.msav", fileDup);
+
+        String renamed = Core.bundle.format("packloader.result.msg.renamed", "map_1.msav");
+        assertEquals("Đã đổi tên thành: map_1.msav", renamed);
 
         assertEquals("Báo lỗi", Core.bundle.get("packloader.bug.report"));
         assertEquals("Chào mừng đến với PackLoader", Core.bundle.get("packloader.welcome.title"));

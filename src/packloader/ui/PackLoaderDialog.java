@@ -564,9 +564,6 @@ public class PackLoaderDialog extends BaseDialog{
                 filterMode = FilterMode.SCHEMATICS;
                 rebuildEntriesList();
             }).checked(b -> filterMode == FilterMode.SCHEMATICS).height(38f);
-        }else{
-            String title = (targetType == PackType.MAP ? getLocalizedText("packloader.dialog.title.maps") : getLocalizedText("packloader.dialog.title.schematics")) + " (" + entries.size + ")";
-            toolbar.add(title).color(Pal.accent).style(Styles.outlineLabel).left().padRight(8f);
         }
 
         toolbar.add().growX(); // spacer pushes mass selection buttons to right

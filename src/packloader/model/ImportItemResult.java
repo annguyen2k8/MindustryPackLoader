@@ -34,15 +34,19 @@ public class ImportItemResult{
     }
 
     public static ImportItemResult success(PackEntry entry, Fi dest){
-        return new ImportItemResult(entry, Status.SUCCESS, getLocalizedText("packloader.result.msg.success", dest.name()), dest);
+        String msg = (dest != null && !dest.name().equals(entry.sanitizedFileName)) ?
+            getLocalizedText("packloader.result.msg.renamed", dest.name()) : "";
+        return new ImportItemResult(entry, Status.SUCCESS, msg, dest);
     }
 
     public static ImportItemResult overwritten(PackEntry entry, Fi dest){
-        return new ImportItemResult(entry, Status.OVERWRITTEN, getLocalizedText("packloader.result.msg.overwritten", dest.name()), dest);
+        return new ImportItemResult(entry, Status.OVERWRITTEN, getLocalizedText("packloader.result.msg.overwritten"), dest);
     }
 
     public static ImportItemResult skipped(PackEntry entry, String reason){
-        return new ImportItemResult(entry, Status.SKIPPED, reason, null);
+        String msg = (reason == null || reason.isEmpty()) ?
+            getLocalizedText("packloader.result.msg.skipped") : reason;
+        return new ImportItemResult(entry, Status.SKIPPED, msg, null);
     }
 
     public static ImportItemResult failed(PackEntry entry, String error){

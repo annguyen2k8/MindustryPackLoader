@@ -103,12 +103,9 @@ public class PackResultDialog extends BaseDialog{
                  .left().row();
 
                 String detail = res.message;
-                if(detail == null || detail.isEmpty()){
-                    detail = res.entry.sourcePath;
+                if(detail != null && !detail.isEmpty()){
+                    t.add(detail).color(Pal.lightishGray).growX().minWidth(0f).left().wrap().padTop(2f);
                 }
-                // Let the label use the remaining row width and wrap naturally instead of
-                // constraining it to a 12x12 cell, which made long errors unreadable.
-                t.add(detail).color(Pal.lightishGray).growX().minWidth(0f).left().wrap().padTop(2f);
             }).growX().minWidth(0f).left().padLeft(6f);
 
             list.add(itemRow).growX().pad(3f).row();
