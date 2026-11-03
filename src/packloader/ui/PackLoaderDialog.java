@@ -480,20 +480,20 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         Table container = new Table();
         container.left().defaults().left().growX();
 
-        Table row = new Table();
-        row.left();
-
         CheckBox quickBox = new CheckBox("");
         quickBox.setChecked(PackLoaderSettings.isQuickImport());
         quickBox.changed(() -> PackLoaderSettings.setQuickImport(quickBox.isChecked()));
-        UIUtils.squareCheck(quickBox, 24f);
+        quickBox.clearChildren();
+        quickBox.left().defaults().left();
+        quickBox.margin(0f);
 
-        row.add(quickBox).size(24f).padRight(10f).center();
+        quickBox.add(quickBox.getImage()).size(24f).padRight(10f).center();
+        UIUtils.squareCheck(quickBox, 24f);
 
         float textWidth = Math.max(160f, rowWidth - 44f);
         Table textTable = new Table();
         textTable.left().defaults().left().growX();
-        textTable.touchable = Touchable.enabled;
+        textTable.touchable = Touchable.disabled;
         textTable.add(getLocalizedText("packloader.quick-import"))
             .style(Styles.defaultLabel)
             .color(Color.white)
@@ -505,40 +505,31 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             .width(textWidth)
             .wrap();
 
-        textTable.clicked(() -> {
-            quickBox.toggle();
-            PackLoaderSettings.setQuickImport(quickBox.isChecked());
-        });
-
-        row.add(textTable).growX().left().center();
-        container.add(row).growX().row();
+        quickBox.add(textTable).growX().left().center();
+        container.add(quickBox).growX().row();
 
         // Sub-option: Skip identical content
-        Table skipRow = new Table();
-        skipRow.left();
-
         CheckBox skipBox = new CheckBox("");
         skipBox.setChecked(PackLoaderSettings.isSkipIdenticalContent());
         skipBox.changed(() -> PackLoaderSettings.setSkipIdenticalContent(skipBox.isChecked()));
+        skipBox.clearChildren();
+        skipBox.left().defaults().left();
+        skipBox.margin(0f);
+
+        skipBox.add(skipBox.getImage()).size(24f).padRight(10f).center();
         UIUtils.squareCheck(skipBox, 24f);
-        skipRow.add(skipBox).size(24f).padRight(10f).center();
 
         Table skipTextTable = new Table();
         skipTextTable.left().defaults().left().growX();
-        skipTextTable.touchable = Touchable.enabled;
+        skipTextTable.touchable = Touchable.disabled;
         skipTextTable.add(getLocalizedText("packloader.quick-import.skip-identical"))
             .style(Styles.defaultLabel)
             .color(Color.lightGray);
 
-        skipTextTable.clicked(() -> {
-            skipBox.toggle();
-            PackLoaderSettings.setSkipIdenticalContent(skipBox.isChecked());
-        });
-
-        skipRow.add(skipTextTable).growX().left().center();
+        skipBox.add(skipTextTable).growX().left().center();
 
         // Aligned along the exact same X axis as row (no padLeft indent)
-        container.add(skipRow).growX().padTop(6f).row();
+        container.add(skipBox).growX().padTop(6f).row();
 
         return container;
     }

@@ -3,29 +3,34 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-03 19:35 +07:00
+- **Last updated:** 2026-11-03 20:05 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** UI Refinement — Native Mindustry Checkbox Hover (`Tex.checkOver` / `Tex.checkOnOver`) & Non-overlapping Click Interaction.
+- **Task:** UI Refinement — Unified Native Checkbox Hover (Across Circle and Label) & Single-Toggle Interaction for Quick Import & Skip Identical Content.
 - **Branch:** master; working tree ready to commit.
 
 ## Results
 
-- [verified] Native CheckBox Hover:
-  - Restored `quickBox` and `skipBox` as active touchable `CheckBox` widgets without custom color animations.
-  - In Arc / Mindustry v160.7, `CheckBox.draw()` natively switches drawables to `Tex.checkOver` (when unchecked and hovered) and `Tex.checkOnOver` (when checked and hovered) via `isOver()`.
-  - Reverted all manual hover tinting on labels, Schematics/Maps cards, Recent Sources, Clear button, and 'X' buttons to keep native clean styling.
+- [verified] Unified Native Checkbox Hover:
+  - Reconstructed `quickBox` and `skipBox` as composite `CheckBox` elements spanning both the checkbox circle and adjacent label text table.
+  - Set `textTable.touchable = Touchable.disabled` inside both composite CheckBoxes so all pointer/hover events across the circle and the text area are handled directly by the parent `CheckBox`.
+  - When the cursor moves over either the circular check icon or the label text, Arc's native `CheckBox.isOver()` evaluates to `true`, automatically rendering `Tex.checkOver` (when unchecked) or `Tex.checkOnOver` (when checked) without custom color animations.
+  - Text labels preserve their native static colors (`Color.white`, `Pal.lightishGray`, `Color.lightGray`) without hover interference.
+  - No hover effects added to any other component (Schematics/Maps cards, Recent Sources, etc.).
 - [verified] Hitbox & Single-Toggle Interaction:
-  - Checkbox circle: direct clicks are received by the CheckBox widget itself, which toggles and persists settings via `changed(...)`.
-  - Label text: clicks on the adjacent text table trigger a single toggle on the corresponding CheckBox and persist settings.
-  - Removed row-level ClickListeners, ensuring zero event listener collision and guaranteed single-toggle behavior whether the user taps the circle or the label.
+  - Clicking anywhere on the composite row (whether on the circle icon or on the label text) is captured once by the `CheckBox` widget.
+  - Zero duplicate event listeners on `textTable`, preventing double-toggle bugs and ensuring settings (`PackLoaderSettings.isQuickImport`, `isSkipIdenticalContent`) are persisted cleanly once per click.
 - [verified] Layout & Alignment:
-  - Preserved identical `24f` square size and `padRight(10f)` for both checkboxes, maintaining strict vertical alignment on the X-axis.
+  - Checkbox circle icon maintains `size(24f).padRight(10f).center()`.
+  - Both checkbox circles strictly align on the X-axis at `x = 0`, and both text tables start at `x = 34`.
+  - Sub-option `skipBox` maintains `padTop(6f)` spacing without arbitrary indentation.
 - [verified] Verification & Tests:
   - `test/packloader/ui/CheckboxRowInteractionTest.java` (3 unit tests):
-    - Verifies hit test on checkbox region resolves to the CheckBox for native `isOver()` and hover drawables.
-    - Verifies hit test on label text resolves to `textTable` without hovering the CheckBox.
-    - Verifies alternating single clicks on both circle and text toggle state accurately.
-    - Verifies strict X-axis alignment of checkboxes (`box1.x == box2.x == 0`) and label text tables (`text1.x == text2.x == 34`).
+    - Verifies hit test on circle resolves to `quickBox` or its child `Image`.
+    - Verifies hit test on label text area resolves directly to composite `quickBox`.
+    - Verifies hover on circle activates `quickBox.isOver()`, and hover on label text also activates `quickBox.isOver()`.
+    - Verifies single clicks on circle and text area toggle state cleanly with exactly one setting save per click.
+    - Verifies identical behavior and single-toggle for `skipBox`.
+    - Verifies strict vertical X-axis alignment of circles (`x = 0`) and text (`x = 34`).
   - Ran `.\gradlew.bat test` — BUILD SUCCESSFUL (all 188 tests passed).
   - Ran `.\gradlew.bat jar check verifyJar` — BUILD SUCCESSFUL.
   - Deployed Desktop JAR to `D:\Anzuno\Mindustry\MindustryData\mods\MindustryPackLoaderDesktop.jar`.
@@ -40,9 +45,9 @@
 1. Read `.agents/handoff.md` from disk at task start.
 2. In-Game Smoke Test:
    - Run `D:\Anzuno\Mindustry\Mindustry.exe`.
-   - Hover mouse over the circular check boxes of Quick Import and Skip identical content $\rightarrow$ verify subtle native `Tex.checkOver` feedback.
-   - Hover over labels and cards $\rightarrow$ verify clean static appearance.
-   - Click both circle and label $\rightarrow$ verify single toggle.
+   - Hover mouse over circle OR label text of Quick Import $\rightarrow$ verify subtle native `Tex.checkOver` feedback on the circle.
+   - Hover mouse over circle OR label text of Skip identical content $\rightarrow$ verify subtle native `Tex.checkOver` feedback on the circle.
+   - Click both circle and label $\rightarrow$ verify single toggle and persistent state.
 3. Transition to P3.2:
    - Next item in roadmap tracker: `Preview thumbnail và metadata`.
 

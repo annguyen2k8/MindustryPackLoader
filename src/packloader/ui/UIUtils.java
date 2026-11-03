@@ -39,7 +39,10 @@ public final class UIUtils{
      */
     public static CheckBox squareCheck(CheckBox box, float size){
         if(box != null){
-            if(box.getImageCell() != null){
+            arc.scene.ui.layout.Cell<?> cell = box.getCell(box.getImage());
+            if(cell != null){
+                cell.size(size);
+            }else if(box.getImageCell() != null){
                 box.getImageCell().size(size);
             }
             if(box.getLabelCell() != null){
