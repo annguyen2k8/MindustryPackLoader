@@ -4,14 +4,18 @@ import arc.Core;
 import arc.files.Fi;
 import arc.graphics.Color;
 import arc.input.KeyCode;
+import arc.scene.event.ClickListener;
 import arc.scene.event.InputEvent;
 import arc.scene.event.InputListener;
 import arc.scene.event.Touchable;
 import arc.scene.style.Drawable;
 import arc.scene.ui.Button;
 import arc.scene.ui.CheckBox;
+import arc.scene.ui.Image;
+import arc.scene.ui.ImageButton;
 import arc.scene.ui.Label;
 import arc.scene.ui.ScrollPane;
+import arc.scene.ui.TextButton;
 import arc.scene.ui.TextField;
 import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
@@ -265,10 +269,17 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         if(!recents.isEmpty()){
             Table recentsHeader = new Table();
             recentsHeader.add(getLocalizedText("packloader.recent.title")).color(Pal.accent).style(Styles.outlineLabel).left().growX();
-            recentsHeader.button(getLocalizedText("packloader.recent.clear"), Icon.trash, Styles.flatt, () -> {
+            TextButton clearBtn = recentsHeader.button(getLocalizedText("packloader.recent.clear"), Icon.trash, Styles.flatt, () -> {
                 RecentSources.clear();
                 rebuild();
-            }).height(32f).padRight(2f);
+            }).height(32f).padRight(2f).get();
+            clearBtn.update(() -> {
+                Color c = clearBtn.isPressed() ? Pal.remove.cpy().mul(0.8f) : (clearBtn.isOver() ? Pal.remove : Pal.accent);
+                clearBtn.getLabel().color.set(c);
+                if(clearBtn.getCells().size > 0 && clearBtn.getCells().get(0).get() instanceof Image){
+                    ((Image)clearBtn.getCells().get(0).get()).color.set(c);
+                }
+            });
             root.add(recentsHeader).pad(4f).padTop(12f).padBottom(4f).row();
 
             for(RecentSources.SourceItem item : recents){
@@ -372,10 +383,17 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         if(!recents.isEmpty()){
             Table recentsHeader = new Table();
             recentsHeader.add(getLocalizedText("packloader.recent.title")).color(Pal.accent).style(Styles.outlineLabel).left().growX();
-            recentsHeader.button(getLocalizedText("packloader.recent.clear"), Icon.trash, Styles.flatt, () -> {
+            TextButton clearBtn = recentsHeader.button(getLocalizedText("packloader.recent.clear"), Icon.trash, Styles.flatt, () -> {
                 RecentSources.clear();
                 rebuild();
-            }).height(32f).padRight(2f);
+            }).height(32f).padRight(2f).get();
+            clearBtn.update(() -> {
+                Color c = clearBtn.isPressed() ? Pal.remove.cpy().mul(0.8f) : (clearBtn.isOver() ? Pal.remove : Pal.accent);
+                clearBtn.getLabel().color.set(c);
+                if(clearBtn.getCells().size > 0 && clearBtn.getCells().get(0).get() instanceof Image){
+                    ((Image)clearBtn.getCells().get(0).get()).color.set(c);
+                }
+            });
             root.add(recentsHeader).pad(4f).padTop(12f).padBottom(4f).row();
 
             for(RecentSources.SourceItem item : recents){
@@ -419,13 +437,26 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         Color typeColor = isMap ? Pal.heal : Pal.accent;
 
         // Column 1: Source format icon (Folder vs Archive)
-        card.image(item.isDirectory ? Icon.folder : Icon.download).size(28f).color(typeColor).pad(4f);
+        Image formatIcon = new Image(item.isDirectory ? Icon.folder : Icon.download);
+        formatIcon.setScaling(Scaling.fit);
+        formatIcon.color.set(typeColor);
+        card.add(formatIcon).size(28f).pad(4f);
 
         // Column 2: Name and path info block
+        Label nameLabel = new Label(item.name);
+        nameLabel.setStyle(Styles.defaultLabel);
+        nameLabel.color.set(Color.white);
+        nameLabel.setEllipsis(true);
+
+        Label pathLabel = new Label(item.path);
+        pathLabel.setStyle(Styles.defaultLabel);
+        pathLabel.color.set(Pal.lightishGray);
+        pathLabel.setEllipsis(true);
+
         card.table(t -> {
             t.left().defaults().left().growX();
-            t.add(item.name).style(Styles.defaultLabel).color(Color.white).ellipsis(true).growX().minWidth(0f).row();
-            t.add(item.path).style(Styles.defaultLabel).color(Pal.lightishGray).ellipsis(true).growX().minWidth(0f);
+            t.add(nameLabel).ellipsis(true).growX().minWidth(0f).row();
+            t.add(pathLabel).ellipsis(true).growX().minWidth(0f);
         }).growX().minWidth(0f).left().padLeft(6f);
 
         // Column 3: Type badge (Map vs Schematic)
@@ -441,8 +472,8 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             }).padLeft(6f).padRight(6f);
         }
 
-        // Column 4: Remove button
-        Button removeBtn = card.button(Icon.cancel, Styles.clearNonei, () -> {
+        // Column 4: Remove button with hover and pressed feedback
+        ImageButton removeBtn = card.button(Icon.cancel, Styles.cleari, () -> {
             RecentSources.remove(item.path, item.type);
             rebuild();
         }).size(32f).pad(2f).get();
@@ -454,26 +485,80 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             }
         });
 
+        removeBtn.update(() -> {
+            Image img = removeBtn.getImage();
+            if(img != null){
+                if(removeBtn.isPressed()){
+                    img.color.set(Pal.remove).mul(0.8f);
+                }else if(removeBtn.isOver()){
+                    img.color.set(Pal.remove);
+                }else{
+                    img.color.set(Pal.lightishGray);
+                }
+            }
+        });
+
+        card.update(() -> {
+            if(card.isPressed()){
+                nameLabel.color.set(typeColor).mul(0.85f);
+                pathLabel.color.set(Color.lightGray);
+                formatIcon.color.set(typeColor).mul(0.85f);
+            }else if(card.isOver()){
+                nameLabel.color.set(typeColor);
+                pathLabel.color.set(Color.white);
+                formatIcon.color.set(Color.white);
+            }else{
+                nameLabel.color.set(Color.white);
+                pathLabel.color.set(Pal.lightishGray);
+                formatIcon.color.set(typeColor);
+            }
+        });
+
         return card;
     }
 
     private Table createSourceOptionButton(Drawable icon, String title, String desc, Runnable clicked, float buttonWidth){
-        // A Button (rather than a plain Table) provides hover/pressed/disabled feedback
-        // from the standard Mindustry button style on both Desktop and Android.
         Button btn = new Button(UIUtils.cardStyle());
         btn.clicked(clicked);
         btn.margin(8f);
 
         // Icon column
-        btn.image(icon).size(40f).color(Pal.accent).left().padRight(12f);
+        Image iconImage = new Image(icon);
+        iconImage.setScaling(Scaling.fit);
+        iconImage.color.set(Pal.accent);
+        btn.add(iconImage).size(40f).left().padRight(12f);
 
         // Text column: explicit width and wrap() ensure subtitle and title never overflow right
         float textWidth = Math.max(160f, buttonWidth - 92f);
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle(Styles.defaultLabel);
+        titleLabel.color.set(Color.white);
+
+        Label descLabel = new Label(desc);
+        descLabel.setStyle(Styles.defaultLabel);
+        descLabel.color.set(Pal.lightishGray);
+
         btn.table(t -> {
             t.left().defaults().left().growX();
-            t.add(title).style(Styles.defaultLabel).color(Color.white).width(textWidth).wrap().padBottom(4f).row();
-            t.add(desc).style(Styles.defaultLabel).color(Pal.lightishGray).width(textWidth).wrap();
+            t.add(titleLabel).width(textWidth).wrap().padBottom(4f).row();
+            t.add(descLabel).width(textWidth).wrap();
         }).growX().left();
+
+        btn.update(() -> {
+            if(btn.isPressed()){
+                titleLabel.color.set(Pal.accent).mul(0.85f);
+                descLabel.color.set(Color.lightGray);
+                iconImage.color.set(Pal.accent).mul(0.85f);
+            }else if(btn.isOver()){
+                titleLabel.color.set(Pal.accent);
+                descLabel.color.set(Color.white);
+                iconImage.color.set(Color.white);
+            }else{
+                titleLabel.color.set(Color.white);
+                descLabel.color.set(Pal.lightishGray);
+                iconImage.color.set(Pal.accent);
+            }
+        });
 
         return btn;
     }
@@ -488,30 +573,52 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         CheckBox quickBox = new CheckBox("");
         quickBox.setChecked(PackLoaderSettings.isQuickImport());
         quickBox.touchable = Touchable.disabled;
-        UIUtils.squareCheck(quickBox, 26f);
+        UIUtils.squareCheck(quickBox, 24f);
 
-        row.add(quickBox).size(26f).padRight(10f).center();
+        row.add(quickBox).size(24f).padRight(10f).center();
 
-        float textWidth = Math.max(160f, rowWidth - 46f);
+        float textWidth = Math.max(160f, rowWidth - 44f);
         Table textTable = new Table();
         textTable.left().defaults().left().growX();
         textTable.touchable = Touchable.disabled;
-        textTable.add(getLocalizedText("packloader.quick-import"))
-            .style(Styles.defaultLabel)
-            .color(Color.white)
-            .padBottom(2f)
-            .row();
-        textTable.add(getLocalizedText("packloader.quick-import.desc"))
-            .style(Styles.defaultLabel)
-            .color(Pal.lightishGray)
-            .width(textWidth)
-            .wrap();
 
-        // Tapping anywhere on the Quick Import row toggles the checkbox
+        Label quickTitle = new Label(getLocalizedText("packloader.quick-import"));
+        quickTitle.setStyle(Styles.defaultLabel);
+        quickTitle.color.set(Color.white);
+        quickTitle.touchable = Touchable.disabled;
+
+        Label quickDesc = new Label(getLocalizedText("packloader.quick-import.desc"));
+        quickDesc.setStyle(Styles.defaultLabel);
+        quickDesc.color.set(Pal.lightishGray);
+        quickDesc.touchable = Touchable.disabled;
+
+        textTable.add(quickTitle).padBottom(2f).row();
+        textTable.add(quickDesc).width(textWidth).wrap();
+
+        ClickListener rowClick = new ClickListener(){
+            @Override
+            public void clicked(InputEvent event, float x, float y){
+                quickBox.setChecked(!quickBox.isChecked());
+                PackLoaderSettings.setQuickImport(quickBox.isChecked());
+            }
+        };
         row.touchable = Touchable.enabled;
-        row.clicked(() -> {
-            quickBox.setChecked(!quickBox.isChecked());
-            PackLoaderSettings.setQuickImport(quickBox.isChecked());
+        row.addListener(rowClick);
+
+        row.update(() -> {
+            if(rowClick.isVisualPressed()){
+                quickTitle.color.set(Pal.accent).mul(0.85f);
+                quickDesc.color.set(Color.lightGray);
+                quickBox.color.set(Pal.accent).mul(0.85f);
+            }else if(rowClick.isOver()){
+                quickTitle.color.set(Pal.accent);
+                quickDesc.color.set(Color.white);
+                quickBox.color.set(Pal.accent);
+            }else{
+                quickTitle.color.set(Color.white);
+                quickDesc.color.set(Pal.lightishGray);
+                quickBox.color.set(Color.white);
+            }
         });
 
         row.add(textTable).growX().left().center();
@@ -524,24 +631,46 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         CheckBox skipBox = new CheckBox("");
         skipBox.setChecked(PackLoaderSettings.isSkipIdenticalContent());
         skipBox.touchable = Touchable.disabled;
-        UIUtils.squareCheck(skipBox, 22f);
-        skipRow.add(skipBox).size(22f).padRight(8f).center();
+        UIUtils.squareCheck(skipBox, 24f);
+        skipRow.add(skipBox).size(24f).padRight(10f).center();
 
         Table skipTextTable = new Table();
         skipTextTable.left().defaults().left().growX();
         skipTextTable.touchable = Touchable.disabled;
-        skipTextTable.add(getLocalizedText("packloader.quick-import.skip-identical"))
-            .style(Styles.defaultLabel)
-            .color(Color.lightGray);
+
+        Label skipLabel = new Label(getLocalizedText("packloader.quick-import.skip-identical"));
+        skipLabel.setStyle(Styles.defaultLabel);
+        skipLabel.color.set(Color.lightGray);
+        skipLabel.touchable = Touchable.disabled;
+
+        skipTextTable.add(skipLabel);
         skipRow.add(skipTextTable).growX().left().center();
 
+        ClickListener skipClick = new ClickListener(){
+            @Override
+            public void clicked(InputEvent event, float x, float y){
+                skipBox.setChecked(!skipBox.isChecked());
+                PackLoaderSettings.setSkipIdenticalContent(skipBox.isChecked());
+            }
+        };
         skipRow.touchable = Touchable.enabled;
-        skipRow.clicked(() -> {
-            skipBox.setChecked(!skipBox.isChecked());
-            PackLoaderSettings.setSkipIdenticalContent(skipBox.isChecked());
+        skipRow.addListener(skipClick);
+
+        skipRow.update(() -> {
+            if(skipClick.isVisualPressed()){
+                skipLabel.color.set(Pal.accent).mul(0.85f);
+                skipBox.color.set(Pal.accent).mul(0.85f);
+            }else if(skipClick.isOver()){
+                skipLabel.color.set(Color.white);
+                skipBox.color.set(Pal.accent);
+            }else{
+                skipLabel.color.set(Color.lightGray);
+                skipBox.color.set(Color.white);
+            }
         });
 
-        container.add(skipRow).growX().padTop(6f).padLeft(36f).row();
+        // Aligned along the exact same X axis as row (no padLeft indent)
+        container.add(skipRow).growX().padTop(6f).row();
 
         return container;
     }
