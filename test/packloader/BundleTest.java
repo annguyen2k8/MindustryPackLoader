@@ -68,6 +68,8 @@ public class BundleTest{
         assertEquals("Skip", Core.bundle.get("packloader.conflict.skip"));
         assertEquals("Overwrite", Core.bundle.get("packloader.conflict.overwrite"));
         assertEquals("Rename", Core.bundle.get("packloader.conflict.rename"));
+        assertEquals("Maps on conflict:", Core.bundle.get("packloader.conflict.label.map"));
+        assertEquals("Schematics on conflict:", Core.bundle.get("packloader.conflict.label.schem"));
         assertEquals("Import .zip", Core.bundle.get("packloader.button.import-zip"));
         assertEquals("Scan Folder", Core.bundle.get("packloader.action.scan-folder"));
         assertEquals("Select", Core.bundle.get("packloader.browser.select.folder"));
@@ -98,6 +100,8 @@ public class BundleTest{
         assertEquals("Bỏ qua", Core.bundle.get("packloader.conflict.skip"));
         assertEquals("Ghi đè", Core.bundle.get("packloader.conflict.overwrite"));
         assertEquals("Tự đổi tên", Core.bundle.get("packloader.conflict.rename"));
+        assertEquals("Bản đồ khi trùng:", Core.bundle.get("packloader.conflict.label.map"));
+        assertEquals("Schematic khi trùng:", Core.bundle.get("packloader.conflict.label.schem"));
         assertEquals("Nhập .zip", Core.bundle.get("packloader.button.import-zip"));
         assertEquals("Quét thư mục", Core.bundle.get("packloader.action.scan-folder"));
         assertEquals("Chọn", Core.bundle.get("packloader.browser.select.folder"));

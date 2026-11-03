@@ -73,6 +73,14 @@ public final class EntryFilter{
      * @return count of selected eligible entries.
      */
     public static int selectEligibleForQuickImport(Seq<PackEntry> entries, PackType targetType, DuplicatePolicy policy){
+        return selectEligibleForQuickImport(entries, targetType, policy, policy);
+    }
+
+    /**
+     * Overload supporting independent per-type conflict policy presets for Maps and Schematics.
+     */
+    public static int selectEligibleForQuickImport(Seq<PackEntry> entries, PackType targetType,
+                                                  DuplicatePolicy mapPolicy, DuplicatePolicy schemPolicy){
         if(entries == null) return 0;
         int count = 0;
         for(int i = 0; i < entries.size; i++){
@@ -85,6 +93,9 @@ public final class EntryFilter{
                 entry.selected = false;
                 continue;
             }
+            DuplicatePolicy policy = entry.type == PackType.MAP ? mapPolicy : schemPolicy;
+            if(policy == null) policy = DuplicatePolicy.SKIP;
+
             if(policy == DuplicatePolicy.SKIP && entry.isDuplicate){
                 entry.selected = false;
                 continue;

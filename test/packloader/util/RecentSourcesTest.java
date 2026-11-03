@@ -135,4 +135,36 @@ public class RecentSourcesTest{
         PackLoaderSettings.setDuplicatePolicy(DuplicatePolicy.RENAME);
         assertEquals(DuplicatePolicy.RENAME, PackLoaderSettings.getDuplicatePolicy());
     }
+
+    @Test
+    public void testPerTypeConflictPolicyPresets(){
+        // Default policies must be SKIP
+        assertEquals(DuplicatePolicy.SKIP, PackLoaderSettings.getDuplicatePolicy(PackType.MAP));
+        assertEquals(DuplicatePolicy.SKIP, PackLoaderSettings.getDuplicatePolicy(PackType.SCHEMATIC));
+
+        // Setting Map policy does not affect Schematics
+        PackLoaderSettings.setDuplicatePolicy(PackType.MAP, DuplicatePolicy.OVERWRITE);
+        assertEquals(DuplicatePolicy.OVERWRITE, PackLoaderSettings.getDuplicatePolicy(PackType.MAP));
+        assertEquals(DuplicatePolicy.SKIP, PackLoaderSettings.getDuplicatePolicy(PackType.SCHEMATIC));
+
+        // Setting Schematic policy does not affect Maps
+        PackLoaderSettings.setDuplicatePolicy(PackType.SCHEMATIC, DuplicatePolicy.RENAME);
+        assertEquals(DuplicatePolicy.OVERWRITE, PackLoaderSettings.getDuplicatePolicy(PackType.MAP));
+        assertEquals(DuplicatePolicy.RENAME, PackLoaderSettings.getDuplicatePolicy(PackType.SCHEMATIC));
+    }
+
+    @Test
+    public void testLegacyPolicyMigrationAndFallback(){
+        // Simulate legacy setting before per-type presets existed
+        Core.settings.put(PackLoaderSettings.KEY_DUPLICATE_POLICY, DuplicatePolicy.OVERWRITE.name());
+
+        // Without per-type keys, both should fall back to legacy setting
+        assertEquals(DuplicatePolicy.OVERWRITE, PackLoaderSettings.getDuplicatePolicy(PackType.MAP));
+        assertEquals(DuplicatePolicy.OVERWRITE, PackLoaderSettings.getDuplicatePolicy(PackType.SCHEMATIC));
+
+        // Explicitly setting one type overrides fallback for that type only
+        PackLoaderSettings.setDuplicatePolicy(PackType.MAP, DuplicatePolicy.RENAME);
+        assertEquals(DuplicatePolicy.RENAME, PackLoaderSettings.getDuplicatePolicy(PackType.MAP));
+        assertEquals(DuplicatePolicy.OVERWRITE, PackLoaderSettings.getDuplicatePolicy(PackType.SCHEMATIC));
+    }
 }

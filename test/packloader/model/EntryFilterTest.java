@@ -167,4 +167,33 @@ public class EntryFilterTest{
         assertFalse(dup1.selected);
         assertFalse(dup2.selected);
     }
+
+    @Test
+    public void testSelectEligibleForQuickImportPerTypePolicies(){
+        Seq<PackEntry> list = new Seq<>();
+        PackEntry mapFresh = createEntry(PackType.MAP, "map_fresh.msav", false, true);
+        PackEntry mapDup = createEntry(PackType.MAP, "map_dup.msav", true, true);
+        PackEntry schemFresh = createEntry(PackType.SCHEMATIC, "schem_fresh.msch", false, true);
+        PackEntry schemDup = createEntry(PackType.SCHEMATIC, "schem_dup.msch", true, true);
+        list.add(mapFresh, mapDup, schemFresh, schemDup);
+
+        // Case 1: Map = OVERWRITE (accepts duplicate), Schematic = SKIP (rejects duplicate)
+        int eligible1 = EntryFilter.selectEligibleForQuickImport(list, null, DuplicatePolicy.OVERWRITE, DuplicatePolicy.SKIP);
+        assertEquals(3, eligible1);
+        assertTrue(mapFresh.selected);
+        assertTrue(mapDup.selected, "Map duplicate must be selected under OVERWRITE");
+        assertTrue(schemFresh.selected);
+        assertFalse(schemDup.selected, "Schematic duplicate must be excluded under SKIP");
+
+        // Reset
+        for(PackEntry e : list) e.selected = false;
+
+        // Case 2: Map = SKIP (rejects duplicate), Schematic = RENAME (accepts duplicate)
+        int eligible2 = EntryFilter.selectEligibleForQuickImport(list, null, DuplicatePolicy.SKIP, DuplicatePolicy.RENAME);
+        assertEquals(3, eligible2);
+        assertTrue(mapFresh.selected);
+        assertFalse(mapDup.selected, "Map duplicate must be excluded under SKIP");
+        assertTrue(schemFresh.selected);
+        assertTrue(schemDup.selected, "Schematic duplicate must be selected under RENAME");
+    }
 }

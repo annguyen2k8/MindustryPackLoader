@@ -630,6 +630,45 @@ public class PackImporterTest{
         assertFalse(mapDir.child("cancel_two.msav").exists());
     }
 
+    @Test
+    public void testImportEntriesWithPerTypePolicies() throws IOException{
+        byte[] originalMap = TestHelper.createValidMapBytes("OriginalMap");
+        byte[] newMap = TestHelper.createValidMapBytes("NewMap");
+        byte[] originalSchem = TestHelper.createValidSchematicBytes("OriginalSchem");
+        byte[] newSchem = TestHelper.createValidSchematicBytes("NewSchem");
+
+        Fi targetMap = mapDir.child("per_type_map.msav");
+        targetMap.writeBytes(originalMap);
+
+        Fi targetSchem = schemDir.child("per_type_schem.msch");
+        targetSchem.writeBytes(originalSchem);
+
+        File inputDir = new File(tempDir, "incoming_per_type");
+        inputDir.mkdirs();
+        Fi incomingMap = new Fi(new File(inputDir, "per_type_map.msav"));
+        incomingMap.writeBytes(newMap);
+        Fi incomingSchem = new Fi(new File(inputDir, "per_type_schem.msch"));
+        incomingSchem.writeBytes(newSchem);
+
+        Seq<PackEntry> entries = scanner.scanFiles(incomingMap, incomingSchem);
+        assertEquals(2, entries.size);
+        for(PackEntry e : entries){
+            e.selected = true;
+            assertTrue(e.isDuplicate, e.sanitizedFileName + " must be flagged as duplicate");
+        }
+
+        // Apply OVERWRITE for Maps and SKIP for Schematics
+        ImportReport report = importer.importEntries(entries, DuplicatePolicy.OVERWRITE, DuplicatePolicy.SKIP, null);
+
+        assertEquals(2, report.totalSelected);
+        assertEquals(1, report.totalOverwritten, "Map must be overwritten");
+        assertEquals(1, report.totalSkipped, "Schematic duplicate must be skipped");
+        assertEquals(0, report.totalFailed);
+
+        assertArrayEquals(newMap, targetMap.readBytes(), "Map file must contain overwritten bytes");
+        assertArrayEquals(originalSchem, targetSchem.readBytes(), "Schematic file must remain unchanged");
+    }
+
     // ---------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------

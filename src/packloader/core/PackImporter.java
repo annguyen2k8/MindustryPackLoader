@@ -73,6 +73,14 @@ public class PackImporter{
      * are dispatched to the main thread through {@link MainThread}.
      */
     public ImportReport importEntries(Seq<PackEntry> entries, DuplicatePolicy policy, ImportListener listener){
+        return importEntries(entries, policy, policy, listener);
+    }
+
+    /**
+     * Imports all selected entries using independent per-type conflict policy presets for Maps and Schematics.
+     */
+    public ImportReport importEntries(Seq<PackEntry> entries, DuplicatePolicy mapPolicy, DuplicatePolicy schemPolicy,
+                                      ImportListener listener){
         ImportReport report = new ImportReport();
         long startTime = System.currentTimeMillis();
 
@@ -109,6 +117,9 @@ public class PackImporter{
                     notifyProgress(listener, entry, toImport.size, report);
                     continue;
                 }
+
+                DuplicatePolicy policy = entry.type == PackType.MAP ? mapPolicy : schemPolicy;
+                if(policy == null) policy = DuplicatePolicy.SKIP;
 
                 boolean imported = false;
                 if(entry.type == PackType.MAP && isNativeMapTarget()){

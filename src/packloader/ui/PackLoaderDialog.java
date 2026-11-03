@@ -52,7 +52,8 @@ public class PackLoaderDialog extends BaseDialog{
     private final Seq<PackEntry> deferredCleanup = new Seq<>();
     private final Seq<Fi> queuedSources = new Seq<>();
     private String sourceName = "";
-    private DuplicatePolicy duplicatePolicy = PackLoaderSettings.getDuplicatePolicy();
+    private DuplicatePolicy mapDuplicatePolicy = PackLoaderSettings.getDuplicatePolicy(PackType.MAP);
+    private DuplicatePolicy schemDuplicatePolicy = PackLoaderSettings.getDuplicatePolicy(PackType.SCHEMATIC);
     private PackType targetType = null;
 
     private enum FilterMode{ ALL, MAPS, SCHEMATICS }
@@ -332,7 +333,10 @@ public class PackLoaderDialog extends BaseDialog{
         }
 
         // Quick Import Option Toggle (no border, aligned with options above)
-        root.add(createQuickImportRow(maxW)).pad(4f, 6f, 4f, 6f).padTop(10f).padBottom(8f).row();
+        root.add(createQuickImportRow(maxW)).pad(4f, 6f, 4f, 6f).padTop(10f).padBottom(4f).row();
+
+        // Conflict Policy Preset Row for this specific type (Maps or Schematics)
+        root.add(createConflictPolicyPresetRow(targetType, maxW)).pad(4f, 6f, 4f, 6f).padBottom(8f).row();
 
         // Recent Sources
         Seq<RecentSources.SourceItem> recents = RecentSources.getForType(targetType);
@@ -482,6 +486,81 @@ public class PackLoaderDialog extends BaseDialog{
         return row;
     }
 
+    private Table createConflictPolicyPresetRow(PackType type, float rowWidth){
+        Table row = new Table(Tex.pane);
+        row.margin(6f);
+        row.defaults().pad(3f);
+
+        boolean isMap = type == PackType.MAP;
+        Color typeColor = isMap ? Pal.heal : Pal.accent;
+        Drawable typeIcon = isMap ?
+            (Icon.terrainSmall != null ? Icon.terrainSmall : Icon.terrain) :
+            (Icon.pasteSmall != null ? Icon.pasteSmall : Icon.paste);
+
+        row.image(typeIcon).size(16f).color(typeColor).padLeft(4f).padRight(4f);
+        row.add(getLocalizedText("packloader.conflict.label")).color(Pal.accent).padRight(8f);
+
+        for(DuplicatePolicy p : DuplicatePolicy.values()){
+            row.button(b -> {
+                b.margin(4f);
+                b.add(p.title()).padLeft(4f).padRight(4f);
+            }, Styles.flatTogglet, () -> {
+                setPolicyForType(type, p);
+            }).checked(btn -> getPolicyForType(type) == p).height(34f).pad(2f);
+        }
+
+        return row;
+    }
+
+    public DuplicatePolicy getPolicyForType(PackType type){
+        if(type == PackType.MAP) return mapDuplicatePolicy;
+        if(type == PackType.SCHEMATIC) return schemDuplicatePolicy;
+        return mapDuplicatePolicy;
+    }
+
+    public void setPolicyForType(PackType type, DuplicatePolicy policy){
+        if(type == PackType.MAP){
+            mapDuplicatePolicy = policy;
+            PackLoaderSettings.setDuplicatePolicy(PackType.MAP, policy);
+        }else if(type == PackType.SCHEMATIC){
+            schemDuplicatePolicy = policy;
+            PackLoaderSettings.setDuplicatePolicy(PackType.SCHEMATIC, policy);
+        }else{
+            mapDuplicatePolicy = policy;
+            schemDuplicatePolicy = policy;
+            PackLoaderSettings.setDuplicatePolicy(null, policy);
+        }
+    }
+
+    private void buildConflictRowSection(Table targetTable, PackType type, boolean mixedMode){
+        Table section = new Table();
+        section.left().defaults().pad(2f);
+
+        boolean isMap = type == PackType.MAP;
+        Color typeColor = isMap ? Pal.heal : Pal.accent;
+        Drawable typeIcon = isMap ?
+            (Icon.terrainSmall != null ? Icon.terrainSmall : Icon.terrain) :
+            (Icon.pasteSmall != null ? Icon.pasteSmall : Icon.paste);
+
+        section.image(typeIcon).size(16f).color(typeColor).padRight(4f);
+        String labelKey = mixedMode ?
+            (isMap ? "packloader.conflict.label.map" : "packloader.conflict.label.schem") :
+            "packloader.conflict.label";
+        section.add(getLocalizedText(labelKey)).color(mixedMode ? typeColor : Pal.accent).padRight(8f);
+
+        for(DuplicatePolicy p : DuplicatePolicy.values()){
+            section.button(b -> {
+                b.margin(4f);
+                b.add(p.title()).padLeft(4f).padRight(4f);
+            }, Styles.flatTogglet, () -> {
+                setPolicyForType(type, p);
+                rebuildEntriesList();
+            }).checked(btn -> getPolicyForType(type) == p).height(34f).pad(2f);
+        }
+
+        targetTable.add(section).growX().left().row();
+    }
+
     /** View 2: File Review and Bulk Import Controls */
     private void buildEntriesView(){
         // Top Header: Source Info & Change Source
@@ -622,17 +701,13 @@ public class PackLoaderDialog extends BaseDialog{
         conflictRow.margin(6f);
         conflictRow.defaults().pad(3f);
 
-        conflictRow.add(getLocalizedText("packloader.conflict.label")).color(Pal.accent).padRight(8f);
-
-        for(DuplicatePolicy p : DuplicatePolicy.values()){
-            conflictRow.button(b -> {
-                b.margin(4f);
-                b.add(p.title()).padLeft(4f).padRight(4f);
-            }, Styles.flatTogglet, () -> {
-                duplicatePolicy = p;
-                PackLoaderSettings.setDuplicatePolicy(p);
-                rebuildEntriesList();
-            }).checked(btn -> duplicatePolicy == p).height(34f).pad(2f);
+        if(targetType == PackType.MAP || (targetType == null && mapsCount > 0 && schemsCount == 0)){
+            buildConflictRowSection(conflictRow, PackType.MAP, false);
+        }else if(targetType == PackType.SCHEMATIC || (targetType == null && schemsCount > 0 && mapsCount == 0)){
+            buildConflictRowSection(conflictRow, PackType.SCHEMATIC, false);
+        }else{
+            buildConflictRowSection(conflictRow, PackType.MAP, true);
+            buildConflictRowSection(conflictRow, PackType.SCHEMATIC, true);
         }
 
         cont.add(conflictRow).growX().pad(4f).row();
@@ -822,8 +897,9 @@ public class PackLoaderDialog extends BaseDialog{
         lastImportProgressPost = 0L;
         lastImportProgress = -1f;
         int token = importGeneration.begin();
-        // Snapshot the policy so changing the UI mid-import cannot affect later entries.
-        DuplicatePolicy policy = duplicatePolicy;
+        // Snapshot the policies so changing the UI mid-import cannot affect later entries.
+        DuplicatePolicy mapPolicy = mapDuplicatePolicy;
+        DuplicatePolicy schemPolicy = schemDuplicatePolicy;
 
         if(Vars.ui != null && Vars.ui.loadfrag != null){
             Vars.ui.loadfrag.show(getLocalizedText("packloader.import.progress.start", 0, toImport.size));
@@ -858,7 +934,7 @@ public class PackLoaderDialog extends BaseDialog{
         Threads.daemon("PackLoader-Import", () -> {
             ImportReport report;
             try{
-                report = importer.importEntries(toImport, policy, listener);
+                report = importer.importEntries(toImport, mapPolicy, schemPolicy, listener);
             }catch(Throwable t){
                 Log.err("[PackLoader] Import error:", t);
                 MainThread.post(() -> {
@@ -1307,9 +1383,11 @@ public class PackLoaderDialog extends BaseDialog{
                         scanner.checkGameDuplicates(entries);
                         resetFilters();
 
-                        duplicatePolicy = PackLoaderSettings.getDuplicatePolicy();
+                        mapDuplicatePolicy = PackLoaderSettings.getDuplicatePolicy(PackType.MAP);
+                        schemDuplicatePolicy = PackLoaderSettings.getDuplicatePolicy(PackType.SCHEMATIC);
                         if(!append && PackLoaderSettings.isQuickImport()){
-                            int eligible = EntryFilter.selectEligibleForQuickImport(entries, targetType, duplicatePolicy);
+                            int eligible = EntryFilter.selectEligibleForQuickImport(entries, targetType,
+                                mapDuplicatePolicy, schemDuplicatePolicy);
                             if(eligible > 0){
                                 executeImport();
                                 return;
