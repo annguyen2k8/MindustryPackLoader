@@ -23,6 +23,10 @@ public final class Localization{
 
     private static ObjectMap<String, String> fallbackProperties;
 
+    static {
+        packloader.PackLoaderMod.initColors();
+    }
+
     private Localization(){}
 
     /** Returns localized text for {@code key}, the English fallback, or {@code key} itself. */

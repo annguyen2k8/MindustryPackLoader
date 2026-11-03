@@ -3,32 +3,30 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-03 11:10 +07:00
+- **Last updated:** 2026-11-03 11:25 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** UI/UX Polish — Text Redundancy Cleanup: audit and refactor all dialogs, cards, toolbars, progress states, and result lists; eliminate redundant repeated titles, subtitles, placeholders, and status labels across EN and VI bundles.
+- **Task:** UI Text Formatting & Localization Audit: register Mindustry palette and semantic markup tags (`heal`, `remove`, `success`, `failed`, `error`) in Arc `Colors` so tags like `[heal]` are rendered in native colors rather than leaked as literal text; close color spans with `[]` in item cards to eliminate color bleed; verify 100% placeholder and markup parity across EN and VI bundles.
 - **Branch:** master; working tree clean post-commit.
 
 ## Results
 
-- [verified] Mode & Source Selection Polish:
-  - Streamlined `packloader.mode.prompt` to "Choose what to import:" / "Chọn nội dung cần nhập:".
-  - Cleaned option cards by removing redundant repeated words ("Bulk import schematics/maps"): now "From ZIP archives or local folders" / "Từ tệp ZIP hoặc thư mục máy".
-  - Cleaned ZIP option title & descriptions: title "ZIP Archive (.zip)" and desc "Extract and import .msch/.msav files".
-  - Clarified Quick Import description: "Skip review and import automatically after scan" / "Tự động nhập ngay sau khi quét, bỏ qua xem lại".
-  - Updated path input placeholder with concrete examples: "e.g. D:/maps or /sdcard/pack.zip" / "Ví dụ: D:/maps hoặc pack.zip".
-- [verified] Review Toolbar & Redundancy Removal:
-  - Removed duplicate toolbar label `Import Maps (X)` in `PackLoaderDialog` which echoed the window title, header summary, and import button.
-  - Shortened conflict policy labels and descriptions for faster scanning ("Khi trùng:", "Bỏ qua và giữ nguyên tệp đã có trong game", etc.).
-- [verified] Result Dialog Item Cleanup:
-  - Eliminated duplicate file names and success labels on per-file item cards in `PackResultDialog`: normal success displays clean single-line entry without repeating `Successfully imported: filename`.
-  - Added specialized `packloader.result.msg.renamed` ("Renamed to: {0}") so secondary line appears only when valuable differentiator exists (rename, overwrite, skip, or failure).
-- [verified] Automated Tests & Parity:
-  - Updated `BundleTest.java` verifying key parity and formatting for `packloader.result.msg.renamed` in both EN and VI.
-  - 130/130 unit tests passed; `testAllSourceKeysExistInBothBundles` verified 100% key parity across all Java sources.
-- [verified] Packaging & Verification:
-  - Desktop JAR built and verified cleanly via `verifyJar`.
-  - No business logic altered.
-  - Local untracked artifacts (`session.json`) completely preserved.
+- [verified] Root Cause & Color Registration:
+  - Disassembled and audited Arc's `GlyphLayout.parseColorMarkup`: Arc resolves `[colorName]` via `Colors.get(colorName)`. If null, it returns `-1` and renders `[colorName]` as literal text.
+  - Mindustry's `UI.loadColors()` only registers `accent`, `unlaunched`, `highlight`, `stat`, and `negstat`. `Pal.heal` and `Pal.remove` exist in code but were never registered into Arc's `Colors` map.
+  - Implemented `PackLoaderMod.initColors()` registering `heal` (`Pal.heal`), `remove` (`Pal.remove`), `accent`, `stat`, `negstat`, `highlight`, and semantic aliases `success`, `failed`, `error`.
+  - Wired `initColors()` into `PackLoaderMod` constructor, `initUI()`, and `Localization` static initializer.
+- [verified] UI Markup Isolation & Closing Tags:
+  - In `PackLoaderDialog.java`, added closing tags `[]` to `[gold]...[]` and `[scarlet]...[]` on entry badge labels.
+  - Added closing tags `[]` to `[lightgray]...[]`, `[gold]...[]`, and `[scarlet]...[]` on secondary info lines to eliminate color bleeding into separators (`  •  `) and subsequent labels.
+- [verified] Localization Parity & Validation:
+  - Verified 176/176 keys across both `bundle.properties` and `bundle_vi.properties` with 100% placeholder index parity (`{0}`, `{1}`, etc.).
+  - Added unit test `testColorTagsRegistrationAndMarkupValidity` verifying all registered colors in Arc's `Colors`.
+  - Added unit test `testImportProgressDetailMarkupTagsAreRegistered` verifying EN/VI progress strings parse with registered colors and don't leak literal `[heal]`.
+  - Added unit test `testBundlePlaceholdersParity` guaranteeing continuous placeholder parity between EN and VI bundles.
+- [verified] Automated Tests & Packaging:
+  - All unit tests passed (`.\gradlew.bat test --rerun` BUILD SUCCESSFUL).
+  - `.\gradlew.bat check` and `.\gradlew.bat verifyJar` BUILD SUCCESSFUL.
+  - Untracked artifacts (`session.json`) completely preserved.
 
 ## Remaining
 
@@ -41,7 +39,7 @@
 2. Desktop In-Game Smoke Test:
    - Copy `build/libs/MindustryPackLoaderDesktop.jar` into portable Mindustry mod folder `D:\Anzuno\Mindustry\MindustryData\mods\` (or `%APPDATA%\Mindustry\mods\`).
    - Launch `D:\Anzuno\Mindustry\Mindustry.exe`.
-   - Verify: Mode selection dialog, source selection, and results dialog render clean, concise text without redundant lines.
+   - Verify: Import progress dialog shows `Success: X` in soft green (`Pal.heal`) without any literal `[heal]` text.
 
 ## Open questions
 
@@ -49,7 +47,7 @@
 
 ## Verification
 
-- `.\gradlew.bat test` — BUILD SUCCESSFUL (130 tests, 0 failures, 0 skipped).
-- `.\gradlew.bat check` — BUILD SUCCESSFUL (130 tests passed, desktop JAR verified).
+- `.\gradlew.bat test --rerun` — BUILD SUCCESSFUL (all unit tests passed).
+- `.\gradlew.bat check` — BUILD SUCCESSFUL (desktop JAR verified).
 - `.\gradlew.bat verifyJar` — BUILD SUCCESSFUL (packaged bundle paths verified at `bundles/*`).
 - `session.json` — verified unaffected.

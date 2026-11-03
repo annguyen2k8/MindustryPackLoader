@@ -14,6 +14,7 @@ import java.util.zip.ZipOutputStream;
 public class TestHelper{
 
     public static void initBundle(Locale locale){
+        packloader.PackLoaderMod.initColors();
         Core.bundle = I18NBundle.createBundle(new Fi("assets/bundles/bundle"), locale);
     }
 

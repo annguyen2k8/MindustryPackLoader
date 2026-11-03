@@ -730,10 +730,10 @@ public class PackLoaderDialog extends BaseDialog{
                     entry.sanitizedFileName.substring(0, entry.sanitizedFileName.lastIndexOf('.')) : entry.sanitizedFileName;
 
                 if(entry.isDuplicate){
-                    titleBuilder.append("  [gold]").append(getLocalizedText("packloader.badge.duplicate"));
+                    titleBuilder.append("  [gold]").append(getLocalizedText("packloader.badge.duplicate")).append("[]");
                 }
                 if(!entry.isValid){
-                    titleBuilder.append("  [scarlet]").append(getLocalizedText("packloader.badge.invalid"));
+                    titleBuilder.append("  [scarlet]").append(getLocalizedText("packloader.badge.invalid")).append("[]");
                 }
 
                 t.add(titleBuilder.toString()).color(Color.white).ellipsis(true).growX().minWidth(0f).left().row();
@@ -743,14 +743,14 @@ public class PackLoaderDialog extends BaseDialog{
                 infoBuilder.append(PackScanner.formatSize(entry.size));
 
                 if(!entry.displayName.equalsIgnoreCase(nameNoExt) && !entry.displayName.equalsIgnoreCase(entry.sanitizedFileName)){
-                    infoBuilder.append("  •  [lightgray]").append(entry.sanitizedFileName);
+                    infoBuilder.append("  •  [lightgray]").append(entry.sanitizedFileName).append("[]");
                 }
 
                 if(entry.isDuplicate && !entry.duplicateReason.isEmpty()){
-                    infoBuilder.append("  •  [gold]").append(entry.duplicateReason);
+                    infoBuilder.append("  •  [gold]").append(entry.duplicateReason).append("[]");
                 }
                 if(!entry.isValid && !entry.errorReason.isEmpty()){
-                    infoBuilder.append("  •  [scarlet]").append(entry.errorReason);
+                    infoBuilder.append("  •  [scarlet]").append(entry.errorReason).append("[]");
                 }
 
                 t.add(infoBuilder.toString()).color(entry.isDuplicate ? Color.orange : entry.isValid ? Pal.lightishGray : Pal.remove)

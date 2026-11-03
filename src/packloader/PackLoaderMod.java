@@ -2,6 +2,8 @@ package packloader;
 
 import arc.Core;
 import arc.Events;
+import arc.graphics.Color;
+import arc.graphics.Colors;
 import arc.scene.style.Drawable;
 import arc.scene.ui.layout.Table;
 import arc.util.Log;
@@ -9,6 +11,7 @@ import arc.util.Time;
 import mindustry.Vars;
 import mindustry.game.EventType.ClientLoadEvent;
 import mindustry.gen.Icon;
+import mindustry.graphics.Pal;
 import mindustry.mod.Mod;
 import packloader.model.PackType;
 import packloader.ui.PackLoaderDialog;
@@ -23,6 +26,7 @@ public class PackLoaderMod extends Mod{
     public static PackLoaderDialog dialog;
 
     public PackLoaderMod(){
+        initColors();
         Log.info("[PackLoader] Mindustry PackLoader mod constructed.");
 
         if(Vars.clientLoaded){
@@ -30,6 +34,28 @@ public class PackLoaderMod extends Mod{
         }else{
             Events.on(ClientLoadEvent.class, e -> initUI());
         }
+    }
+
+    /**
+     * Registers required palette colors and semantic markup aliases in {@link Colors}.
+     * Mindustry v160 built-in UI only registers a small subset of colors (accent, unlaunched,
+     * highlight, stat, negstat). This method ensures tags like [heal], [remove], [success],
+     * and [failed] are recognized by Arc's GlyphLayout color markup parser instead of being
+     * leaked as literal text.
+     */
+    public static void initColors(){
+        // Standard palette colors
+        if(Colors.get("accent") == null) Colors.put("accent", Pal.accent != null ? Pal.accent : Color.valueOf("ffd37f"));
+        if(Colors.get("heal") == null) Colors.put("heal", Pal.heal != null ? Pal.heal : Color.valueOf("98ffa9"));
+        if(Colors.get("remove") == null) Colors.put("remove", Pal.remove != null ? Pal.remove : Color.valueOf("e55454"));
+        if(Colors.get("stat") == null) Colors.put("stat", Pal.stat != null ? Pal.stat : Color.valueOf("ffda9e"));
+        if(Colors.get("negstat") == null) Colors.put("negstat", Pal.negativeStat != null ? Pal.negativeStat : Color.valueOf("e55454"));
+        if(Colors.get("highlight") == null) Colors.put("highlight", (Pal.accent != null ? Pal.accent : Color.valueOf("ffd37f")).cpy().lerp(Color.white, 0.3f));
+
+        // Semantic markup aliases for UI text
+        if(Colors.get("success") == null) Colors.put("success", Pal.heal != null ? Pal.heal : Color.valueOf("98ffa9"));
+        if(Colors.get("failed") == null) Colors.put("failed", Pal.remove != null ? Pal.remove : Color.valueOf("e55454"));
+        if(Colors.get("error") == null) Colors.put("error", Pal.remove != null ? Pal.remove : Color.valueOf("e55454"));
     }
 
     private void initUI(){

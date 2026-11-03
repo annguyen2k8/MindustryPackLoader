@@ -265,4 +265,98 @@ public class BundleTest{
                 });
         }
     }
+
+    @Test
+    public void testColorTagsRegistrationAndMarkupValidity(){
+        PackLoaderMod.initColors();
+
+        assertNotNull(arc.graphics.Colors.get("heal"), "Colors must have 'heal' registered");
+        assertEquals(mindustry.graphics.Pal.heal, arc.graphics.Colors.get("heal"));
+
+        assertNotNull(arc.graphics.Colors.get("remove"), "Colors must have 'remove' registered");
+        assertEquals(mindustry.graphics.Pal.remove, arc.graphics.Colors.get("remove"));
+
+        assertNotNull(arc.graphics.Colors.get("success"), "Colors must have 'success' alias registered");
+        assertEquals(mindustry.graphics.Pal.heal, arc.graphics.Colors.get("success"));
+
+        assertNotNull(arc.graphics.Colors.get("failed"), "Colors must have 'failed' alias registered");
+        assertEquals(mindustry.graphics.Pal.remove, arc.graphics.Colors.get("failed"));
+
+        assertNotNull(arc.graphics.Colors.get("error"), "Colors must have 'error' alias registered");
+        assertEquals(mindustry.graphics.Pal.remove, arc.graphics.Colors.get("error"));
+
+        assertNotNull(arc.graphics.Colors.get("accent"), "Colors must have 'accent' registered");
+        assertNotNull(arc.graphics.Colors.get("stat"), "Colors must have 'stat' registered");
+        assertNotNull(arc.graphics.Colors.get("negstat"), "Colors must have 'negstat' registered");
+        assertNotNull(arc.graphics.Colors.get("highlight"), "Colors must have 'highlight' registered");
+    }
+
+    @Test
+    public void testImportProgressDetailMarkupTagsAreRegistered(){
+        PackLoaderMod.initColors();
+
+        // 1. English format test
+        TestHelper.initBundle(Locale.ENGLISH);
+        String enDetail = packloader.util.Localization.getLocalizedText("packloader.import.progress.detail",
+            "test.msch", 10, 50, 9, 1);
+        assertNotNull(enDetail);
+        assertFalse(enDetail.isEmpty());
+
+        // 2. Vietnamese format test
+        TestHelper.initBundle(new Locale("vi"));
+        String viDetail = packloader.util.Localization.getLocalizedText("packloader.import.progress.detail",
+            "test.msch", 10, 50, 9, 1);
+        assertNotNull(viDetail);
+        assertFalse(viDetail.isEmpty());
+
+        // Validate all markup tags across both
+        for(String str : new String[]{enDetail, viDetail}){
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\[([a-zA-Z0-9#_]+)\\]").matcher(str);
+            while(m.find()){
+                String tag = m.group(1);
+                if(tag.startsWith("#")){
+                    assertDoesNotThrow(() -> arc.graphics.Color.valueOf(tag.substring(1)),
+                        "Hex color tag [" + tag + "] must be valid hex");
+                }else{
+                    assertNotNull(arc.graphics.Colors.get(tag),
+                        "Markup tag [" + tag + "] in progress detail string must be registered in Colors");
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testBundlePlaceholdersParity() throws Exception{
+        Properties en = new Properties();
+        try(InputStream in = getClass().getResourceAsStream("/bundles/bundle.properties")){
+            en.load(new InputStreamReader(in, StandardCharsets.UTF_8));
+        }
+        Properties vi = new Properties();
+        try(InputStream in = getClass().getResourceAsStream("/bundles/bundle_vi.properties")){
+            vi.load(new InputStreamReader(in, StandardCharsets.UTF_8));
+        }
+
+        java.util.regex.Pattern pPat = java.util.regex.Pattern.compile("\\{([0-9]+)\\}");
+
+        for(String key : en.stringPropertyNames()){
+            String enVal = en.getProperty(key);
+            String viVal = vi.getProperty(key);
+            assertNotNull(viVal, "Missing key in Vietnamese bundle: " + key);
+
+            java.util.Set<Integer> enPlaceholders = new java.util.TreeSet<>();
+            java.util.regex.Matcher mEn = pPat.matcher(enVal);
+            while(mEn.find()){
+                enPlaceholders.add(Integer.parseInt(mEn.group(1)));
+            }
+
+            java.util.Set<Integer> viPlaceholders = new java.util.TreeSet<>();
+            java.util.regex.Matcher mVi = pPat.matcher(viVal);
+            while(mVi.find()){
+                viPlaceholders.add(Integer.parseInt(mVi.group(1)));
+            }
+
+            assertEquals(enPlaceholders, viPlaceholders,
+                "Placeholder mismatch for key '" + key + "': EN " + enPlaceholders + " vs VI " + viPlaceholders);
+        }
+    }
 }
