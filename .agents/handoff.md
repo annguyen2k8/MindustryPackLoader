@@ -3,46 +3,54 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-07 16:50 +07:00
+- **Last updated:** 2026-11-07 21:46 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** UI Borderless / Flat Design Enhancement for Import Sources and Import Schematics screens.
-- **Branch:** master; working tree clean post-commit `9d83138`.
+- **Task:** UI/UX Refinement — Borderless Flat UI (Post-Visual Testing).
+- **Branch:** master; working tree clean post-commit `6fec160`.
 
 ## Results
 
-- [verified] Borderless Flat UI cho Màn hình 1 (Import Sources):
-  - Loại bỏ hoàn toàn viền hình chữ nhật dày (`Styles.defaultb`) bao quanh từng Option (`Scan Folder`, `Select ZIP`, `Manual Path`) và các thẻ `Recent Sources`.
-  - Thay thế bằng `UIUtils.cardStyle()` với nền tối phân cấp nhẹ (`Styles.black5`), viền phẳng không gờ, hover highlight mượt mà (`Styles.flatOver`) và phản hồi chạm (`Styles.flatDown`).
-  - Tối ưu spacing: Tăng khoảng đệm nội bộ `margin(10f, 14f, 10f, 14f)` cho Option và `margin(8f, 12f, 8f, 12f)` cho Recent Sources tạo khoảng thở thị giác tự nhiên.
-  - Loại bỏ viền `Tex.pane` bao quanh Quick Import: Chuyển sang nền phẳng `UIUtils.flatPane()` kết hợp khoảng đệm cân đối; giữ nguyên thụt lề 34f cho cụm conflict preset và checkbox vuông 24f trực quan.
-  - Giảm độ nổi bật của viền trên nút `Back` và `Report a Bug`: Chuyển hoàn toàn từ style nút dày 210x64f sang `Styles.flatt` (140x54f) và `Styles.flati` (48x54f), đồng bộ với toàn bộ dialog.
-- [verified] Borderless Flat UI cho Màn hình 2 (Import Schematics Review):
-  - Thay thế toàn bộ khung viền `Tex.pane` thô trên Top Header, Hàng 1 (Search + Conflict), và Hàng 2 (Live Dry-Run Summary) bằng nền tối nhẹ `UIUtils.flatPane()`.
-  - Chuẩn hóa từng hàng danh sách bản vẽ với `UIUtils.rowStyle()` (nền `Styles.black3`, hover highlight `Styles.flatOver`), phân tách bằng spacing `pad(2f, 3f)` thay vì viền dày.
-  - Bảo toàn 100% hierarchy: Checkbox 24f, thumbnail 36f, nhãn màu semantic (`Pal.accent`, `Pal.heal`), nút `[Paste]` và `(i)` cố định mép phải.
-- [verified] Test Suite & Cross-Version Matrix:
-  - 233/233 unit tests passing 100% (0 failures, 0 skipped) trên cả hai phiên bản Mindustry v160 và v160.7.
-  - Đóng gói và kiểm tra localization `verifyJar` thành công 100% trên cả v160 và v160.7.
-  - Desktop JAR đã deploy tại `D:\Anzuno\Mindustry\MindustryData\mods\MindustryPackLoaderDesktop.jar`.
+- [verified] Quick Import & Skip Identical Borderless Layout:
+  - Loại bỏ hoàn toàn container `new Table(UIUtils.flatPane())`, chuyển sang `new Table()` trong suốt không nền (`null background`).
+  - Cả 2 checkbox `Quick Import` và `Skip identical content` cùng các mô tả hiển thị trực tiếp trên bề mặt dialog, không còn viền hoặc card background nào bao quanh.
+  - Áp dụng nhất quán trên cả màn hình chính của mod (`buildModeSelection`) và màn hình chọn nguồn (`buildSourceSelection`).
+- [verified] Conflict Policy Preset trên Main Menu:
+  - Kích hoạt hiển thị preset xung đột `On conflict: Skip / Overwrite / Rename` ngay tại Main Menu khi Quick Import được bật.
+  - Xử lý đồng bộ 2 chiều (`getPolicyForType(null)` và `setPolicyForType(null, policy)`), tự động cập nhật cài đặt lưu trữ `PackLoaderSettings` và bảo toàn chính sách khi chuyển qua lại giữa các màn hình.
+- [verified] Recent Sources Clear Button Refinement:
+  - Thêm helper method `UIUtils.clearButtonStyle()` với `up = Styles.none`, loại bỏ hoàn toàn nền đen `Styles.flatt`.
+  - Tăng khoảng cách `padRight(8f)` giữa icon thùng rác và chữ `Clear`.
+  - Duy trì hitbox thoải mái `height(32f)` và căn giữa baseline chuẩn theo chiều dọc với tiêu đề `Recent Sources`.
+- [verified] Schematic List Density Optimization:
+  - Loại bỏ vĩnh viễn thông tin số block (`Blocks: N`) khỏi schematic list.
+  - Ẩn metadata phụ (dung lượng file `PackScanner.formatSize` và kích thước `entry.getDimensionsString()`) theo mặc định khi `showDetailedMeta == false`.
+  - Ưu tiên hiển thị tên tệp, loại nội dung và lý do xung đột (`duplicateReason`, `contentDuplicateReason`, `target.renamed`, `errorReason`). Khi tệp mới và không có lỗi, hiển thị nhãn trạng thái `Ready to import` (`Sẵn sàng nhập`).
+  - Thêm nút bật/tắt `Details` (`Chi tiết`) trên thanh công cụ Hàng 2 để người dùng có thể xem kích thước và dung lượng khi cần.
+- [verified] Unit Test Suite & Cross-Version Verification:
+  - Bổ sung test suite mới `BorderlessFlatRefinementTest` (4 unit tests) bao quát toàn bộ 4 nội dung tinh chỉnh.
+  - Mindustry v160: **237/237 tests PASS 100%**.
+  - Mindustry v160.7: **237/237 tests PASS 100%**.
+  - `verifyJar`: BUILD SUCCESSFUL (Kiểm tra bundle và localization đạt chuẩn 100%).
+  - Desktop JAR đã deploy tại `D:\Anzuno\Mindustry\MindustryData\mods\MindustryPackLoaderDesktop.jar` (thời điểm: `07/11/2026 9:44:32 PM`).
 
 ## Remaining
 
-- Đợi người dùng đánh giá so sánh Trước/Sau (Before/After) của Borderless Flat UI.
-- Chuyển sang giai đoạn: Finalization & Release Preparation.
+- Bàn giao để người dùng khởi động lại game Mindustry v160.7 và kiểm tra trực quan trực tiếp lần cuối.
 
 ## Next steps
 
-1. Trình bày chi tiết phân tích Before / After (kèm hình ảnh so sánh) tới người dùng.
-2. Chờ người dùng phê duyệt giao diện Borderless Flat UI.
+1. Người dùng khởi động lại Mindustry để nạp bản build mod mới nhất.
+2. Kiểm tra trực quan 4 điểm cải tiến: Quick Import không viền, Conflict Policy trên Main Menu, nút Clear trong suốt có khoảng cách, và Schematic List tinh gọn với nút Details.
+3. Người dùng phản hồi xác nhận hoàn tất UI/UX Refinement.
 
 ## Open questions
 
-- Không có. Tất cả 7 yêu cầu về Borderless / Flat UI đã được triển khai đầy đủ và kiểm thử thành công.
+- Không có. Tất cả 5 mục yêu cầu đã được đáp ứng trọn vẹn và kiểm thử thành công.
 
 ## Verification
 
-- `.\gradlew.bat test "-PmindustryVersion=v160"` — BUILD SUCCESSFUL (233/233 tests passed).
-- `.\gradlew.bat test "-PmindustryVersion=v160.7"` — BUILD SUCCESSFUL (233/233 tests passed).
+- `.\gradlew.bat test "-PmindustryVersion=v160"` — BUILD SUCCESSFUL (237/237 tests passed).
+- `.\gradlew.bat test "-PmindustryVersion=v160.7"` — BUILD SUCCESSFUL (237/237 tests passed).
 - `.\gradlew.bat jar check verifyJar "-PmindustryVersion=v160"` — BUILD SUCCESSFUL.
 - `.\gradlew.bat jar check verifyJar "-PmindustryVersion=v160.7"` — BUILD SUCCESSFUL.
 - Desktop JAR deployed to `D:\Anzuno\Mindustry\MindustryData\mods\MindustryPackLoaderDesktop.jar`.
