@@ -364,11 +364,8 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             )).minHeight(72f).pad(4f).row();
         }
 
-        // Quick Import Option Toggle (no border, aligned with options above)
-        root.add(createQuickImportRow(maxW)).pad(4f, 6f, 4f, 6f).padTop(10f).padBottom(4f).row();
-
-        // Conflict Policy Preset Row for this specific type (Maps or Schematics)
-        root.add(createConflictPolicyPresetRow(targetType, maxW)).pad(4f, 6f, 4f, 6f).padBottom(8f).row();
+        // Import Configuration Card (Quick Import, dynamic conflict preset, skip identical content)
+        root.add(createQuickImportRow(targetType, maxW)).pad(4f, 6f, 4f, 6f).padTop(10f).padBottom(8f).row();
 
         // Recent Sources
         Seq<RecentSources.SourceItem> recents = RecentSources.getForType(targetType);
@@ -479,13 +476,17 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         return btn;
     }
 
-    private Table createQuickImportRow(float rowWidth){
-        Table container = new Table();
-        container.left().defaults().left().growX();
+    Table createQuickImportRow(float rowWidth){
+        return createQuickImportRow(targetType, rowWidth);
+    }
+
+    Table createQuickImportRow(PackType type, float rowWidth){
+        Table card = new Table(Tex.pane);
+        card.margin(10f);
+        card.left().defaults().left().growX();
 
         CheckBox quickBox = new CheckBox("");
         quickBox.setChecked(PackLoaderSettings.isQuickImport());
-        quickBox.changed(() -> PackLoaderSettings.setQuickImport(quickBox.isChecked()));
         quickBox.clearChildren();
         quickBox.left().defaults().left();
         quickBox.margin(0f);
@@ -493,7 +494,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         quickBox.add(quickBox.getImage()).size(24f).padRight(10f).center();
         UIUtils.squareCheck(quickBox, 24f);
 
-        float textWidth = Math.max(160f, rowWidth - 44f);
+        float textWidth = Math.max(160f, rowWidth - 64f);
         Table textTable = new Table();
         textTable.left().defaults().left().growX();
         textTable.touchable = Touchable.disabled;
@@ -509,7 +510,31 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             .wrap();
 
         quickBox.add(textTable).growX().left().center();
-        container.add(quickBox).growX().row();
+        card.add(quickBox).growX().row();
+
+        // Conflict Policy Preset Container (dynamically shown ONLY when Quick Import is ON and type is known)
+        Table conflictContainer = new Table();
+        conflictContainer.left().defaults().left();
+
+        Runnable updateConflictVisibility = () -> {
+            conflictContainer.clearChildren();
+            if(quickBox.isChecked() && type != null){
+                conflictContainer.margin(2f, 34f, 4f, 0f);
+                populateConflictPresetContent(conflictContainer, type);
+            }else{
+                conflictContainer.margin(0f);
+            }
+            conflictContainer.invalidateHierarchy();
+        };
+
+        quickBox.changed(() -> {
+            PackLoaderSettings.setQuickImport(quickBox.isChecked());
+            updateConflictVisibility.run();
+        });
+
+        updateConflictVisibility.run();
+
+        card.add(conflictContainer).growX().row();
 
         // Sub-option: Skip identical content
         CheckBox skipBox = new CheckBox("");
@@ -531,35 +556,36 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
         skipBox.add(skipTextTable).growX().left().center();
 
-        // Aligned along the exact same X axis as row (no padLeft indent)
-        container.add(skipBox).growX().padTop(6f).row();
+        card.add(skipBox).growX().padTop(6f).row();
 
-        return container;
+        return card;
     }
 
-    private Table createConflictPolicyPresetRow(PackType type, float rowWidth){
-        Table row = new Table(Tex.pane);
-        row.margin(6f);
-        row.defaults().pad(3f);
-
+    void populateConflictPresetContent(Table target, PackType type){
+        if(type == null) return;
         boolean isMap = type == PackType.MAP;
         Color typeColor = isMap ? Pal.heal : Pal.accent;
         Drawable typeIcon = isMap ?
             (Icon.terrainSmall != null ? Icon.terrainSmall : Icon.terrain) :
             (Icon.pasteSmall != null ? Icon.pasteSmall : Icon.paste);
 
-        row.image(typeIcon).size(16f).color(typeColor).padLeft(4f).padRight(4f);
-        row.add(getLocalizedText("packloader.conflict.label")).color(Pal.accent).padRight(8f);
+        target.image(typeIcon).size(16f).color(typeColor).padRight(6f);
+        target.add(getLocalizedText("packloader.conflict.label")).color(Pal.accent).padRight(8f);
 
         for(DuplicatePolicy p : DuplicatePolicy.values()){
-            row.button(b -> {
+            target.button(b -> {
                 b.margin(4f);
                 b.add(p.title()).padLeft(4f).padRight(4f);
             }, Styles.flatTogglet, () -> {
                 setPolicyForType(type, p);
-            }).checked(btn -> getPolicyForType(type) == p).height(34f).pad(2f);
+            }).checked(btn -> getPolicyForType(type) == p).height(32f).pad(2f);
         }
+    }
 
+    Table createConflictPolicyPresetRow(PackType type, float rowWidth){
+        Table row = new Table();
+        row.defaults().pad(2f);
+        populateConflictPresetContent(row, type);
         return row;
     }
 
