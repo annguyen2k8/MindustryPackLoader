@@ -27,18 +27,13 @@ public final class SchematicPlacementHelper{
     public static boolean placeSchematic(PackEntry entry, Runnable onPlaced){
         if(entry == null) return false;
 
-        Schematic s = entry.schematic;
+        Schematic s = entry.schematic != null ? entry.schematic : entry.getOrReadSchematic();
         if(s == null){
-            try(java.io.InputStream in = entry.openStream()){
-                s = PackFormat.readSchematic(in);
-                entry.schematic = s;
-            }catch(Throwable t){
-                Log.err("[PackLoader] Failed to read schematic for placement: @", entry.sanitizedFileName, t);
-                if(Vars.ui != null){
-                    Vars.ui.showErrorMessage(getLocalizedText("packloader.error.invalid-schematic"));
-                }
-                return false;
+            Log.err("[PackLoader] Failed to read schematic for placement: @", entry.sanitizedFileName);
+            if(Vars.ui != null){
+                Vars.ui.showErrorMessage(getLocalizedText("packloader.error.invalid-schematic"));
             }
+            return false;
         }
 
         SchematicPlacementValidator.ValidationResult result = SchematicPlacementValidator.validate(s);

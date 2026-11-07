@@ -40,25 +40,20 @@ public class SchematicInfoDialog extends BaseDialog{
 
     public void show(PackEntry entry){
         cont.clear();
-        buttons.clear();
-        addCloseButton();
+        buttons.clearChildren();
+        buttons.button("@back", Icon.left, this::hide).size(180f, 54f).pad(4f);
 
         if(entry == null){
             super.show();
             return;
         }
 
-        Schematic s = entry.schematic;
+        Schematic s = entry.schematic != null ? entry.schematic : entry.getOrReadSchematic();
         if(s == null){
-            try(java.io.InputStream in = entry.openStream()){
-                s = PackFormat.readSchematic(in);
-                entry.schematic = s;
-            }catch(Throwable t){
-                if(Vars.ui != null){
-                    Vars.ui.showErrorMessage(getLocalizedText("packloader.error.invalid-schematic"));
-                }
-                return;
+            if(Vars.ui != null){
+                Vars.ui.showErrorMessage(getLocalizedText("packloader.error.invalid-schematic"));
             }
+            return;
         }
 
         title.setText(s.name() != null && !s.name().isEmpty() ? s.name() : entry.displayName);

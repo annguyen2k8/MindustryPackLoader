@@ -282,4 +282,103 @@ public class SchematicPlacementValidatorTest{
                 "Bundle missing key for " + res + ": " + res.getMessageKey());
         }
     }
+
+    @Test
+    public void testPlacementHelperSuccessFlow(){
+        Schematic s = createDummySchematic();
+        packloader.model.PackEntry entry = new packloader.model.PackEntry(
+            packloader.model.PackType.SCHEMATIC, "test.msch", "test.msch", 100L
+        );
+        entry.displayName = "Test Schem";
+        entry.schematic = s;
+        entry.isValid = true;
+
+        Vars.state = new GameState();
+        Vars.state.set(GameState.State.playing);
+        Vars.state.rules = new Rules();
+        Vars.state.rules.schematicsAllowed = true;
+
+        Player player = Player.create();
+        player.team(Team.sharded);
+
+        TestUnit builder = new TestUnit();
+        builder.valid = true;
+        builder.buildCapability = true;
+        player.unit(builder);
+        Vars.player = player;
+
+        sun.misc.Unsafe unsafe;
+        try{
+            java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            unsafe = (sun.misc.Unsafe)f.get(null);
+            Vars.control = (Control)unsafe.allocateInstance(Control.class);
+        }catch(Throwable t){
+            throw new RuntimeException(t);
+        }
+
+        final Schematic[] usedSchematic = new Schematic[1];
+        Vars.control.input = new InputHandler(){
+            @Override
+            public void useSchematic(Schematic used, boolean b){
+                usedSchematic[0] = used;
+            }
+
+            @Override
+            public void useSchematic(Schematic used){
+                usedSchematic[0] = used;
+            }
+        };
+
+        boolean[] callbackExecuted = {false};
+        boolean success = SchematicPlacementHelper.placeSchematic(entry, () -> callbackExecuted[0] = true);
+
+        assertTrue(success, "Placement should succeed under valid game conditions");
+        assertTrue(callbackExecuted[0], "onPlaced callback should be executed on success");
+        assertSame(s, usedSchematic[0], "Schematic passed to input handler should match entry schematic");
+    }
+
+    @Test
+    public void testPlacementHelperBlockedWhenConditionsNotMet(){
+        Schematic s = createDummySchematic();
+        packloader.model.PackEntry entry = new packloader.model.PackEntry(
+            packloader.model.PackType.SCHEMATIC, "blocked.msch", "blocked.msch", 100L
+        );
+        entry.displayName = "Blocked Schem";
+        entry.schematic = s;
+        entry.isValid = true;
+
+        // Condition 1: Not in game
+        Vars.state = null;
+        boolean[] callbackExecuted = {false};
+        boolean success = SchematicPlacementHelper.placeSchematic(entry, () -> callbackExecuted[0] = true);
+        assertFalse(success);
+        assertFalse(callbackExecuted[0]);
+
+        // Condition 2: Schematics banned
+        Vars.state = new GameState();
+        Vars.state.set(GameState.State.playing);
+        Vars.state.rules = new Rules();
+        Vars.state.rules.schematicsAllowed = false;
+
+        success = SchematicPlacementHelper.placeSchematic(entry, () -> callbackExecuted[0] = true);
+        assertFalse(success);
+        assertFalse(callbackExecuted[0]);
+    }
+
+    @Test
+    public void testPlacementHelperNullOrInvalidEntry(){
+        boolean[] callbackExecuted = {false};
+        assertFalse(SchematicPlacementHelper.placeSchematic(null, () -> callbackExecuted[0] = true));
+        assertFalse(callbackExecuted[0]);
+
+        packloader.model.PackEntry invalidEntry = new packloader.model.PackEntry(
+            packloader.model.PackType.SCHEMATIC, "invalid.msch", "invalid.msch", 100L
+        );
+        invalidEntry.isValid = false;
+        invalidEntry.schematic = null;
+
+        assertFalse(SchematicPlacementHelper.placeSchematic(invalidEntry, () -> callbackExecuted[0] = true));
+        assertFalse(callbackExecuted[0]);
+    }
 }
