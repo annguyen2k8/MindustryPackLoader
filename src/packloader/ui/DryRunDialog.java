@@ -1,12 +1,16 @@
 package packloader.ui;
 
 import arc.graphics.Color;
+import arc.graphics.Texture;
 import arc.scene.ui.ScrollPane;
 import arc.scene.ui.layout.Table;
+import arc.util.Scaling;
 import mindustry.Vars;
+import mindustry.game.Schematic;
 import mindustry.gen.Icon;
 import mindustry.gen.Tex;
 import mindustry.graphics.Pal;
+import mindustry.ui.BorderImage;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
 import packloader.model.DryRunAction;
@@ -62,12 +66,32 @@ public class DryRunDialog extends BaseDialog{
                 itemRow.margin(8f);
                 itemRow.defaults().pad(4f);
 
-                // Type Icon
-                if(item.entry.type == PackType.MAP){
-                    itemRow.image(Icon.terrain).size(28f).color(Pal.accent);
+                // Thumbnail / Type Icon
+                Table thumb = new Table();
+                thumb.setSize(32f, 32f);
+                Texture cached = PreviewManager.getCachedTexture(item.entry);
+                if(cached != null && !cached.isDisposed()){
+                    BorderImage b = new BorderImage(cached, 2f);
+                    b.setScaling(Scaling.fit);
+                    thumb.add(b).size(32f);
                 }else{
-                    itemRow.image(Icon.paste).size(28f).color(Pal.accent);
+                    if(item.entry.type == PackType.MAP){
+                        thumb.image(Icon.terrain).size(26f).color(Pal.accent);
+                    }else{
+                        thumb.image(Icon.paste).size(26f).color(Pal.accent);
+                    }
+                    if(item.entry.isValid){
+                        PreviewManager.loadPreviewAsync(item.entry, tex -> {
+                            if(tex != null && !tex.isDisposed()){
+                                thumb.clear();
+                                BorderImage b = new BorderImage(tex, 2f);
+                                b.setScaling(Scaling.fit);
+                                thumb.add(b).size(32f);
+                            }
+                        });
+                    }
                 }
+                itemRow.add(thumb).size(32f).padRight(4f);
 
                 // File and resolution description
                 itemRow.table(t -> {
@@ -82,6 +106,10 @@ public class DryRunDialog extends BaseDialog{
 
                     StringBuilder info = new StringBuilder();
                     info.append("[lightgray]").append(item.entry.sanitizedFileName).append("[]");
+                    String dims = item.entry.getDimensionsString();
+                    if(!dims.isEmpty()){
+                        info.append("  •  [lightgray]").append(dims).append("[]");
+                    }
                     if(item.entry.isDuplicate && !item.entry.duplicateReason.isEmpty()){
                         info.append("  •  [gold]").append(item.entry.duplicateReason).append("[]");
                     }
@@ -96,6 +124,20 @@ public class DryRunDialog extends BaseDialog{
                 badge.margin(4f, 10f, 4f, 10f);
                 badge.add(item.action.localized()).color(item.action.color).style(Styles.outlineLabel);
                 itemRow.add(badge).padLeft(8f);
+
+                // Info action button
+                if(item.entry.isValid){
+                    itemRow.button(Icon.info, Styles.clearNonei, () -> {
+                        if(item.entry.type == PackType.MAP){
+                            new MapInfoDialog().show(item.entry);
+                        }else{
+                            Schematic s = item.entry.schematic != null ? item.entry.schematic : item.entry.getOrReadSchematic();
+                            if(s != null && Vars.ui != null && Vars.ui.schematics != null){
+                                Vars.ui.schematics.showInfo(s);
+                            }
+                        }
+                    }).size(32f).padLeft(4f);
+                }
 
                 list.add(itemRow).growX().pad(3f).row();
             }

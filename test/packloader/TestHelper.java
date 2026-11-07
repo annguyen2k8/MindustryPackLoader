@@ -139,6 +139,60 @@ public class TestHelper{
         return baos.toByteArray();
     }
 
+    public static byte[] createMapWithMetadataBytes(String name, String author, String description, int width, int height) throws IOException{
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try(DataOutputStream dos = new DataOutputStream(new DeflaterOutputStream(baos))){
+            dos.write(new byte[]{'M', 'S', 'A', 'V'});
+            dos.writeInt(13);
+
+            ByteArrayOutputStream metaBaos = new ByteArrayOutputStream();
+            try(DataOutputStream metaDos = new DataOutputStream(metaBaos)){
+                metaDos.writeShort(6);
+                metaDos.writeUTF("name");
+                metaDos.writeUTF(name);
+                metaDos.writeUTF("author");
+                metaDos.writeUTF(author);
+                metaDos.writeUTF("description");
+                metaDos.writeUTF(description);
+                metaDos.writeUTF("width");
+                metaDos.writeUTF(String.valueOf(width));
+                metaDos.writeUTF("height");
+                metaDos.writeUTF(String.valueOf(height));
+                metaDos.writeUTF("build");
+                metaDos.writeUTF("160");
+            }
+            writeChunk(dos, metaBaos.toByteArray());
+            writeChunk(dos, new byte[0]); // patches
+            writeChunk(dos, new byte[]{0}); // content
+            writeChunk(dos, createMapPayload(13, width, height));
+            writeChunk(dos, createEntityPayload(13));
+            writeChunk(dos, new byte[0]); // markers
+            writeChunk(dos, createCustomPayload());
+        }
+        return baos.toByteArray();
+    }
+
+    public static byte[] createSchematicWithMetadataBytes(String name, String description, int width, int height) throws IOException{
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        baos.write(new byte[]{'m', 's', 'c', 'h'});
+        baos.write((byte)1);
+
+        try(DataOutputStream dos = new DataOutputStream(new DeflaterOutputStream(baos))){
+            dos.writeShort(width);
+            dos.writeShort(height);
+
+            dos.writeByte(2); // 2 tags
+            dos.writeUTF("name");
+            dos.writeUTF(name);
+            dos.writeUTF("description");
+            dos.writeUTF(description);
+
+            dos.writeByte(0); // 0 blocks
+            dos.writeInt(0);  // 0 tiles
+        }
+        return baos.toByteArray();
+    }
+
     public static byte[] createLegacyMapWithFallbackBlock(String name, String fallbackBlockName) throws IOException{
         ByteArrayOutputStream contentBaos = new ByteArrayOutputStream();
         try(DataOutputStream out = new DataOutputStream(contentBaos)){

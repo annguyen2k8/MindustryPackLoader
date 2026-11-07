@@ -3,6 +3,7 @@ package packloader.ui;
 import arc.Core;
 import arc.files.Fi;
 import arc.graphics.Color;
+import arc.graphics.Texture;
 import arc.input.KeyCode;
 import arc.scene.event.InputEvent;
 import arc.scene.event.InputListener;
@@ -23,6 +24,7 @@ import mindustry.game.Schematic;
 import mindustry.gen.Icon;
 import mindustry.gen.Tex;
 import mindustry.graphics.Pal;
+import mindustry.ui.BorderImage;
 import mindustry.ui.FileChooser;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
@@ -84,6 +86,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
         shown(this::rebuild);
         onResize(this::rebuild);
+        hidden(PreviewManager::dispose);
     }
 
     @Override
@@ -903,12 +906,32 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                 updatePreviewSummary();
             });
 
-            // Type Icon
-            if(entry.type == PackType.MAP){
-                row.image(Icon.terrain).size(28f).color(Pal.accent);
+            // Thumbnail / Type Icon
+            Table thumb = new Table();
+            thumb.setSize(32f, 32f);
+            Texture cached = PreviewManager.getCachedTexture(entry);
+            if(cached != null && !cached.isDisposed()){
+                BorderImage b = new BorderImage(cached, 2f);
+                b.setScaling(Scaling.fit);
+                thumb.add(b).size(32f);
             }else{
-                row.image(Icon.paste).size(28f).color(Pal.accent);
+                if(entry.type == PackType.MAP){
+                    thumb.image(Icon.terrain).size(26f).color(Pal.accent);
+                }else{
+                    thumb.image(Icon.paste).size(26f).color(Pal.accent);
+                }
+                if(entry.isValid){
+                    PreviewManager.loadPreviewAsync(entry, tex -> {
+                        if(tex != null && !tex.isDisposed()){
+                            thumb.clear();
+                            BorderImage b = new BorderImage(tex, 2f);
+                            b.setScaling(Scaling.fit);
+                            thumb.add(b).size(32f);
+                        }
+                    });
+                }
             }
+            row.add(thumb).size(32f).padRight(4f);
 
             // Title & Subtitle Info
             row.table(t -> {
@@ -938,9 +961,17 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
                 t.add(titleBuilder.toString()).color(Color.white).ellipsis(true).growX().minWidth(0f).left().row();
 
-                // Clean second line: File size & optional details (no confusing repeating path)
+                // Clean second line: File size, dimensions, author & optional details
                 StringBuilder infoBuilder = new StringBuilder();
                 infoBuilder.append(PackScanner.formatSize(entry.size));
+
+                String dims = entry.getDimensionsString();
+                if(!dims.isEmpty()){
+                    infoBuilder.append("  •  [lightgray]").append(dims).append("[]");
+                }
+                if(entry.type == PackType.MAP && entry.mapInfo != null && !entry.mapInfo.author.isEmpty()){
+                    infoBuilder.append("  •  [lightgray]").append(entry.mapInfo.author).append("[]");
+                }
 
                 if(!entry.displayName.equalsIgnoreCase(nameNoExt) && !entry.displayName.equalsIgnoreCase(entry.sanitizedFileName)){
                     infoBuilder.append("  •  [lightgray]").append(entry.sanitizedFileName).append("[]");
@@ -962,10 +993,14 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                  .ellipsis(true).growX().minWidth(0f).left().padTop(2f);
             }).growX().minWidth(0f).left().padLeft(8f);
 
-            // Schematic actions: Info & In-World Placement
-            if(entry.type == PackType.SCHEMATIC && entry.isValid){
+            // Actions: Info (for both Maps & Schematics) & In-World Placement (for Schematics)
+            if(entry.isValid){
                 Button infoBtn = row.button(Icon.info, Styles.clearNonei, () -> {
-                    showSchematicInfo(entry);
+                    if(entry.type == PackType.MAP){
+                        showMapInfo(entry);
+                    }else{
+                        showSchematicInfo(entry);
+                    }
                 }).size(36f).padLeft(2f).padRight(2f).get();
                 infoBtn.addListener(new InputListener(){
                     @Override
@@ -975,7 +1010,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                     }
                 });
 
-                if(Vars.state != null && Vars.state.isGame()){
+                if(entry.type == PackType.SCHEMATIC && Vars.state != null && Vars.state.isGame()){
                     Button placeBtn = row.button(Icon.play, Styles.clearNonei, () -> {
                         placeSchematic(entry);
                     }).size(36f).padLeft(2f).padRight(2f).get();
@@ -1120,6 +1155,16 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             lastImportProgress = value;
             Vars.ui.loadfrag.setProgress(value);
         }
+    }
+
+    private MapInfoDialog mapInfoDialog;
+
+    public void showMapInfo(PackEntry entry){
+        if(entry == null) return;
+        if(mapInfoDialog == null){
+            mapInfoDialog = new MapInfoDialog();
+        }
+        mapInfoDialog.show(entry);
     }
 
     public void showSchematicInfo(PackEntry entry){

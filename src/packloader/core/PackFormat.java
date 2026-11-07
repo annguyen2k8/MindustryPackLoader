@@ -54,17 +54,27 @@ public final class PackFormat{
         public final int height;
         public final int version;
         public final boolean hasNameTag;
+        public final String author;
+        public final String description;
+        public final Map<String, String> tags;
 
         public MapInfo(String name, int width, int height, int version){
-            this(name, width, height, version, true);
+            this(name, width, height, version, true, "", "", null);
         }
 
         public MapInfo(String name, int width, int height, int version, boolean hasNameTag){
+            this(name, width, height, version, hasNameTag, "", "", null);
+        }
+
+        public MapInfo(String name, int width, int height, int version, boolean hasNameTag, String author, String description, Map<String, String> tags){
             this.name = name;
             this.width = width;
             this.height = height;
             this.version = version;
             this.hasNameTag = hasNameTag;
+            this.author = author != null ? author : "";
+            this.description = description != null ? description : "";
+            this.tags = tags != null ? tags : java.util.Collections.emptyMap();
         }
     }
 
@@ -154,6 +164,9 @@ public final class PackFormat{
                 throw new IOException("Map has no name in its metadata");
             }
 
+            String author = tags.get("author");
+            String description = tags.get("description");
+
             int metaWidth = parseOptionalInt(tags.get("width"), "width");
             int metaHeight = parseOptionalInt(tags.get("height"), "height");
             if(metaWidth < 0 || metaHeight < 0){
@@ -226,7 +239,7 @@ public final class PackFormat{
                 throw new IOException("Map contains trailing compressed data");
             }
 
-            return new MapInfo(name, width, height, version, hasNameTag);
+            return new MapInfo(name, width, height, version, hasNameTag, author, description, tags);
         }catch(IOException e){
             throw e;
         }catch(RuntimeException e){

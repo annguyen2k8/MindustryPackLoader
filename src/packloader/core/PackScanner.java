@@ -670,6 +670,7 @@ public class PackScanner{
 
     private void validateMap(PackEntry entry, InputStream in) throws IOException{
         PackFormat.MapInfo info = PackFormat.validateMap(in);
+        entry.mapInfo = info;
         entry.displayName = info.name;
     }
 

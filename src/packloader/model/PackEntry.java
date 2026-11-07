@@ -45,6 +45,8 @@ public class PackEntry{
     public byte[] cachedData;
     /** Cached parsed schematic object to avoid redundant disk I/O when viewing info or importing. */
     public Schematic schematic;
+    /** Cached parsed map metadata to avoid redundant disk I/O when viewing info or reviewing. */
+    public packloader.core.PackFormat.MapInfo mapInfo;
 
     public PackEntry(PackType type, String sourcePath, String rawFileName, long size){
         this.type = type;
@@ -177,5 +179,40 @@ public class PackEntry{
         this.isIntraBatchContentDuplicate = false;
         this.contentDuplicateMatch = "";
         this.contentDuplicateReason = "";
+    }
+
+    public packloader.core.PackFormat.MapInfo getOrReadMapInfo(){
+        if(type != PackType.MAP) return null;
+        if(mapInfo == null && isValid){
+            try(InputStream in = openStream()){
+                mapInfo = packloader.core.PackFormat.readMap(in);
+            }catch(Throwable ignored){}
+        }
+        return mapInfo;
+    }
+
+    public Schematic getOrReadSchematic(){
+        if(type != PackType.SCHEMATIC) return null;
+        if(schematic == null && isValid){
+            try(InputStream in = openStream()){
+                schematic = packloader.core.PackFormat.readSchematic(in);
+            }catch(Throwable ignored){}
+        }
+        return schematic;
+    }
+
+    public String getDimensionsString(){
+        if(type == PackType.MAP){
+            packloader.core.PackFormat.MapInfo info = mapInfo != null ? mapInfo : getOrReadMapInfo();
+            if(info != null && info.width > 0 && info.height > 0){
+                return info.width + "x" + info.height;
+            }
+        }else if(type == PackType.SCHEMATIC){
+            Schematic s = schematic != null ? schematic : getOrReadSchematic();
+            if(s != null && s.width > 0 && s.height > 0){
+                return s.width + "x" + s.height;
+            }
+        }
+        return "";
     }
 }
