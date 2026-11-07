@@ -7,7 +7,9 @@ import mindustry.Vars;
 import mindustry.gen.Icon;
 import mindustry.gen.Tex;
 import mindustry.graphics.Pal;
+import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
+import packloader.core.ReportExporter;
 import packloader.model.ImportItemResult;
 import packloader.model.ImportReport;
 import packloader.model.PackType;
@@ -151,6 +153,16 @@ public class PackResultDialog extends BaseDialog{
             UIUtils.pad(buttons.button(getLocalizedText("packloader.undo.button"), Icon.undo, () -> {
                 new UndoConfirmDialog(undoManager, report.transaction, this::hide).show();
             }).size(180f, 64f).pad(4f).get());
+        }
+
+        if(Vars.mobile){
+            buttons.button(Icon.export, Styles.flati, () -> {
+                new ExportReportDialog(ReportExporter.createFromImportReport(report, null)).show();
+            }).size(64f, 64f).pad(4f);
+        }else{
+            UIUtils.pad(buttons.button(getLocalizedText("packloader.report.button.export"), Icon.export, () -> {
+                new ExportReportDialog(ReportExporter.createFromImportReport(report, null)).show();
+            }).size(190f, 64f).pad(4f).get());
         }
 
         UIUtils.pad(buttons.button(getLocalizedText("packloader.result.close"), Icon.cancel, this::hide).size(210f, 64f).pad(4f).get());

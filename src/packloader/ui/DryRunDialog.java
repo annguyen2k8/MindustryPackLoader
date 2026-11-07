@@ -13,6 +13,7 @@ import mindustry.graphics.Pal;
 import mindustry.ui.BorderImage;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
+import packloader.core.ReportExporter;
 import packloader.model.DryRunAction;
 import packloader.model.DryRunPlan;
 import packloader.model.PackType;
@@ -156,6 +157,16 @@ public class DryRunDialog extends BaseDialog{
         buttons.clear();
         UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, this::hide)
             .size(Vars.mobile ? 140f : 180f, 60f).get());
+
+        if(Vars.mobile){
+            buttons.button(Icon.export, Styles.flati, () -> {
+                new ExportReportDialog(ReportExporter.createFromDryRunPlan(plan, null)).show();
+            }).size(60f, 60f).pad(4f);
+        }else{
+            UIUtils.pad(buttons.button(getLocalizedText("packloader.report.button.plan"), Icon.export, () -> {
+                new ExportReportDialog(ReportExporter.createFromDryRunPlan(plan, null)).show();
+            }).size(170f, 60f).pad(4f).get());
+        }
 
         var confirmBtn = UIUtils.pad(buttons.button(
             getLocalizedText("packloader.dryrun.button.confirm", plan.totalSelected),
