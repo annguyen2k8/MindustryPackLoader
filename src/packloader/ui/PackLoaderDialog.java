@@ -611,7 +611,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
     private void buildConflictRowSection(Table targetTable, PackType type, boolean mixedMode){
         Table section = new Table();
-        section.left().defaults().pad(2f);
+        section.right().defaults().pad(1f);
 
         boolean isMap = type == PackType.MAP;
         Color typeColor = isMap ? Pal.heal : Pal.accent;
@@ -623,19 +623,19 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         String labelKey = mixedMode ?
             (isMap ? "packloader.conflict.label.map" : "packloader.conflict.label.schem") :
             "packloader.conflict.label";
-        section.add(getLocalizedText(labelKey)).color(mixedMode ? typeColor : Pal.accent).padRight(8f);
+        section.add(getLocalizedText(labelKey)).color(mixedMode ? typeColor : Pal.accent).padRight(6f);
 
         for(DuplicatePolicy p : DuplicatePolicy.values()){
             section.button(b -> {
-                b.margin(4f);
-                b.add(p.title()).padLeft(4f).padRight(4f);
+                b.margin(2f, 6f, 2f, 6f);
+                b.add(p.title()).padLeft(2f).padRight(2f);
             }, Styles.flatTogglet, () -> {
                 setPolicyForType(type, p);
                 rebuildEntriesList();
-            }).checked(btn -> getPolicyForType(type) == p).height(34f).pad(2f);
+            }).checked(btn -> getPolicyForType(type) == p).height(30f).pad(1f);
         }
 
-        targetTable.add(section).growX().left().row();
+        targetTable.add(section).right().row();
     }
 
     /** View 2: File Review and Bulk Import Controls */
@@ -686,127 +686,129 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
         cont.add(header).growX().pad(6f).row();
 
-        // Search bar row
-        Table searchRow = new Table(Tex.pane);
-        searchRow.margin(4f);
-        searchRow.image(Icon.zoom).size(22f).color(Pal.accent).padLeft(6f).padRight(6f);
+        // Row 1: Search Bar (Left) + Conflict Policy Selector (Right) in a unified Tex.pane
+        Table row1 = new Table(Tex.pane);
+        row1.margin(4f);
+
+        // Search Bar (Left)
+        row1.image(Icon.zoom).size(20f).color(Pal.accent).padLeft(6f).padRight(6f);
         TextField searchField = new TextField(searchText);
         searchField.setMessageText(getLocalizedText("packloader.search.placeholder"));
         searchField.changed(() -> {
             searchText = searchField.getText();
             rebuildEntriesList();
         });
-        searchRow.add(searchField).growX().height(36f);
+        row1.add(searchField).growX().minWidth(100f).height(32f);
         if(!searchText.isEmpty()){
-            searchRow.button(Icon.cancel, Styles.clearNonei, () -> {
+            row1.button(Icon.cancel, Styles.clearNonei, () -> {
                 searchText = "";
                 searchField.setText("");
                 rebuildEntriesList();
-            }).size(32f).padRight(4f);
+            }).size(30f).padRight(4f);
         }
-        cont.add(searchRow).growX().pad(4f).row();
 
-        // Toolbar: Filter, Selection, Conflict Resolution Mode
-        Table toolbar = new Table();
-        toolbar.defaults().pad(3f);
+        // Conflict Resolution Policy (Right)
+        Table conflictBox = new Table();
+        conflictBox.right().defaults().pad(1f);
+
+        if(targetType == PackType.MAP || (targetType == null && mapsCount > 0 && schemsCount == 0)){
+            buildConflictRowSection(conflictBox, PackType.MAP, false);
+        }else if(targetType == PackType.SCHEMATIC || (targetType == null && schemsCount > 0 && mapsCount == 0)){
+            buildConflictRowSection(conflictBox, PackType.SCHEMATIC, false);
+        }else{
+            buildConflictRowSection(conflictBox, PackType.MAP, true);
+            buildConflictRowSection(conflictBox, PackType.SCHEMATIC, true);
+        }
+
+        row1.add(conflictBox).right().padLeft(8f).padRight(4f);
+        cont.add(row1).growX().pad(2f, 4f, 2f, 4f).row();
+
+        // Row 2: Selection & Filter Toolbar (Left) + Live Dry-Run Preview Summary (Right)
+        Table row2 = new Table();
+        row2.margin(2f);
+        row2.defaults().pad(2f);
 
         // Filter buttons (only shown in general multi-type mode)
         if(targetType == null){
-            toolbar.button(getLocalizedText("packloader.filter.all", entries.size), Styles.flatTogglet, () -> {
+            row2.button(getLocalizedText("packloader.filter.all", entries.size), Styles.flatTogglet, () -> {
                 filterMode = FilterMode.ALL;
                 rebuildEntriesList();
-            }).checked(b -> filterMode == FilterMode.ALL).height(38f);
+            }).checked(b -> filterMode == FilterMode.ALL).height(30f).padRight(2f);
 
-            toolbar.button(getLocalizedText("packloader.filter.maps", mapsCount), Styles.flatTogglet, () -> {
+            row2.button(getLocalizedText("packloader.filter.maps", mapsCount), Styles.flatTogglet, () -> {
                 filterMode = FilterMode.MAPS;
                 rebuildEntriesList();
-            }).checked(b -> filterMode == FilterMode.MAPS).height(38f);
+            }).checked(b -> filterMode == FilterMode.MAPS).height(30f).padRight(2f);
 
-            toolbar.button(getLocalizedText("packloader.filter.schematics", schemsCount), Styles.flatTogglet, () -> {
+            row2.button(getLocalizedText("packloader.filter.schematics", schemsCount), Styles.flatTogglet, () -> {
                 filterMode = FilterMode.SCHEMATICS;
                 rebuildEntriesList();
-            }).checked(b -> filterMode == FilterMode.SCHEMATICS).height(38f);
+            }).checked(b -> filterMode == FilterMode.SCHEMATICS).height(30f).padRight(2f);
         }
 
-        toolbar.add().growX(); // spacer pushes mass selection buttons to right
-
-        // Smart selection buttons
-        var selectAllBtn = UIUtils.pad(toolbar.button(
+        // Smart selection buttons (compact height 30f)
+        var selectAllBtn = UIUtils.pad(row2.button(
             getLocalizedText("packloader.select.all"),
             Icon.ok, Styles.flatt, () -> {
                 EntryFilter.setVisibleSelected(entries, targetType, filterType(), searchText, true);
                 rebuildEntriesList();
-            }).height(38f).pad(2f).get());
+            }).height(30f).pad(1f).get());
         if(selectAllBtn != null){
-            selectAllBtn.margin(4f, 8f, 4f, 8f);
+            selectAllBtn.margin(3f, 6f, 3f, 6f);
         }
 
-        var selectNewBtn = UIUtils.pad(toolbar.button(
+        var selectNewBtn = UIUtils.pad(row2.button(
             getLocalizedText("packloader.select.new"),
             Icon.add, Styles.flatt, () -> {
                 EntryFilter.selectNewOnly(entries, targetType, filterType(), searchText);
                 rebuildEntriesList();
-            }).height(38f).pad(2f).get());
+            }).height(30f).pad(1f).get());
         if(selectNewBtn != null){
-            selectNewBtn.margin(4f, 8f, 4f, 8f);
+            selectNewBtn.margin(3f, 6f, 3f, 6f);
         }
 
-        var selectUniqueBtn = UIUtils.pad(toolbar.button(
+        var selectUniqueBtn = UIUtils.pad(row2.button(
             getLocalizedText("packloader.select.unique"),
             Icon.star, Styles.flatt, () -> {
                 EntryFilter.selectUniqueContentOnly(entries, targetType, filterType(), searchText);
                 rebuildEntriesList();
-            }).height(38f).pad(2f).get());
+            }).height(30f).pad(1f).get());
         if(selectUniqueBtn != null){
-            selectUniqueBtn.margin(4f, 8f, 4f, 8f);
+            selectUniqueBtn.margin(3f, 6f, 3f, 6f);
         }
 
-        var invertBtn = UIUtils.pad(toolbar.button(
+        var invertBtn = UIUtils.pad(row2.button(
             getLocalizedText("packloader.select.invert"),
             Icon.refresh, Styles.flatt, () -> {
                 EntryFilter.invertVisibleSelected(entries, targetType, filterType(), searchText);
                 rebuildEntriesList();
-            }).height(38f).pad(2f).get());
+            }).height(30f).pad(1f).get());
         if(invertBtn != null){
-            invertBtn.margin(4f, 8f, 4f, 8f);
+            invertBtn.margin(3f, 6f, 3f, 6f);
         }
 
-        var deselectBtn = UIUtils.pad(toolbar.button(
+        var deselectBtn = UIUtils.pad(row2.button(
             getLocalizedText("packloader.select.none"),
             Icon.cancel, Styles.flatt, () -> {
                 EntryFilter.setVisibleSelected(entries, targetType, filterType(), searchText, false);
                 rebuildEntriesList();
-            }).height(38f).pad(2f).get());
+            }).height(30f).pad(1f).get());
         if(deselectBtn != null){
-            deselectBtn.margin(4f, 8f, 4f, 8f);
+            deselectBtn.margin(3f, 6f, 3f, 6f);
         }
 
-        cont.add(toolbar).growX().pad(4f).row();
+        row2.add().growX(); // Spacer pushes Live Dry-Run summary to the right
 
-        // Conflict Resolution Policy Row
-        Table conflictRow = new Table(Tex.pane);
-        conflictRow.margin(6f);
-        conflictRow.defaults().pad(3f);
-
-        if(targetType == PackType.MAP || (targetType == null && mapsCount > 0 && schemsCount == 0)){
-            buildConflictRowSection(conflictRow, PackType.MAP, false);
-        }else if(targetType == PackType.SCHEMATIC || (targetType == null && schemsCount > 0 && mapsCount == 0)){
-            buildConflictRowSection(conflictRow, PackType.SCHEMATIC, false);
-        }else{
-            buildConflictRowSection(conflictRow, PackType.MAP, true);
-            buildConflictRowSection(conflictRow, PackType.SCHEMATIC, true);
-        }
-
-        cont.add(conflictRow).growX().pad(4f).row();
-
-        // Live Dry-Run Preview Summary Row
-        Table previewRow = new Table(Tex.pane);
-        previewRow.margin(6f);
-        previewRow.image(Icon.eye).size(18f).color(Pal.accent).padRight(6f);
+        // Live Dry-Run Preview Summary (Right)
+        Table summaryBox = new Table(Tex.pane);
+        summaryBox.margin(3f, 8f, 3f, 8f);
+        summaryBox.image(Icon.eye).size(16f).color(Pal.accent).padRight(4f);
         DryRunPlan initialPlan = calculateDryRunPlan();
-        previewSummaryLabel = previewRow.add(formatDryRunSummary(initialPlan))
-            .color(Pal.lightishGray).style(Styles.outlineLabel).growX().left().get();
-        cont.add(previewRow).growX().pad(2f, 4f, 4f, 4f).row();
+        previewSummaryLabel = summaryBox.add(formatDryRunSummary(initialPlan))
+            .color(Pal.lightishGray).style(Styles.outlineLabel).left().get();
+
+        row2.add(summaryBox).right().padLeft(6f);
+        cont.add(row2).growX().pad(2f, 4f, 4f, 4f).row();
 
         // Scrollable Entries List Container
         cont.table(this::buildListTable).grow().minWidth(0f).pad(4f).name("listContainer").row();
