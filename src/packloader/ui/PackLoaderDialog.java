@@ -285,27 +285,30 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         cont.add(pane).grow().pad(4f).row();
 
         buttons.clear();
-        addCloseButton();
+        buttons.defaults().pad(4f);
+
+        UIUtils.pad(buttons.button(getLocalizedText("packloader.action.close"), Icon.cancel, Styles.flatt, this::hide)
+            .size(Vars.mobile ? 110f : 140f, 54f).get());
+        addCloseListener();
+
+        buttons.add().growX();
 
         ImportTransaction latestTx = importer.undoManager.getLatestTransaction();
         if(latestTx != null && !latestTx.undone && latestTx.getActiveItemCount() > 0){
-            if(Vars.mobile){
-                buttons.button(Icon.undo, Styles.flati, () -> {
-                    new UndoConfirmDialog(importer.undoManager, latestTx, this::rebuild).show();
-                }).size(64f, 64f).pad(4f);
-            }else{
-                UIUtils.pad(buttons.button(getLocalizedText("packloader.undo.button.last"), Icon.undo, () -> {
-                    new UndoConfirmDialog(importer.undoManager, latestTx, this::rebuild).show();
-                }).size(210f, 64f).pad(4f).get());
+            var undoBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.undo.button.last"), Icon.undo, Styles.flatt, () -> {
+                new UndoConfirmDialog(importer.undoManager, latestTx, this::rebuild).show();
+            }).size(Vars.mobile ? 120f : 150f, 54f).get());
+            if(undoBtn != null && undoBtn.getLabel() != null){
+                undoBtn.getLabel().setColor(Color.orange);
             }
         }
 
         if(Vars.mobile){
-            buttons.button(Icon.link, Styles.flati, () -> Core.app.openURI(ISSUES_URL)).size(64f, 64f);
+            buttons.button(Icon.link, Styles.flati, () -> Core.app.openURI(ISSUES_URL)).size(48f, 54f);
         }else{
-            UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
+            UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, Styles.flatt, () -> {
                 Core.app.openURI(ISSUES_URL);
-            }).size(210f, 64f).get());
+            }).size(150f, 54f).get());
         }
     }
 
@@ -389,18 +392,27 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         cont.add(pane).grow().pad(4f).row();
 
         buttons.clear();
-        UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, () -> {
+        buttons.defaults().pad(4f);
+        UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, Styles.flatt, () -> {
             targetType = null;
             rebuild();
-        }).size(210f, 64f).get());
-        UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
-            Core.app.openURI(ISSUES_URL);
-        }).size(210f, 64f).get());
+        }).size(Vars.mobile ? 120f : 140f, 54f).get());
+        addCloseListener();
+
+        buttons.add().growX();
+
+        if(Vars.mobile){
+            buttons.button(Icon.link, Styles.flati, () -> Core.app.openURI(ISSUES_URL)).size(48f, 54f);
+        }else{
+            UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, Styles.flatt, () -> {
+                Core.app.openURI(ISSUES_URL);
+            }).size(150f, 54f).get());
+        }
     }
 
     private Button createRecentSourceCard(RecentSources.SourceItem item, PackType activeType){
         Button card = new Button(UIUtils.cardStyle());
-        card.margin(6f);
+        card.margin(8f, 12f, 8f, 12f);
         card.clicked(() -> {
             Fi file = Core.files.absolute(item.path);
             if(!file.exists()){
@@ -460,16 +472,16 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     private Table createSourceOptionButton(Drawable icon, String title, String desc, Runnable clicked, float buttonWidth){
         Button btn = new Button(UIUtils.cardStyle());
         btn.clicked(clicked);
-        btn.margin(8f);
+        btn.margin(10f, 14f, 10f, 14f);
 
         // Icon column
-        btn.image(icon).size(40f).color(Pal.accent).left().padRight(12f);
+        btn.image(icon).size(36f).color(Pal.accent).left().padRight(14f);
 
         // Text column: explicit width and wrap() ensure subtitle and title never overflow right
         float textWidth = Math.max(160f, buttonWidth - 92f);
         btn.table(t -> {
             t.left().defaults().left().growX();
-            t.add(title).style(Styles.defaultLabel).color(Color.white).width(textWidth).wrap().padBottom(4f).row();
+            t.add(title).style(Styles.defaultLabel).color(Color.white).width(textWidth).wrap().padBottom(3f).row();
             t.add(desc).style(Styles.defaultLabel).color(Pal.lightishGray).width(textWidth).wrap();
         }).growX().left();
 
@@ -481,8 +493,8 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     }
 
     Table createQuickImportRow(PackType type, float rowWidth){
-        Table card = new Table(Tex.pane);
-        card.margin(10f);
+        Table card = new Table(UIUtils.flatPane());
+        card.margin(10f, 14f, 10f, 14f);
         card.left().defaults().left().growX();
 
         CheckBox quickBox = new CheckBox("");
@@ -641,8 +653,8 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     /** View 2: File Review and Bulk Import Controls */
     private void buildEntriesView(){
         // Top Header: Source Info & Change Source
-        Table header = new Table(Tex.pane);
-        header.margin(8f);
+        Table header = new Table(UIUtils.flatPane());
+        header.margin(6f, 10f, 6f, 10f);
         header.defaults().pad(4f);
 
         int mapsCount = entries.count(e -> e.type == PackType.MAP);
@@ -686,9 +698,9 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
         cont.add(header).growX().pad(6f).row();
 
-        // Row 1: Search Bar (Left) + Conflict Policy Selector (Right) in a unified Tex.pane
-        Table row1 = new Table(Tex.pane);
-        row1.margin(4f);
+        // Row 1: Search Bar (Left) + Conflict Policy Selector (Right) in a unified flat container
+        Table row1 = new Table(UIUtils.flatPane());
+        row1.margin(4f, 8f, 4f, 8f);
 
         // Search Bar (Left)
         row1.image(Icon.zoom).size(20f).color(Pal.accent).padLeft(6f).padRight(6f);
@@ -800,7 +812,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         row2.add().growX(); // Spacer pushes Live Dry-Run summary to the right
 
         // Live Dry-Run Preview Summary (Right)
-        Table summaryBox = new Table(Tex.pane);
+        Table summaryBox = new Table(UIUtils.flatPane());
         summaryBox.margin(3f, 8f, 3f, 8f);
         summaryBox.image(Icon.eye).size(16f).color(Pal.accent).padRight(4f);
         DryRunPlan initialPlan = calculateDryRunPlan();
@@ -930,9 +942,9 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         for(PackEntry entry : filtered){
             DryRunPlan.DryRunItem dryItem = plan.getItem(entry);
 
-            // Button rows get hover/pressed feedback while keeping the pane-like look.
+            // Flat button rows get hover/pressed feedback with subtle dark background.
             Button row = new Button(UIUtils.rowStyle());
-            row.margin(6f);
+            row.margin(6f, 8f, 6f, 8f);
             row.defaults().pad(3f);
 
             // Touch-friendly CheckBox (touch disabled so row click handles toggle cleanly)

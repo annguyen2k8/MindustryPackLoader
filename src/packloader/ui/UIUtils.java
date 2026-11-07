@@ -1,5 +1,6 @@
 package packloader.ui;
 
+import arc.scene.style.Drawable;
 import arc.scene.ui.Button;
 import arc.scene.ui.CheckBox;
 import arc.scene.ui.TextButton;
@@ -10,14 +11,32 @@ import mindustry.ui.Styles;
 public final class UIUtils{
     private UIUtils(){}
 
-    /** Standard card style with hover/pressed/disabled feedback. */
+    /** Flat, borderless card style with subtle dark background and hover highlight. */
     public static Button.ButtonStyle cardStyle(){
-        return new Button.ButtonStyle(Styles.defaultb);
+        Button.ButtonStyle style = new Button.ButtonStyle();
+        style.up = flatPane();
+        style.over = Styles.flatOver != null ? Styles.flatOver : Styles.none;
+        style.down = Styles.flatDown != null ? Styles.flatDown : Styles.none;
+        return style;
     }
 
-    /** Pane-like row style that still exposes hover/pressed feedback. */
+    /** Borderless flat row style with hover/pressed feedback. */
     public static Button.ButtonStyle rowStyle(){
-        return new Button.ButtonStyle(Styles.grayt);
+        Button.ButtonStyle style = new Button.ButtonStyle();
+        style.up = Styles.black3 != null ? Styles.black3 : Styles.none;
+        style.over = Styles.flatOver != null ? Styles.flatOver : Styles.none;
+        style.down = Styles.flatDown != null ? Styles.flatDown : Styles.none;
+        return style;
+    }
+
+    /** Returns a subtle flat borderless dark panel background (black with 50% opacity). */
+    public static Drawable flatPane(){
+        return Styles.black5 != null ? Styles.black5 : Styles.none;
+    }
+
+    /** Returns a slightly darker subtle flat borderless panel background (black with 60% opacity). */
+    public static Drawable flatPaneDark(){
+        return Styles.black6 != null ? Styles.black6 : Styles.none;
     }
 
     /** Adds consistent spacing between icon and label in a TextButton. */
