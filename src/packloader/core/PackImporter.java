@@ -913,9 +913,7 @@ public class PackImporter{
         Runnable refreshAction = () -> {
             try{
                 if(reloadMaps && Vars.maps != null){
-                    try{
-                        Vars.maps.loadPreviews();
-                    }catch(Throwable ignored){}
+                    invokeLoadPreviews(Vars.maps);
 
                     if(Vars.ui != null){
                         if(Vars.ui.maps != null) invokeSetup(Vars.ui.maps);
@@ -950,6 +948,22 @@ public class PackImporter{
         }
         String msg = (cause.getMessage() != null ? cause.getMessage() : cause.getClass().getSimpleName());
         report.addResult(ImportItemResult.failed(entry, getLocalizedText("packloader.result.msg.failed", msg)));
+    }
+
+    private static void invokeLoadPreviews(Object maps){
+        if(maps == null) return;
+        try{
+            // Compatibility adapter: v160.7+ uses loadPreviewsAsync(), while v160 uses loadPreviews()
+            try{
+                java.lang.reflect.Method m = maps.getClass().getMethod("loadPreviewsAsync");
+                m.invoke(maps);
+            }catch(NoSuchMethodException e){
+                try{
+                    java.lang.reflect.Method m = maps.getClass().getMethod("loadPreviews");
+                    m.invoke(maps);
+                }catch(NoSuchMethodException ignored){}
+            }
+        }catch(Throwable ignored){}
     }
 
     private static void invokeSetup(Object dialog){

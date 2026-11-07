@@ -20,8 +20,10 @@ sourceSets.test{
 // Valid values:
 // - latest: depend on the latest release of mindustry
 // - be: depend on the very latest commit of mindustry
-// - v<number>: depend on a specific version
-val mindustryVersion = "v160"
+// - v<number>: depend on a specific version (e.g. v160, v160.7)
+// Can be overridden via -PmindustryVersion=v160 or -PmindustryJar=<path>
+val mindustryVersion = (project.findProperty("mindustryVersion") as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: "v160"
+val localMindustryJar = (project.findProperty("mindustryJar") as? String)?.trim()?.takeIf { it.isNotEmpty() }?.let { File(it) }
 val isWindows = System.getProperty("os.name").lowercase().contains("windows")
 val sdkRoot: String? = System.getenv("ANDROID_HOME")
     ?: System.getenv("ANDROID_SDK_ROOT")
@@ -64,8 +66,13 @@ java{
 }
 
 dependencies{
-    compileOnly(if(mindustryVersion == "be") "Anuken:MindustryBuilds:latest" else "Anuken:Mindustry:$mindustryVersion")
-    testImplementation(if(mindustryVersion == "be") "Anuken:MindustryBuilds:latest" else "Anuken:Mindustry:$mindustryVersion")
+    if (localMindustryJar != null && localMindustryJar.exists()) {
+        compileOnly(files(localMindustryJar))
+        testImplementation(files(localMindustryJar))
+    } else {
+        compileOnly(if(mindustryVersion == "be") "Anuken:MindustryBuilds:latest" else "Anuken:Mindustry:$mindustryVersion")
+        testImplementation(if(mindustryVersion == "be") "Anuken:MindustryBuilds:latest" else "Anuken:Mindustry:$mindustryVersion")
+    }
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
