@@ -34,137 +34,183 @@ public class PackResultDialog extends BaseDialog{
         setupUI();
     }
 
+    private void addStatBadge(Table parent, String label, int count, Color color){
+        Table card = new Table(Tex.button);
+        card.margin(3f, 10f, 3f, 10f);
+        card.table(t -> {
+            t.add(String.valueOf(count)).color(color).style(Styles.outlineLabel).fontScale(1.2f).row();
+            t.add(label).color(Pal.lightishGray).fontScale(0.85f);
+        });
+        parent.add(card).uniform().pad(2f, 4f, 2f, 4f);
+    }
+
     private void setupUI(){
         cont.clear();
 
-        // Summary cards banner
+        // Summary KPI Banner
         Table summary = new Table(Tex.pane);
-        summary.margin(10f);
-        summary.defaults().pad(6f).height(50f);
+        summary.margin(8f);
 
-        summary.table(t -> {
-            t.add(getLocalizedText("packloader.result.success", report.totalSuccess)).color(Pal.heal);
-        }).padRight(10f);
+        Table kpiCards = new Table();
+        kpiCards.defaults().pad(3f);
+
+        addStatBadge(kpiCards, getLocalizedText("packloader.result.status.success"), report.totalSuccess, Pal.heal);
 
         if(report.totalOverwritten > 0){
-            summary.table(t -> {
-                t.add(getLocalizedText("packloader.result.overwritten", report.totalOverwritten)).color(Pal.accent);
-            }).padRight(10f);
+            addStatBadge(kpiCards, getLocalizedText("packloader.result.status.overwritten"), report.totalOverwritten, Pal.accent);
         }
 
         if(report.totalSkipped > 0){
-            summary.table(t -> {
-                t.add(getLocalizedText("packloader.result.skipped", report.totalSkipped)).color(Color.orange);
-            }).padRight(10f);
+            addStatBadge(kpiCards, getLocalizedText("packloader.result.status.skipped"), report.totalSkipped, Color.orange);
         }
 
         if(report.totalFailed > 0){
-            summary.table(t -> {
-                t.add(getLocalizedText("packloader.result.failed", report.totalFailed)).color(Pal.remove);
-            }).padRight(10f);
+            addStatBadge(kpiCards, getLocalizedText("packloader.result.status.failed"), report.totalFailed, Pal.remove);
         }
 
-        summary.table(t -> {
-            t.add(getLocalizedText("packloader.result.time", report.elapsedMillis)).color(Pal.lightishGray);
-        });
+        summary.add(kpiCards).growX().center().row();
 
-        cont.add(summary).growX().pad(8f).row();
+        // Secondary metadata line: Time elapsed and transaction ID (if present)
+        StringBuilder meta = new StringBuilder();
+        meta.append(getLocalizedText("packloader.result.time", report.elapsedMillis));
+        if(report.transaction != null && report.transaction.id != null && !report.transaction.id.isEmpty()){
+            meta.append("  •  ").append(getLocalizedText("packloader.result.transaction", report.transaction.id));
+        }
+        summary.add(meta.toString()).color(Pal.lightishGray).fontScale(0.85f).padTop(4f).row();
+
+        cont.add(summary).growX().pad(6f, 8f, 4f, 8f).row();
 
         if(report.cancelled){
             Table cancelled = new Table(Tex.pane);
             cancelled.margin(8f);
             cancelled.add(getLocalizedText("packloader.result.cancelled",
                 report.processed(), report.totalSelected)).color(Color.orange).wrap().growX().minWidth(0f).left();
-            cont.add(cancelled).growX().pad(4f, 8f, 4f, 8f).row();
+            cont.add(cancelled).growX().pad(2f, 8f, 4f, 8f).row();
         }
 
         // Detailed per-file list
         Table list = new Table();
-        list.margin(6f);
+        list.margin(4f);
 
         for(ImportItemResult res : report.results){
             Table itemRow = new Table(Tex.pane);
-            itemRow.margin(8f);
-            itemRow.defaults().pad(4f);
+            itemRow.margin(6f);
+            itemRow.defaults().pad(2f);
 
-            // Status Icon
+            // Exactly 1 status icon
+            Color statusColor;
+            arc.scene.style.Drawable statusIcon;
             switch(res.status){
-                case SUCCESS -> itemRow.image(Icon.ok).size(32f).color(Pal.heal);
-                case OVERWRITTEN -> itemRow.image(Icon.refresh).size(32f).color(Pal.accent);
-                case SKIPPED -> itemRow.image(Icon.warning).size(32f).color(Color.orange);
-                case FAILED -> itemRow.image(Icon.cancel).size(32f).color(Pal.remove);
+                case SUCCESS -> {
+                    statusIcon = Icon.ok;
+                    statusColor = Pal.heal;
+                }
+                case OVERWRITTEN -> {
+                    statusIcon = Icon.refresh;
+                    statusColor = Pal.accent;
+                }
+                case SKIPPED -> {
+                    statusIcon = Icon.warning;
+                    statusColor = Color.orange;
+                }
+                case FAILED -> {
+                    statusIcon = Icon.cancel;
+                    statusColor = Pal.remove;
+                }
+                default -> {
+                    statusIcon = Icon.info;
+                    statusColor = Pal.lightishGray;
+                }
             }
+            itemRow.image(statusIcon).size(24f).color(statusColor).padLeft(2f).padRight(6f);
 
-            // Type Icon
-            if(res.entry.type == PackType.MAP){
-                itemRow.image(Icon.terrain).size(28f).color(Pal.accent);
-            }else{
-                itemRow.image(Icon.paste).size(28f).color(Pal.accent);
-            }
-
-            // File description
+            // File description & Content Type Badge
             itemRow.table(t -> {
-                t.left();
-                t.add(res.entry.sanitizedFileName).color(Color.white).left();
-                t.add(" (" + res.status.localizedLabel() + ")")
-                 .color(res.status == ImportItemResult.Status.FAILED ? Pal.remove :
-                        res.status == ImportItemResult.Status.SKIPPED ? Color.orange : Pal.heal)
-                 .left().row();
+                t.left().defaults().left().growX();
 
+                // Line 1: Type Badge ([Map] or [Schem]) + Sanitized Filename
+                Table line1 = new Table();
+                line1.left().defaults().left();
+
+                String typeTag = res.entry.type == PackType.MAP ? "[Map]" : "[Schem]";
+                Color typeColor = res.entry.type == PackType.MAP ? Pal.heal : Pal.accent;
+                line1.add(typeTag).color(typeColor).padRight(6f);
+
+                line1.add(res.entry.sanitizedFileName).color(Color.white).ellipsis(true).growX().minWidth(0f);
+                t.add(line1).growX().minWidth(0f).left().row();
+
+                // Line 2: Message detail (Success message, destination, or failure reason)
                 String detail = res.message;
                 if(detail != null && !detail.isEmpty()){
-                    t.add(detail).color(Pal.lightishGray).growX().minWidth(0f).left().wrap().padTop(2f);
+                    t.add(detail).color(Pal.lightishGray).ellipsis(true).growX().minWidth(0f).left().padTop(2f);
                 }
-            }).growX().minWidth(0f).left().padLeft(6f);
+            }).growX().minWidth(0f).left().padLeft(4f);
 
-            list.add(itemRow).growX().pad(3f).row();
+            list.add(itemRow).growX().minWidth(0f).pad(2f).row();
         }
 
         ScrollPane pane = new ScrollPane(list);
         pane.setScrollingDisabled(true, false);
         pane.setFadeScrollBars(false);
-        cont.add(pane).grow().pad(8f).row();
+        cont.add(pane).grow().minWidth(0f).pad(4f, 8f, 4f, 8f).row();
 
-        // Bottom Action buttons
+        // Bottom Action Bar (Rebuilt hierarchy & Anti-overflow)
         buttons.clear();
+        buttons.defaults().pad(4f);
 
+        // Left Action: Close (Dismissive)
+        UIUtils.pad(buttons.button(getLocalizedText("packloader.result.close"), Icon.cancel, Styles.flatt, this::hide)
+            .size(Vars.mobile ? 110f : 130f, 54f).get());
+        addCloseListener();
+
+        // Spacer pushes secondary & primary actions to the right
+        buttons.add().growX();
+
+        // Export Report (Utility / Secondary)
+        if(Vars.mobile){
+            buttons.button(Icon.export, Styles.flati, () -> {
+                new ExportReportDialog(ReportExporter.createFromImportReport(report, null)).show();
+            }).size(48f, 54f);
+        }else{
+            UIUtils.pad(buttons.button(getLocalizedText("packloader.report.button.export"), Icon.export, Styles.flatt, () -> {
+                new ExportReportDialog(ReportExporter.createFromImportReport(report, null)).show();
+            }).size(140f, 54f).get());
+        }
+
+        // Undo (Safety / Warning action, shown only when transaction is reversible)
+        if(report.transaction != null && report.transaction.getActiveItemCount() > 0 && !report.transaction.undone){
+            var undoBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.undo.button"), Icon.undo, Styles.flatt, () -> {
+                new UndoConfirmDialog(undoManager, report.transaction, this::hide).show();
+            }).size(Vars.mobile ? 120f : 140f, 54f).get());
+            if(undoBtn != null && undoBtn.getLabel() != null){
+                undoBtn.getLabel().setColor(Color.orange);
+            }
+        }
+
+        // Primary CTA: Open Schematics / Open Custom Game (Tier 1)
         if(report.hasSuccess()){
             boolean hasMaps = report.results.contains(r -> r.entry.type == PackType.MAP && r.destinationFile != null);
             boolean hasSchems = report.results.contains(r -> r.entry.type == PackType.SCHEMATIC && r.destinationFile != null);
 
             if(hasMaps && Vars.ui != null && Vars.ui.custom != null){
-                // Custom maps are playable through the Custom Game dialog; opening the
-                // editor map list would show a different, non-playable context.
-                UIUtils.pad(buttons.button(getLocalizedText("packloader.result.open.custom"), Icon.terrain, () -> {
+                var openMapsBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.result.open.custom"), Icon.terrain, () -> {
                     hide();
                     Vars.ui.custom.show();
-                }).size(210f, 64f).pad(4f).get());
+                }).size(Vars.mobile ? 140f : 170f, 54f).get());
+                if(openMapsBtn != null && openMapsBtn.getLabel() != null){
+                    openMapsBtn.getLabel().setColor(Pal.accent);
+                }
             }
 
             if(hasSchems && Vars.ui != null && Vars.ui.schematics != null){
-                UIUtils.pad(buttons.button(getLocalizedText("packloader.result.open.schematics"), Icon.paste, () -> {
+                var openSchemsBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.result.open.schematics"), Icon.paste, () -> {
                     hide();
                     Vars.ui.schematics.show();
-                }).size(210f, 64f).pad(4f).get());
+                }).size(Vars.mobile ? 140f : 170f, 54f).get());
+                if(openSchemsBtn != null && openSchemsBtn.getLabel() != null){
+                    openSchemsBtn.getLabel().setColor(Pal.accent);
+                }
             }
         }
-
-        if(report.transaction != null && report.transaction.getActiveItemCount() > 0 && !report.transaction.undone){
-            UIUtils.pad(buttons.button(getLocalizedText("packloader.undo.button"), Icon.undo, () -> {
-                new UndoConfirmDialog(undoManager, report.transaction, this::hide).show();
-            }).size(180f, 64f).pad(4f).get());
-        }
-
-        if(Vars.mobile){
-            buttons.button(Icon.export, Styles.flati, () -> {
-                new ExportReportDialog(ReportExporter.createFromImportReport(report, null)).show();
-            }).size(64f, 64f).pad(4f);
-        }else{
-            UIUtils.pad(buttons.button(getLocalizedText("packloader.report.button.export"), Icon.export, () -> {
-                new ExportReportDialog(ReportExporter.createFromImportReport(report, null)).show();
-            }).size(190f, 64f).pad(4f).get());
-        }
-
-        UIUtils.pad(buttons.button(getLocalizedText("packloader.result.close"), Icon.cancel, this::hide).size(210f, 64f).pad(4f).get());
     }
 }
