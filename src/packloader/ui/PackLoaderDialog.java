@@ -815,21 +815,32 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
         // Bottom Action Bar
         buttons.clear();
-        addCloseButton();
+        buttons.defaults().pad(4f);
 
-        if(Vars.mobile){
-            buttons.button(Icon.link, Styles.flati, () -> Core.app.openURI(ISSUES_URL)).size(64f, 64f);
-        }else{
-            UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
-                Core.app.openURI(ISSUES_URL);
-            }).size(180f, 64f).get());
-        }
+        // Left Actions: Back (Dismissive) + Bug Report (Utility Icon)
+        UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, Styles.flatt, () -> {
+            clearEntries();
+            sourceName = "";
+            targetType = null;
+            resetFilters();
+            rebuild();
+        }).size(Vars.mobile ? 120f : 140f, 54f).get());
+        addCloseListener();
 
+        buttons.button(Icon.link, Styles.flati, () -> {
+            Core.app.openURI(ISSUES_URL);
+        }).size(48f, 54f);
+
+        // Spacer pushes primary actions to the right
+        buttons.add().growX();
+
+        // Right Actions: Preview (Secondary) + Import (Primary CTA)
         var previewBtn = UIUtils.pad(buttons.button(
             getLocalizedText("packloader.dryrun.button.preview"),
             Icon.eye,
+            Styles.flatt,
             this::showDryRunDialog
-        ).size(Vars.mobile ? 140f : 170f, 64f).get());
+        ).size(Vars.mobile ? 130f : 150f, 54f).get());
         if(previewBtn != null){
             previewBtn.update(() -> {
                 previewBtn.setDisabled(visibleSelectedCount() == 0 || importRunning);
@@ -838,12 +849,16 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
         int selectedCount = visibleSelectedCount();
         String initialImportText = getLocalizedText("packloader.import.action", selectedCount);
-        var importBtn = UIUtils.pad(buttons.button(initialImportText, Icon.download, this::executeImport).size(Vars.mobile ? 160f : 200f, 64f).get());
+        var importBtn = UIUtils.pad(buttons.button(initialImportText, Icon.download, this::executeImport).size(Vars.mobile ? 160f : 200f, 54f).get());
         importBtn.update(() -> {
             int count = visibleSelectedCount();
             String text = getLocalizedText("packloader.import.action", count);
             importBtn.setText(text);
-            importBtn.setDisabled(count == 0 || importRunning);
+            boolean disabled = count == 0 || importRunning;
+            importBtn.setDisabled(disabled);
+            if(importBtn.getLabel() != null){
+                importBtn.getLabel().setColor(disabled ? Pal.gray : Pal.accent);
+            }
         });
     }
 
@@ -924,8 +939,8 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             CheckBox box = new CheckBox("");
             box.setChecked(entry.selected);
             box.touchable = Touchable.disabled;
-            UIUtils.squareCheck(box, 26f);
-            row.add(box).size(26f).padRight(6f);
+            UIUtils.squareCheck(box, 24f);
+            row.add(box).size(24f).padLeft(2f).padRight(6f);
 
             // Clicking whole row toggles selection
             row.clicked(() -> {
@@ -934,14 +949,14 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                 updatePreviewSummary();
             });
 
-            // Thumbnail / Type Icon
+            // Thumbnail / Type Icon (fixed 36x36f)
             Table thumb = new Table();
-            thumb.setSize(32f, 32f);
+            thumb.setSize(36f, 36f);
             Texture cached = PreviewManager.getCachedTexture(entry);
             if(cached != null && !cached.isDisposed()){
                 BorderImage b = new BorderImage(cached, 2f);
                 b.setScaling(Scaling.fit);
-                thumb.add(b).size(32f);
+                thumb.add(b).size(36f);
             }else{
                 if(entry.type == PackType.MAP){
                     thumb.image(Icon.terrain).size(26f).color(Pal.accent);
@@ -954,12 +969,12 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                             thumb.clear();
                             BorderImage b = new BorderImage(tex, 2f);
                             b.setScaling(Scaling.fit);
-                            thumb.add(b).size(32f);
+                            thumb.add(b).size(36f);
                         }
                     });
                 }
             }
-            row.add(thumb).size(32f).padRight(4f);
+            row.add(thumb).size(36f).padRight(6f);
 
             // Title & Subtitle Info
             row.table(t -> {
@@ -989,13 +1004,16 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
                 t.add(titleBuilder.toString()).color(Color.white).ellipsis(true).growX().minWidth(0f).left().row();
 
-                // Clean second line: File size, dimensions, author & optional details
+                // Clean second line: File size, dimensions, blocks, author & optional details
                 StringBuilder infoBuilder = new StringBuilder();
                 infoBuilder.append(PackScanner.formatSize(entry.size));
 
                 String dims = entry.getDimensionsString();
                 if(!dims.isEmpty()){
                     infoBuilder.append("  •  [lightgray]").append(dims).append("[]");
+                }
+                if(entry.type == PackType.SCHEMATIC && entry.schematic != null && entry.schematic.tiles != null){
+                    infoBuilder.append("  •  [lightgray]").append(getLocalizedText("packloader.preview.blocks", entry.schematic.tiles.size)).append("[]");
                 }
                 if(entry.type == PackType.MAP && entry.mapInfo != null && !entry.mapInfo.author.isEmpty()){
                     infoBuilder.append("  •  [lightgray]").append(entry.mapInfo.author).append("[]");
@@ -1019,29 +1037,17 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
                 t.add(infoBuilder.toString()).color(entry.isDuplicate ? Color.orange : entry.isValid ? Pal.lightishGray : Pal.remove)
                  .ellipsis(true).growX().minWidth(0f).left().padTop(2f);
-            }).growX().minWidth(0f).left().padLeft(8f);
+            }).growX().minWidth(0f).left().padLeft(6f).padRight(6f);
 
-            // Actions: Info (for both Maps & Schematics) & In-World Placement (for Schematics)
+            // Actions: Info (for both Maps & Schematics) & In-World Placement (for Schematics, docked right)
+            Table actions = new Table();
+            actions.right().defaults().size(36f).pad(2f);
+
             if(entry.isValid){
-                Button infoBtn = row.button(Icon.info, Styles.clearNonei, () -> {
-                    if(entry.type == PackType.MAP){
-                        showMapInfo(entry);
-                    }else{
-                        showSchematicInfo(entry);
-                    }
-                }).size(36f).padLeft(2f).padRight(2f).get();
-                infoBtn.addListener(new InputListener(){
-                    @Override
-                    public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
-                        event.stop();
-                        return true;
-                    }
-                });
-
                 if(entry.type == PackType.SCHEMATIC && Vars.state != null && Vars.state.isGame()){
-                    Button placeBtn = row.button(Icon.paste, Styles.clearNonei, () -> {
+                    Button placeBtn = actions.button(Icon.paste, Styles.clearNonei, () -> {
                         placeSchematic(entry);
-                    }).size(36f).padLeft(2f).padRight(2f).get();
+                    }).size(36f).get();
                     placeBtn.addListener(new InputListener(){
                         @Override
                         public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
@@ -1050,7 +1056,24 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                         }
                     });
                 }
+
+                Button infoBtn = actions.button(Icon.info, Styles.clearNonei, () -> {
+                    if(entry.type == PackType.MAP){
+                        showMapInfo(entry);
+                    }else{
+                        showSchematicInfo(entry);
+                    }
+                }).size(36f).get();
+                infoBtn.addListener(new InputListener(){
+                    @Override
+                    public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
+                        event.stop();
+                        return true;
+                    }
+                });
             }
+
+            row.add(actions).right();
 
             table.add(row).growX().minWidth(0f).pad(2f).row();
         }
