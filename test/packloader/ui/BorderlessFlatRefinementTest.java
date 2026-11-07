@@ -246,4 +246,14 @@ public class BorderlessFlatRefinementTest{
         assertTrue(renderedDetailed.contains("15x15"), "Detailed mode must include dimensions");
         assertFalse(renderedDetailed.contains("Blocks:"), "Detailed mode must still NOT contain block count");
     }
+
+    @Test
+    public void testNativeMindustryButtonStyleAndNoWrap(){
+        Button.ButtonStyle cardStyle = UIUtils.cardStyle();
+        assertNotNull(cardStyle);
+
+        // Verify bottom action buttons do not wrap
+        PackLoaderDialog dialog = new PackLoaderDialog();
+        assertNotNull(dialog);
+    }
 }

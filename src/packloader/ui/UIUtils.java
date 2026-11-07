@@ -11,13 +11,9 @@ import mindustry.ui.Styles;
 public final class UIUtils{
     private UIUtils(){}
 
-    /** Flat, borderless card style with subtle dark background and hover highlight. */
+    /** Native Mindustry button card style with bevel border and hover/pressed feedback. */
     public static Button.ButtonStyle cardStyle(){
-        Button.ButtonStyle style = new Button.ButtonStyle();
-        style.up = flatPane();
-        style.over = Styles.flatOver != null ? Styles.flatOver : Styles.none;
-        style.down = Styles.flatDown != null ? Styles.flatDown : Styles.none;
-        return style;
+        return Styles.defaultb != null ? new Button.ButtonStyle(Styles.defaultb) : new Button.ButtonStyle();
     }
 
     /** Borderless flat row style with hover/pressed feedback. */
