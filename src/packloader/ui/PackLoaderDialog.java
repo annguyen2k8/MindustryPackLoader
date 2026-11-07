@@ -1011,7 +1011,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                 });
 
                 if(entry.type == PackType.SCHEMATIC && Vars.state != null && Vars.state.isGame()){
-                    Button placeBtn = row.button(Icon.play, Styles.clearNonei, () -> {
+                    Button placeBtn = row.button(Icon.paste, Styles.clearNonei, () -> {
                         placeSchematic(entry);
                     }).size(36f).padLeft(2f).padRight(2f).get();
                     placeBtn.addListener(new InputListener(){
@@ -1158,6 +1158,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     }
 
     private MapInfoDialog mapInfoDialog;
+    private SchematicInfoDialog schematicInfoDialog;
 
     public void showMapInfo(PackEntry entry){
         if(entry == null) return;
@@ -1169,46 +1170,14 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
     public void showSchematicInfo(PackEntry entry){
         if(entry == null) return;
-        Schematic s = entry.schematic;
-        if(s == null){
-            try(java.io.InputStream in = entry.openStream()){
-                s = PackFormat.readSchematic(in);
-                entry.schematic = s;
-            }catch(Throwable t){
-                Log.err("[PackLoader] Failed to read schematic for info", t);
-                if(Vars.ui != null){
-                    Vars.ui.showErrorMessage(getLocalizedText("packloader.error.invalid-schematic"));
-                }
-                return;
-            }
+        if(schematicInfoDialog == null){
+            schematicInfoDialog = new SchematicInfoDialog(this::hide);
         }
-        if(s != null && Vars.ui != null && Vars.ui.schematics != null){
-            Vars.ui.schematics.showInfo(s);
-        }
+        schematicInfoDialog.show(entry);
     }
 
     public void placeSchematic(PackEntry entry){
-        if(entry == null) return;
-        Schematic s = entry.schematic;
-        if(s == null){
-            try(java.io.InputStream in = entry.openStream()){
-                s = PackFormat.readSchematic(in);
-                entry.schematic = s;
-            }catch(Throwable t){
-                Log.err("[PackLoader] Failed to read schematic for placement", t);
-                if(Vars.ui != null){
-                    Vars.ui.showErrorMessage(getLocalizedText("packloader.error.invalid-schematic"));
-                }
-                return;
-            }
-        }
-        if(s != null && Vars.control != null && Vars.control.input != null){
-            Vars.control.input.useSchematic(s);
-            hide();
-            if(Vars.ui != null){
-                Vars.ui.showInfoToast(getLocalizedText("packloader.schematic.placed", s.name()), 2.5f);
-            }
-        }
+        SchematicPlacementHelper.placeSchematic(entry, this::hide);
     }
 
     public static String truncateFileName(String name, int maxLength){

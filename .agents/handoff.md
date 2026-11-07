@@ -3,53 +3,67 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-07 11:55 +07:00
+- **Last updated:** 2026-11-07 12:35 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** Comprehensive Final Audit P2-P3 & P4 Roadmap Preparation.
-- **Branch:** master; working tree clean.
+- **Task:** Implement Milestone P4.1 – Direct In-Game Schematic Placement.
+- **Branch:** master; working tree clean post-commit.
 
 ## Results
 
-- [verified] Comprehensive Final Audit (P2 - Import Safety):
-  - Pre-write backups strictly created before overwrite in both Map and Schematic paths.
-  - Safe in-place Undo verifies path traversal escape (`isWithinDirectory`), SHA-256 content verification, and prevents modifying files altered by user after import.
-  - Backup quota enforced (5 transactions / 50MB max total bytes).
-  - Dry-Run Conflict Preview runs purely in-memory with zero disk mutations or side effects.
-  - Content-Hash duplicate detection utilizes thread-safe caching without cross-type collisions.
-- [verified] Comprehensive Final Audit (P3 - UX & Integration):
-  - Desktop Drag-and-Drop batched and verified via `FileDropHandlerTest` and `ApplicationListener.fileDropped`.
-  - Android Share/Open-with boundary confirmed as host manifest limitation (`ACTION_SEND`/`ACTION_VIEW`).
-  - Checkbox hover/click interaction unified in single CheckBox widget without double-toggling.
-  - PreviewManager manages async daemon pixmap decoding with main-thread GPU texture creation; disposes all local textures on dialog hide.
-  - ReportExporter strictly adheres to RFC 4180 CSV with UTF-8 BOM, Arc Jval JSON formatting, path privacy sanitization, and background daemon stream export.
-- [verified] CI Matrix & Version Compatibility:
-  - Re-run all 203 automated unit tests against both Mindustry v160 and v160.7 (BUILD SUCCESSFUL on both).
-  - Re-run `jar check verifyJar` on both versions (BUILD SUCCESSFUL on both).
-  - Reflection adapter `invokeLoadPreviews` validated against upstream bytecode differences.
-- [verified] Synchronized Documentation:
-  - Synced `PROGRESS.md` in repository root and `D:\Users\Desktop\PROGRESS.md`.
-  - Created and committed `P3_CLOSURE_AUDIT.md`.
-- [verified] P4 Roadmap Proposed:
-  - Formulated 4 prioritized features: In-Game Schematic Placement Helper, Bulk Tagging & Folder Organization, Bulk ZIP Export, and URL Direct Download.
+- [verified] In-Game Schematic Placement Validation (`SchematicPlacementValidator.java`):
+  - Validates game active context (`Vars.state != null && Vars.state.isGame()`).
+  - Blocks placement if game is over (`Vars.state.gameOver`).
+  - Validates match/server permissions (`Vars.state.rules.schematicsAllowed`).
+  - Validates player existence and alive status (`Vars.player != null && !Vars.player.dead()`).
+  - Validates unit availability and building capability (`unit != null && unit.canBuild()`).
+  - Blocks spectator/derelict team placement (`player.team() != Team.derelict`).
+  - Ensures control and input handler availability (`Vars.control != null && Vars.control.input != null`).
+  - Validates schematic integrity and non-empty tiles.
+- [verified] Placement Helper & Action Flow (`SchematicPlacementHelper.java`):
+  - Loads schematic lazily from stream if not yet cached in entry.
+  - Triggers Mindustry native placement cursor via `Vars.control.input.useSchematic(s)`.
+  - Native engine retains native rotation (`R` / scroll wheel) and cancellation (right-click / Esc).
+  - Automatically hides PackLoader dialogs upon placement activation.
+  - Shows localized info toast informing player of schematic name and dimensions.
+- [verified] Schematic Detail & Preview Dialog (`SchematicInfoDialog.java`):
+  - Displays preview thumbnail with asynchronous fallback decoding and texture caching.
+  - Shows metadata: Dimensions ($W \times H$), block count, file size, power generation/consumption.
+  - Displays requirement resource cost matrix with Mindustry item icons and quantities.
+  - Displays schematic description with word-wrapping.
+  - Features dedicated in-game "Place" button (`Icon.paste`) that triggers native placement.
+- [verified] PackLoaderDialog Integration:
+  - Row item button renders `Icon.paste` during active gameplay for 1-click placement.
+  - Info button opens `SchematicInfoDialog` for full inspection before placing.
+- [verified] Localization (1:1 Key Parity):
+  - Added 11 keys in `bundle.properties` and `bundle_vi.properties` covering validation errors, toast details, and requirement labels.
+- [verified] Automated Testing:
+  - Added `SchematicPlacementValidatorTest` (10 tests) covering all validation branches and bundle keys.
+  - Total project test count: 213/213 passing (0 failures, 0 skipped).
+- [verified] CI Matrix & JAR Verification:
+  - `.\gradlew.bat test "-PmindustryVersion=v160" --rerun` -> BUILD SUCCESSFUL.
+  - `.\gradlew.bat test "-PmindustryVersion=v160.7" --rerun` -> BUILD SUCCESSFUL.
+  - `.\gradlew.bat jar check verifyJar "-PmindustryVersion=v160"` -> BUILD SUCCESSFUL.
+  - `.\gradlew.bat jar check verifyJar "-PmindustryVersion=v160.7"` -> BUILD SUCCESSFUL.
+  - Desktop JAR deployed to `D:\Anzuno\Mindustry\MindustryData\mods\MindustryPackLoaderDesktop.jar`.
 
 ## Remaining
 
-- P4 Implementation (awaiting user decision and prioritization).
+- Awaiting user feedback on in-game schematic placement UX.
+- Other P4 candidates (P4.2, P4.3, P4.4) remained explicitly excluded per user decision.
 
 ## Next steps
 
 1. Read `.agents/handoff.md` from disk at task start.
-2. Align with user on P4 roadmap feature selection and prioritization.
-3. Begin Milestone P4 implementation following the agreed scope.
+2. Await user feedback and review of P4.1.
 
 ## Open questions
 
-- Awaiting user confirmation on P4 roadmap priorities (P4.1 Schematic In-Game Placement vs P4.2 Bulk Tagging/Folders vs P4.3 Bulk Export).
+- None. Scope boundary strictly preserved.
 
 ## Verification
 
-- `.\gradlew.bat test "-PmindustryVersion=v160" --rerun` — BUILD SUCCESSFUL (203/203 unit tests passed).
-- `.\gradlew.bat test "-PmindustryVersion=v160.7" --rerun` — BUILD SUCCESSFUL (203/203 unit tests passed).
+- `.\gradlew.bat test "-PmindustryVersion=v160" --rerun` — BUILD SUCCESSFUL (213/213 tests passed).
+- `.\gradlew.bat test "-PmindustryVersion=v160.7" --rerun` — BUILD SUCCESSFUL (213/213 tests passed).
 - `.\gradlew.bat jar check verifyJar "-PmindustryVersion=v160"` — BUILD SUCCESSFUL.
 - `.\gradlew.bat jar check verifyJar "-PmindustryVersion=v160.7"` — BUILD SUCCESSFUL.
-- Live Mindustry 160.7 runtime UI verification.
+- Mod deployed to `D:\Anzuno\Mindustry\MindustryData\mods\MindustryPackLoaderDesktop.jar`.

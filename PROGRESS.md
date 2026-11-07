@@ -46,6 +46,10 @@
 - [x] Export import report.
 - [x] CI matrix v160/v160.7 và runtime smoke test.
 
+### P4 — Tối ưu hóa In-Game Workflow
+
+- [x] P4.1 — Direct in-game schematic placement.
+
 ## Quy ước cập nhật
 
 - `[ ]` Chưa hoàn thành.
