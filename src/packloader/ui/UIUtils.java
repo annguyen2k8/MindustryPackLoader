@@ -29,6 +29,15 @@ public final class UIUtils{
         return style;
     }
 
+    /** Completely transparent button style with flat hover/down feedback (for Clear buttons, header actions, etc.). */
+    public static Button.ButtonStyle clearButtonStyle(){
+        Button.ButtonStyle style = new Button.ButtonStyle();
+        style.up = Styles.none;
+        style.over = Styles.flatOver != null ? Styles.flatOver : Styles.none;
+        style.down = Styles.flatDown != null ? Styles.flatDown : Styles.none;
+        return style;
+    }
+
     /** Returns a subtle flat borderless dark panel background (black with 50% opacity). */
     public static Drawable flatPane(){
         return Styles.black5 != null ? Styles.black5 : Styles.none;

@@ -68,6 +68,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     private FilterMode filterMode = FilterMode.ALL;
     private String searchText = "";
     private Label previewSummaryLabel;
+    private boolean showDetailedMeta = false;
 
     private final TaskGeneration scanGeneration = new TaskGeneration();
     private final TaskGeneration importGeneration = new TaskGeneration();
@@ -267,11 +268,16 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         Seq<RecentSources.SourceItem> recents = RecentSources.load();
         if(!recents.isEmpty()){
             Table recentsHeader = new Table();
+            recentsHeader.left().defaults().center();
             recentsHeader.add(getLocalizedText("packloader.recent.title")).color(Pal.accent).style(Styles.outlineLabel).left().growX();
-            recentsHeader.button(getLocalizedText("packloader.recent.clear"), Icon.trash, Styles.flatt, () -> {
+            Button clearBtn = recentsHeader.button(b -> {
+                b.image(Icon.trash).size(16f).color(Pal.lightishGray).padRight(8f);
+                b.add(getLocalizedText("packloader.recent.clear")).color(Pal.lightishGray).style(Styles.outlineLabel);
+            }, UIUtils.clearButtonStyle(), () -> {
                 RecentSources.clear();
                 rebuild();
-            }).height(32f).padRight(2f);
+            }).height(32f).padRight(2f).get();
+            clearBtn.margin(4f, 8f, 4f, 8f);
             root.add(recentsHeader).pad(4f).padTop(12f).padBottom(4f).row();
 
             for(RecentSources.SourceItem item : recents){
@@ -374,11 +380,16 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         Seq<RecentSources.SourceItem> recents = RecentSources.getForType(targetType);
         if(!recents.isEmpty()){
             Table recentsHeader = new Table();
+            recentsHeader.left().defaults().center();
             recentsHeader.add(getLocalizedText("packloader.recent.title")).color(Pal.accent).style(Styles.outlineLabel).left().growX();
-            recentsHeader.button(getLocalizedText("packloader.recent.clear"), Icon.trash, Styles.flatt, () -> {
+            Button clearBtn = recentsHeader.button(b -> {
+                b.image(Icon.trash).size(16f).color(Pal.lightishGray).padRight(8f);
+                b.add(getLocalizedText("packloader.recent.clear")).color(Pal.lightishGray).style(Styles.outlineLabel);
+            }, UIUtils.clearButtonStyle(), () -> {
                 RecentSources.clear();
                 rebuild();
-            }).height(32f).padRight(2f);
+            }).height(32f).padRight(2f).get();
+            clearBtn.margin(4f, 8f, 4f, 8f);
             root.add(recentsHeader).pad(4f).padTop(12f).padBottom(4f).row();
 
             for(RecentSources.SourceItem item : recents){
@@ -493,9 +504,9 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     }
 
     Table createQuickImportRow(PackType type, float rowWidth){
-        Table card = new Table(UIUtils.flatPane());
-        card.margin(10f, 14f, 10f, 14f);
-        card.left().defaults().left().growX();
+        Table container = new Table();
+        container.left().defaults().left().growX();
+        container.margin(6f, 0f, 6f, 0f);
 
         CheckBox quickBox = new CheckBox("");
         quickBox.setChecked(PackLoaderSettings.isQuickImport());
@@ -522,15 +533,15 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             .wrap();
 
         quickBox.add(textTable).growX().left().center();
-        card.add(quickBox).growX().row();
+        container.add(quickBox).growX().row();
 
-        // Conflict Policy Preset Container (dynamically shown ONLY when Quick Import is ON and type is known)
+        // Conflict Policy Preset Container (dynamically shown ONLY when Quick Import is ON)
         Table conflictContainer = new Table();
         conflictContainer.left().defaults().left();
 
         Runnable updateConflictVisibility = () -> {
             conflictContainer.clearChildren();
-            if(quickBox.isChecked() && type != null){
+            if(quickBox.isChecked()){
                 conflictContainer.margin(2f, 34f, 4f, 0f);
                 populateConflictPresetContent(conflictContainer, type);
             }else{
@@ -546,7 +557,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
         updateConflictVisibility.run();
 
-        card.add(conflictContainer).growX().row();
+        container.add(conflictContainer).growX().row();
 
         // Sub-option: Skip identical content
         CheckBox skipBox = new CheckBox("");
@@ -568,20 +579,23 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
         skipBox.add(skipTextTable).growX().left().center();
 
-        card.add(skipBox).growX().padTop(6f).row();
+        container.add(skipBox).growX().padTop(6f).row();
 
-        return card;
+        return container;
     }
 
     void populateConflictPresetContent(Table target, PackType type){
-        if(type == null) return;
         boolean isMap = type == PackType.MAP;
-        Color typeColor = isMap ? Pal.heal : Pal.accent;
+        boolean isSchem = type == PackType.SCHEMATIC;
+        Color typeColor = isMap ? Pal.heal : isSchem ? Pal.accent : Pal.accent;
         Drawable typeIcon = isMap ?
             (Icon.terrainSmall != null ? Icon.terrainSmall : Icon.terrain) :
-            (Icon.pasteSmall != null ? Icon.pasteSmall : Icon.paste);
+            isSchem ? (Icon.pasteSmall != null ? Icon.pasteSmall : Icon.paste) :
+            (Icon.settingsSmall != null ? Icon.settingsSmall : Icon.settings);
 
-        target.image(typeIcon).size(16f).color(typeColor).padRight(6f);
+        if(typeIcon != null){
+            target.image(typeIcon).size(16f).color(typeColor).padRight(6f);
+        }
         target.add(getLocalizedText("packloader.conflict.label")).color(Pal.accent).padRight(8f);
 
         for(DuplicatePolicy p : DuplicatePolicy.values()){
@@ -604,7 +618,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     public DuplicatePolicy getPolicyForType(PackType type){
         if(type == PackType.MAP) return mapDuplicatePolicy;
         if(type == PackType.SCHEMATIC) return schemDuplicatePolicy;
-        return mapDuplicatePolicy;
+        return mapDuplicatePolicy != null ? mapDuplicatePolicy : PackLoaderSettings.getDuplicatePolicy();
     }
 
     public void setPolicyForType(PackType type, DuplicatePolicy policy){
@@ -807,6 +821,16 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             }).height(30f).pad(1f).get());
         if(deselectBtn != null){
             deselectBtn.margin(3f, 6f, 3f, 6f);
+        }
+
+        var metaToggleBtn = UIUtils.pad(row2.button(
+            getLocalizedText("packloader.meta.details"),
+            Icon.list, Styles.flatTogglet, () -> {
+                showDetailedMeta = !showDetailedMeta;
+                rebuildEntriesList();
+            }).checked(b -> showDetailedMeta).height(30f).pad(1f).get());
+        if(metaToggleBtn != null){
+            metaToggleBtn.margin(3f, 6f, 3f, 6f);
         }
 
         row2.add().growX(); // Spacer pushes Live Dry-Run summary to the right
@@ -1016,38 +1040,57 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
                 t.add(titleBuilder.toString()).color(Color.white).ellipsis(true).growX().minWidth(0f).left().row();
 
-                // Clean second line: File size, dimensions, blocks, author & optional details
+                // Clean second line: status reasons, author, and optional detailed metadata
                 StringBuilder infoBuilder = new StringBuilder();
-                infoBuilder.append(PackScanner.formatSize(entry.size));
+                boolean hasInfo = false;
 
-                String dims = entry.getDimensionsString();
-                if(!dims.isEmpty()){
-                    infoBuilder.append("  •  [lightgray]").append(dims).append("[]");
+                if(dryItem != null && dryItem.isRenamed()){
+                    infoBuilder.append("[gold]").append(getLocalizedText("packloader.dryrun.target.renamed", dryItem.plannedTargetName)).append("[]");
+                    hasInfo = true;
+                }else if(entry.isDuplicate && !entry.duplicateReason.isEmpty()){
+                    infoBuilder.append("[gold]").append(entry.duplicateReason).append("[]");
+                    hasInfo = true;
                 }
-                if(entry.type == PackType.SCHEMATIC && entry.schematic != null && entry.schematic.tiles != null){
-                    infoBuilder.append("  •  [lightgray]").append(getLocalizedText("packloader.preview.blocks", entry.schematic.tiles.size)).append("[]");
+
+                if(entry.isContentDuplicate && !entry.contentDuplicateReason.isEmpty()){
+                    if(hasInfo) infoBuilder.append("  •  ");
+                    infoBuilder.append("[cyan]").append(entry.contentDuplicateReason).append("[]");
+                    hasInfo = true;
                 }
+
+                if(!entry.isValid && !entry.errorReason.isEmpty()){
+                    if(hasInfo) infoBuilder.append("  •  ");
+                    infoBuilder.append("[scarlet]").append(entry.errorReason).append("[]");
+                    hasInfo = true;
+                }
+
                 if(entry.type == PackType.MAP && entry.mapInfo != null && !entry.mapInfo.author.isEmpty()){
-                    infoBuilder.append("  •  [lightgray]").append(entry.mapInfo.author).append("[]");
+                    if(hasInfo) infoBuilder.append("  •  ");
+                    infoBuilder.append("[lightgray]").append(entry.mapInfo.author).append("[]");
+                    hasInfo = true;
                 }
 
                 if(!entry.displayName.equalsIgnoreCase(nameNoExt) && !entry.displayName.equalsIgnoreCase(entry.sanitizedFileName)){
-                    infoBuilder.append("  •  [lightgray]").append(entry.sanitizedFileName).append("[]");
+                    if(hasInfo) infoBuilder.append("  •  ");
+                    infoBuilder.append("[lightgray]").append(entry.sanitizedFileName).append("[]");
+                    hasInfo = true;
                 }
 
-                if(dryItem != null && dryItem.isRenamed()){
-                    infoBuilder.append("  •  [gold]").append(getLocalizedText("packloader.dryrun.target.renamed", dryItem.plannedTargetName)).append("[]");
-                }else if(entry.isDuplicate && !entry.duplicateReason.isEmpty()){
-                    infoBuilder.append("  •  [gold]").append(entry.duplicateReason).append("[]");
-                }
-                if(entry.isContentDuplicate && !entry.contentDuplicateReason.isEmpty()){
-                    infoBuilder.append("  •  [cyan]").append(entry.contentDuplicateReason).append("[]");
-                }
-                if(!entry.isValid && !entry.errorReason.isEmpty()){
-                    infoBuilder.append("  •  [scarlet]").append(entry.errorReason).append("[]");
+                if(showDetailedMeta){
+                    if(hasInfo) infoBuilder.append("  •  ");
+                    infoBuilder.append("[lightgray]").append(PackScanner.formatSize(entry.size)).append("[]");
+                    String dims = entry.getDimensionsString();
+                    if(!dims.isEmpty()){
+                        infoBuilder.append("  •  [lightgray]").append(dims).append("[]");
+                    }
+                    hasInfo = true;
                 }
 
-                t.add(infoBuilder.toString()).color(entry.isDuplicate ? Color.orange : entry.isValid ? Pal.lightishGray : Pal.remove)
+                if(!hasInfo){
+                    infoBuilder.append("[heal]").append(getLocalizedText("packloader.status.ready")).append("[]");
+                }
+
+                t.add(infoBuilder.toString()).color(Color.white)
                  .ellipsis(true).growX().minWidth(0f).left().padTop(2f);
             }).growX().minWidth(0f).left().padLeft(6f).padRight(6f);
 
