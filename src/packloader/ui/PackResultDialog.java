@@ -160,7 +160,7 @@ public class PackResultDialog extends BaseDialog{
 
         // Left Action: Close (Dismissive)
         var closeBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.result.close"), Icon.cancel, this::hide)
-            .size(Vars.mobile ? 110f : 130f, 54f).get());
+            .size(Vars.mobile ? 100f : 120f, 54f).get());
         if(closeBtn != null && closeBtn.getLabel() != null){
             closeBtn.getLabel().setWrap(false);
         }
@@ -169,7 +169,7 @@ public class PackResultDialog extends BaseDialog{
         // Spacer pushes secondary & primary actions to the right
         buttons.add().growX();
 
-        // Export Report (Utility / Secondary)
+        // Export (Utility / Secondary)
         if(Vars.mobile){
             buttons.button(Icon.export, () -> {
                 new ExportReportDialog(ReportExporter.createFromImportReport(report, null)).show();
@@ -177,7 +177,7 @@ public class PackResultDialog extends BaseDialog{
         }else{
             var exportBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.report.button.export"), Icon.export, () -> {
                 new ExportReportDialog(ReportExporter.createFromImportReport(report, null)).show();
-            }).size(140f, 54f).get());
+            }).size(120f, 54f).get());
             if(exportBtn != null && exportBtn.getLabel() != null){
                 exportBtn.getLabel().setWrap(false);
             }
@@ -187,7 +187,7 @@ public class PackResultDialog extends BaseDialog{
         if(report.transaction != null && report.transaction.getActiveItemCount() > 0 && !report.transaction.undone){
             var undoBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.undo.button"), Icon.undo, () -> {
                 new UndoConfirmDialog(undoManager, report.transaction, this::hide).show();
-            }).size(Vars.mobile ? 120f : 140f, 54f).get());
+            }).size(Vars.mobile ? 100f : 110f, 54f).get());
             if(undoBtn != null && undoBtn.getLabel() != null){
                 undoBtn.getLabel().setColor(Color.orange);
                 undoBtn.getLabel().setWrap(false);
@@ -203,7 +203,7 @@ public class PackResultDialog extends BaseDialog{
                 var openMapsBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.result.open.custom"), Icon.terrain, () -> {
                     hide();
                     Vars.ui.custom.show();
-                }).size(Vars.mobile ? 140f : 170f, 54f).get());
+                }).size(Vars.mobile ? 120f : 140f, 54f).get());
                 if(openMapsBtn != null && openMapsBtn.getLabel() != null){
                     openMapsBtn.getLabel().setColor(Pal.accent);
                     openMapsBtn.getLabel().setWrap(false);
@@ -214,7 +214,7 @@ public class PackResultDialog extends BaseDialog{
                 var openSchemsBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.result.open.schematics"), Icon.paste, () -> {
                     hide();
                     Vars.ui.schematics.show();
-                }).size(Vars.mobile ? 140f : 170f, 54f).get());
+                }).size(Vars.mobile ? 120f : 140f, 54f).get());
                 if(openSchemsBtn != null && openSchemsBtn.getLabel() != null){
                     openSchemsBtn.getLabel().setColor(Pal.accent);
                     openSchemsBtn.getLabel().setWrap(false);

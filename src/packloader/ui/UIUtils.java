@@ -40,15 +40,10 @@ public final class UIUtils{
         return Styles.black6 != null ? Styles.black6 : Styles.none;
     }
 
-    /** Adds consistent spacing between icon and label in a TextButton. */
+    /** Adds clean spacing between icon and label in a TextButton without excessive padding. */
     public static <T extends TextButton> T pad(T btn){
-        if(btn != null){
-            if(btn.getCells().size > 0){
-                btn.getCells().get(0).padRight(8f);
-            }
-            if(btn.getLabelCell() != null){
-                btn.getLabelCell().padLeft(8f);
-            }
+        if(btn != null && btn.getCells().size > 1){
+            btn.getCells().get(0).padRight(6f);
         }
         return btn;
     }

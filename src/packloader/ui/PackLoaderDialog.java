@@ -300,27 +300,27 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         }
         addCloseListener();
 
+        if(Vars.mobile){
+            buttons.button(Icon.link, () -> Core.app.openURI(ISSUES_URL)).size(54f, 54f);
+        }else{
+            var bugBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
+                Core.app.openURI(ISSUES_URL);
+            }).size(180f, 54f).get());
+            if(bugBtn != null && bugBtn.getLabel() != null){
+                bugBtn.getLabel().setWrap(false);
+            }
+        }
+
         buttons.add().growX();
 
         ImportTransaction latestTx = importer.undoManager.getLatestTransaction();
         if(latestTx != null && !latestTx.undone && latestTx.getActiveItemCount() > 0){
             var undoBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.undo.button.last"), Icon.undo, () -> {
                 new UndoConfirmDialog(importer.undoManager, latestTx, this::rebuild).show();
-            }).size(Vars.mobile ? 160f : 230f, 54f).get());
+            }).size(Vars.mobile ? 140f : 180f, 54f).get());
             if(undoBtn != null && undoBtn.getLabel() != null){
                 undoBtn.getLabel().setColor(Color.orange);
                 undoBtn.getLabel().setWrap(false);
-            }
-        }
-
-        if(Vars.mobile){
-            buttons.button(Icon.link, () -> Core.app.openURI(ISSUES_URL)).size(54f, 54f);
-        }else{
-            var bugBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
-                Core.app.openURI(ISSUES_URL);
-            }).size(200f, 54f).get());
-            if(bugBtn != null && bugBtn.getLabel() != null){
-                bugBtn.getLabel().setWrap(false);
             }
         }
     }
@@ -420,18 +420,19 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         }
         addCloseListener();
 
-        buttons.add().growX();
-
+        // Report Bug placed on the left side alongside Back
         if(Vars.mobile){
             buttons.button(Icon.link, () -> Core.app.openURI(ISSUES_URL)).size(54f, 54f);
         }else{
             var bugBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
                 Core.app.openURI(ISSUES_URL);
-            }).size(200f, 54f).get());
+            }).size(180f, 54f).get());
             if(bugBtn != null && bugBtn.getLabel() != null){
                 bugBtn.getLabel().setWrap(false);
             }
         }
+
+        buttons.add().growX();
     }
 
     private Button createRecentSourceCard(RecentSources.SourceItem item, PackType activeType){
@@ -821,7 +822,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         }
 
         // Native Mindustry visual divider between Selection and Smart Filter groups
-        row2.image().color(Pal.gray).width(1f).height(18f).pad(0f, 4f, 0f, 4f);
+        row2.image().color(Pal.gray).width(1f).height(18f).pad(0f, 6f, 0f, 6f);
 
         // --- Group 2: Smart Selection (New, Unique) ---
         var selectNewBtn = UIUtils.pad(row2.button(
@@ -847,7 +848,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         }
 
         // Native Mindustry visual divider between Smart Filter and View options
-        row2.image().color(Pal.gray).width(1f).height(18f).pad(0f, 4f, 0f, 4f);
+        row2.image().color(Pal.gray).width(1f).height(18f).pad(0f, 6f, 0f, 6f);
 
         // --- Group 3: View Toggle (Details) ---
         var metaToggleBtn = UIUtils.pad(row2.button(
@@ -906,7 +907,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         }else{
             var bugBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
                 Core.app.openURI(ISSUES_URL);
-            }).size(190f, 54f).get());
+            }).size(180f, 54f).get());
             if(bugBtn != null && bugBtn.getLabel() != null){
                 bugBtn.getLabel().setWrap(false);
             }
@@ -1493,8 +1494,10 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
     private void showAddSourceDialog(PackType type){
         BaseDialog d = new BaseDialog(getLocalizedText("packloader.source.add"));
-        d.addCloseButton();
-        d.cont.defaults().size(300f, 64f).pad(6f);
+
+        Table card = new Table(Tex.pane);
+        card.margin(12f);
+        card.defaults().size(320f, 56f).pad(4f);
 
         String zipText = type == PackType.MAP ? getLocalizedText("packloader.source.zip.map") :
                          type == PackType.SCHEMATIC ? getLocalizedText("packloader.source.zip.schem") :
@@ -1503,22 +1506,44 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                             type == PackType.SCHEMATIC ? getLocalizedText("packloader.source.scan-folder.schem") :
                             getLocalizedText("packloader.action.scan-folder");
 
-        d.cont.button(zipText, Icon.download, () -> {
+        card.button(b -> {
+            b.left().margin(8f, 16f, 8f, 16f);
+            b.image(Icon.download).size(26f).color(Pal.accent).padRight(12f);
+            b.add(zipText).style(Styles.defaultLabel).color(Color.white).growX().left();
+        }, UIUtils.cardStyle(), () -> {
             d.hide();
             pickZip(type, true);
-        }).row();
+        }).growX().row();
 
-        d.cont.button(folderText, Icon.folder, () -> {
+        card.button(b -> {
+            b.left().margin(8f, 16f, 8f, 16f);
+            b.image(Icon.folder).size(26f).color(Pal.accent).padRight(12f);
+            b.add(folderText).style(Styles.defaultLabel).color(Color.white).growX().left();
+        }, UIUtils.cardStyle(), () -> {
             d.hide();
             openFolderPicker(type, true);
-        }).row();
+        }).growX().row();
 
         if(!Vars.mobile){
-            d.cont.button(getLocalizedText("packloader.source.path.title"), Icon.paste, () -> {
+            card.button(b -> {
+                b.left().margin(8f, 16f, 8f, 16f);
+                b.image(Icon.paste).size(26f).color(Pal.accent).padRight(12f);
+                b.add(getLocalizedText("packloader.source.path.title")).style(Styles.defaultLabel).color(Color.white).growX().left();
+            }, UIUtils.cardStyle(), () -> {
                 d.hide();
                 openPathInputDialog(true);
-            }).row();
+            }).growX().row();
         }
+
+        d.cont.add(card).pad(10f);
+
+        d.buttons.defaults().pad(4f);
+        var closeBtn = UIUtils.pad(d.buttons.button(getLocalizedText("packloader.action.close"), Icon.cancel, d::hide)
+            .size(Vars.mobile ? 120f : 160f, 54f).get());
+        if(closeBtn != null && closeBtn.getLabel() != null){
+            closeBtn.getLabel().setWrap(false);
+        }
+        d.addCloseListener();
 
         d.show();
     }

@@ -120,9 +120,9 @@ public class DryRunDialog extends BaseDialog{
                     t.add(info.toString()).ellipsis(true).growX().minWidth(0f).padTop(2f);
                 }).growX().minWidth(0f).left().padLeft(6f);
 
-                // Action Badge
-                Table badge = new Table(Tex.button);
-                badge.margin(4f, 10f, 4f, 10f);
+                // Action Badge (Clean non-button status badge)
+                Table badge = new Table(Tex.pane);
+                badge.margin(3f, 8f, 3f, 8f);
                 badge.add(item.action.localized()).color(item.action.color).style(Styles.outlineLabel);
                 itemRow.add(badge).padLeft(8f);
 
@@ -155,20 +155,21 @@ public class DryRunDialog extends BaseDialog{
 
         // Bottom Action buttons
         buttons.clear();
+        buttons.defaults().pad(4f);
         var backBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, this::hide)
-            .size(Vars.mobile ? 140f : 180f, 60f).get());
+            .size(Vars.mobile ? 110f : 130f, 54f).get());
         if(backBtn != null && backBtn.getLabel() != null){
             backBtn.getLabel().setWrap(false);
         }
 
         if(Vars.mobile){
-            buttons.button(Icon.export, Styles.flati, () -> {
+            buttons.button(Icon.export, () -> {
                 new ExportReportDialog(ReportExporter.createFromDryRunPlan(plan, null)).show();
-            }).size(60f, 60f).pad(4f);
+            }).size(48f, 54f);
         }else{
             var exportBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.report.button.plan"), Icon.export, () -> {
                 new ExportReportDialog(ReportExporter.createFromDryRunPlan(plan, null)).show();
-            }).size(170f, 60f).pad(4f).get());
+            }).size(130f, 54f).get());
             if(exportBtn != null && exportBtn.getLabel() != null){
                 exportBtn.getLabel().setWrap(false);
             }
@@ -180,7 +181,7 @@ public class DryRunDialog extends BaseDialog{
                 hide();
                 if(onConfirm != null) onConfirm.run();
             }
-        ).size(Vars.mobile ? 180f : 240f, 60f).get());
+        ).size(Vars.mobile ? 150f : 180f, 54f).get());
         if(confirmBtn != null){
             confirmBtn.setDisabled(plan.totalSelected == 0);
             if(confirmBtn.getLabel() != null){

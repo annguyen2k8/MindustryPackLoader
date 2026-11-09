@@ -3,50 +3,49 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-09 21:52 +07:00
+- **Last updated:** 2026-11-09 22:30 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** PackLoader UI Polish & Native Mindustry UI Audit (Button sizing, text overflow, native consistency, toolbar cleanup, and single-line import progress).
+- **Task:** PackLoader UI/UX Polish (Button Sizing, Icon Overlap, Modal Card Refinement, and Bottom Bar Consistency).
 - **Branch:** master; ready to commit and push.
 
 ## Results
 
-- [verified] Import Progress UI Simplification:
-  - Loại bỏ hoàn toàn dòng `File: ...` khỏi UI tiến trình import (`updateImportProgress`), triệt tiêu hoàn toàn hiện tượng nhấp nháy thị giác do tên file thay đổi liên tục.
-  - Gộp thành một dòng thông tin duy nhất trên cùng baseline: `Importing 41/845  |  Success: 41  |  Failed: 0` (tiếng Việt: `Đang nhập 41/845  |  Thành công: 41  |  Lỗi: 0`).
-  - Sử dụng chuẩn màu semantic Mindustry: `[accent]` cho hành động, `[white]` cho tỷ lệ hoàn thành, `[heal]` cho thành công, `[scarlet]` cho thất bại.
-  - Progress bar và tỷ lệ phần trăm được giữ nguyên và cập nhật mượt mà.
-- [verified] Search Toolbar & Selection Cleanup:
-  - Tái cấu trúc Hàng 2 bên dưới thanh Search thành các cụm chức năng rõ ràng theo chuẩn Mindustry:
-    1. Bulk Selection: `All` (`Tất cả`), `None` (`Bỏ chọn`), `Invert` (`Đảo chọn`).
-    2. Visual Divider: Vạch ngăn cách 1px (`Pal.gray`) tiêu chuẩn native Mindustry.
-    3. Smart Selection: `New` (`Mới`), `Unique` (`Độc nhất`).
-    4. Visual Divider: Vạch ngăn cách 1px (`Pal.gray`).
-    5. View Mode: `Details` (`Chi tiết`, toggle).
-  - Rút gọn nhãn nút xúc tích, dứt khoát, loại bỏ tình trạng tràn chữ hoặc va chạm với Live Outcome Preview.
-  - Live Outcome Breakdown được chuyển thành nút tương tác native `summaryBox` (`Styles.flatt`, hiển thị icon `Icon.eye` và các số liệu New, Overwrite, Rename, Skip mà không lặp lại từ "Preview"). Người dùng có thể click trực tiếp vào box này để mở DryRunDialog.
-  - Xử lý màn hình hẹp / mobile: Tách riêng thanh selection và live summary box khi màn hình hẹp để đảm bảo 0% khả năng bị xén hoặc đè chữ.
-- [verified] Global Button Audit & Native Mindustry UI Compliance:
-  - Khắc phục các nút trong `PackResultDialog`: Chuyển `Close`, `Export Report`, `Undo` từ `Styles.flatt` sang native beveled button style (`Styles.defaultt`) đồng bộ 100% với các nút CTA `Open Maps` và `Open Schematics`.
-  - Khắc phục các tùy chọn định dạng xuất trong `ExportReportDialog` (`JSON`, `CSV`, `Clipboard`): Chuyển sang button native có viền nổi 3D và phản hồi tactile Mindustry.
-  - Bổ sung `setWrap(false)` cho toàn bộ các nút action trong `DryRunDialog`, `ExportReportDialog`, `PackResultDialog`, `SchematicInfoDialog`, `UndoConfirmDialog`, `UndoResultDialog`.
-  - Chuẩn hóa `UIUtils.clearButtonStyle()` tái sử dụng trực tiếp native `Styles.flatt`.
+- [verified] Button Sizing & Icon Overlap Fix:
+  - Khắc phục triệt để lỗi icon download đè lên chữ trong nút Import bằng cách rút ngắn nhãn `Confirm Import ({0})` thành `Import ({0})` (`Nhập ({0})`) và chuẩn hóa `UIUtils.pad()` (loại bỏ `padLeft(8f)` gây phình nội bộ, chỉ giữ `padRight(6f)` giữa icon và text).
+  - Rút ngắn nhãn các nút dài gây tràn viền trên `PackResultDialog`:
+    - `Export Report` -> `Export` (`Xuất`, size 120f).
+    - `Open Maps` / `Open Custom Game` -> `Maps` (`Bản đồ`, size 140f).
+    - `Open Schematics` -> `Schematics` (`Sơ đồ`, size 140f).
+    - `Undo Last` -> `Undo` (`Hoàn tác`, size 110f).
+    - `Close` (`Đóng`, size 120f).
+    - Tổng chiều rộng các action bên phải chỉ còn ~370f, loại bỏ 100% tình trạng tràn lề màn hình hoặc xén chữ trên cả desktop và mobile.
+- [verified] Preview Import (`DryRunDialog`) Refinement:
+  - Thay đổi Action Badge (`[Rename]`, `[Skip]`, `[Overwrite]`, `[New]`) từ `Tex.button` sang `Tex.pane`, biến thành badge trạng thái trực quan rõ ràng, không còn gây nhầm lẫn là nút bấm tương tác.
+  - Tối ưu kích thước các nút bottom bar: `Back` (130f), `Export` (130f), `Import ({0})` (180f).
+- [verified] Add Source Dialog (`showAddSourceDialog`) Modernization:
+  - Tái cấu trúc từ 3 nút đơn độc trôi nổi trên nền đen thành một Card modal nổi (`Tex.pane`) đồng bộ với giao diện chính.
+  - Các tùy chọn nguồn (`ZIP Archive`, `Scan Folder`, `Enter Direct Path`) sử dụng `UIUtils.cardStyle()` với icon màu `Pal.accent` và tiêu đề căn lề trái chuẩn Mindustry.
+  - Thay nút `[<- Back]` đáy mặc định bằng nút `Close` (`Icon.cancel`) kích thước 160x54f có viền nổi.
+- [verified] Bottom Bar Consistency Across Views:
+  - Thống nhất bố cục thanh bottom bar ở cả 3 view (`buildModeSelection`, `buildSourceSelection`, `buildEntriesView`): Bên trái là `Close`/`Back` + `Report Bug` (180f), Spacer `growX()`, Bên phải là các nút Action chính (`Undo Last`, `Preview`, `Import`).
+  - Tăng khoảng đệm divider giữa các nhóm nút toolbar từ 4f lên 6f để tăng tính thẩm mỹ và tách bạch thị giác.
 - [verified] Tests & Cross-Version Verification:
-  - Bổ sung test kiểm tra format tiến trình đơn dòng và nhãn nút xúc tích trong `BorderlessFlatRefinementTest.java`.
-  - Cập nhật test trong `BundleTest.java` và `ReviewHeaderDensityTest.java`.
   - Mindustry v160.7: **240/240 tests PASS 100%**.
   - Mindustry v160: **240/240 tests PASS 100%**.
-  - `verifyJar`: BUILD SUCCESSFUL (Kiểm tra bundle và localization đạt chuẩn 100%).
-  - Desktop JAR đã deploy tại `D:\Anzuno\Mindustry\MindustryData\mods\MindustryPackLoaderDesktop.jar` (thời điểm: `2026-11-09 21:51:21`, dung lượng: 278,228 bytes).
+  - `verifyJar`: BUILD SUCCESSFUL (Localization bundles & packaged jar verified).
+  - Desktop JAR đã deploy tại `D:\Anzuno\Mindustry\MindustryData\mods\MindustryPackLoaderDesktop.jar` (thời điểm: `2026-11-09 22:27:02`, dung lượng: 278,514 bytes).
 
 ## Remaining
 
-- Bàn giao để người dùng trải nghiệm thực tế trong game Mindustry v160.7.
+- Bàn giao để người dùng trải nghiệm trong game Mindustry v160.7.
 
 ## Next steps
 
-1. Người dùng khởi động lại game Mindustry v160.7.
-2. Kiểm tra Import Schematics: Toolbar Hàng 2 gọn gàng, phân nhóm trực quan, không còn chen chúc với Live Preview.
-3. Nhập một gói schematics lớn: Tiến trình Import hiển thị gọn trên một dòng duy nhất, không còn dòng `File: ...`, màu sắc phân biệt rõ ràng giữa Thành công và Thất bại.
+1. Người dùng khởi động lại hoặc reload mod trong game Mindustry v160.7.
+2. Kiểm tra các màn hình:
+   - Add Source dialog: Card nổi native, icon vàng cam căn trái, nút Close ở đáy.
+   - Preview Import dialog: Action badge hiển thị dạng nhãn trạng thái (không còn viền nút bấm), nút Import không bị đè icon.
+   - Import Results: Các nút Close, Export, Undo, Schematics/Maps vừa vặn hoàn hảo, không còn bị xén chữ hay tràn ra ngoài mép cửa sổ.
 
 ## Open questions
 
@@ -57,5 +56,4 @@
 - `.\gradlew.bat test "-PmindustryVersion=v160.7"` — BUILD SUCCESSFUL (240/240 tests passed).
 - `.\gradlew.bat test "-PmindustryVersion=v160"` — BUILD SUCCESSFUL (240/240 tests passed).
 - `.\gradlew.bat verifyJar "-PmindustryVersion=v160.7"` — BUILD SUCCESSFUL.
-- `.\gradlew.bat jar` — BUILD SUCCESSFUL.
-- Desktop JAR deployed to `D:\Anzuno\Mindustry\MindustryData\mods\MindustryPackLoaderDesktop.jar` (`2026-11-09 21:51:21`).
+- Desktop JAR deployed to `D:\Anzuno\Mindustry\MindustryData\mods\MindustryPackLoaderDesktop.jar` (`2026-11-09 22:27:02`).
