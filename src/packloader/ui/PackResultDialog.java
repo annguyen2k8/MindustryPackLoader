@@ -159,8 +159,11 @@ public class PackResultDialog extends BaseDialog{
         buttons.defaults().pad(4f);
 
         // Left Action: Close (Dismissive)
-        UIUtils.pad(buttons.button(getLocalizedText("packloader.result.close"), Icon.cancel, Styles.flatt, this::hide)
+        var closeBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.result.close"), Icon.cancel, this::hide)
             .size(Vars.mobile ? 110f : 130f, 54f).get());
+        if(closeBtn != null && closeBtn.getLabel() != null){
+            closeBtn.getLabel().setWrap(false);
+        }
         addCloseListener();
 
         // Spacer pushes secondary & primary actions to the right
@@ -168,22 +171,26 @@ public class PackResultDialog extends BaseDialog{
 
         // Export Report (Utility / Secondary)
         if(Vars.mobile){
-            buttons.button(Icon.export, Styles.flati, () -> {
+            buttons.button(Icon.export, () -> {
                 new ExportReportDialog(ReportExporter.createFromImportReport(report, null)).show();
             }).size(48f, 54f);
         }else{
-            UIUtils.pad(buttons.button(getLocalizedText("packloader.report.button.export"), Icon.export, Styles.flatt, () -> {
+            var exportBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.report.button.export"), Icon.export, () -> {
                 new ExportReportDialog(ReportExporter.createFromImportReport(report, null)).show();
             }).size(140f, 54f).get());
+            if(exportBtn != null && exportBtn.getLabel() != null){
+                exportBtn.getLabel().setWrap(false);
+            }
         }
 
         // Undo (Safety / Warning action, shown only when transaction is reversible)
         if(report.transaction != null && report.transaction.getActiveItemCount() > 0 && !report.transaction.undone){
-            var undoBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.undo.button"), Icon.undo, Styles.flatt, () -> {
+            var undoBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.undo.button"), Icon.undo, () -> {
                 new UndoConfirmDialog(undoManager, report.transaction, this::hide).show();
             }).size(Vars.mobile ? 120f : 140f, 54f).get());
             if(undoBtn != null && undoBtn.getLabel() != null){
                 undoBtn.getLabel().setColor(Color.orange);
+                undoBtn.getLabel().setWrap(false);
             }
         }
 
@@ -199,6 +206,7 @@ public class PackResultDialog extends BaseDialog{
                 }).size(Vars.mobile ? 140f : 170f, 54f).get());
                 if(openMapsBtn != null && openMapsBtn.getLabel() != null){
                     openMapsBtn.getLabel().setColor(Pal.accent);
+                    openMapsBtn.getLabel().setWrap(false);
                 }
             }
 
@@ -209,6 +217,7 @@ public class PackResultDialog extends BaseDialog{
                 }).size(Vars.mobile ? 140f : 170f, 54f).get());
                 if(openSchemsBtn != null && openSchemsBtn.getLabel() != null){
                     openSchemsBtn.getLabel().setColor(Pal.accent);
+                    openSchemsBtn.getLabel().setWrap(false);
                 }
             }
         }

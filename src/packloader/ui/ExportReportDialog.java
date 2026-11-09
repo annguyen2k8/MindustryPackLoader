@@ -62,19 +62,23 @@ public class ExportReportDialog extends BaseDialog{
         actions.defaults().pad(5f).minHeight(56f).growX();
 
         // 1. Export as JSON
-        actions.button(getLocalizedText("packloader.report.format.json"), Icon.download, Styles.flatt, () -> {
+        var jsonBtn = UIUtils.pad(actions.button(getLocalizedText("packloader.report.format.json"), Icon.download, () -> {
             String defaultName = ReportExporter.defaultReportFileName(model, "json");
             exportWithChooser(defaultName, "json", dest -> ReportExporter.writeJson(model, dest));
-        }).row();
+        }).get());
+        if(jsonBtn != null && jsonBtn.getLabel() != null) jsonBtn.getLabel().setWrap(false);
+        actions.row();
 
         // 2. Export as CSV
-        actions.button(getLocalizedText("packloader.report.format.csv"), Icon.download, Styles.flatt, () -> {
+        var csvBtn = UIUtils.pad(actions.button(getLocalizedText("packloader.report.format.csv"), Icon.download, () -> {
             String defaultName = ReportExporter.defaultReportFileName(model, "csv");
             exportWithChooser(defaultName, "csv", dest -> ReportExporter.writeCsv(model, dest));
-        }).row();
+        }).get());
+        if(csvBtn != null && csvBtn.getLabel() != null) csvBtn.getLabel().setWrap(false);
+        actions.row();
 
         // 3. Copy to Clipboard (JSON)
-        actions.button(getLocalizedText("packloader.report.copy.clipboard"), Icon.copy, Styles.flatt, () -> {
+        var clipBtn = UIUtils.pad(actions.button(getLocalizedText("packloader.report.copy.clipboard"), Icon.copy, () -> {
             String json = ReportExporter.generateJson(model);
             if(Core.app != null){
                 Core.app.setClipboardText(json);
@@ -82,7 +86,9 @@ public class ExportReportDialog extends BaseDialog{
             if(Vars.ui != null){
                 Vars.ui.showInfoFade(getLocalizedText("packloader.report.copied"));
             }
-        }).row();
+        }).get());
+        if(clipBtn != null && clipBtn.getLabel() != null) clipBtn.getLabel().setWrap(false);
+        actions.row();
 
         root.add(actions).pad(8f).row();
 

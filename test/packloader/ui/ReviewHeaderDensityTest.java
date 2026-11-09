@@ -159,18 +159,18 @@ public class ReviewHeaderDensityTest{
         Table row2 = new Table();
         row2.setSize(800f, 36f);
 
-        // Smart selection buttons on left
+        // Selection & filter buttons on left, organized into functional groups
         TextButton allBtn = new TextButton("All");
+        TextButton noneBtn = new TextButton("None");
+        TextButton invertBtn = new TextButton("Invert");
         TextButton newBtn = new TextButton("New");
         TextButton uniqueBtn = new TextButton("Unique");
-        TextButton invertBtn = new TextButton("Invert");
-        TextButton noneBtn = new TextButton("None");
 
         row2.add(allBtn).height(30f).pad(1f);
+        row2.add(noneBtn).height(30f).pad(1f);
+        row2.add(invertBtn).height(30f).pad(1f);
         row2.add(newBtn).height(30f).pad(1f);
         row2.add(uniqueBtn).height(30f).pad(1f);
-        row2.add(invertBtn).height(30f).pad(1f);
-        row2.add(noneBtn).height(30f).pad(1f);
 
         row2.add().growX(); // spacer
 

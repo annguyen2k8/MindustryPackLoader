@@ -155,17 +155,23 @@ public class DryRunDialog extends BaseDialog{
 
         // Bottom Action buttons
         buttons.clear();
-        UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, this::hide)
+        var backBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, this::hide)
             .size(Vars.mobile ? 140f : 180f, 60f).get());
+        if(backBtn != null && backBtn.getLabel() != null){
+            backBtn.getLabel().setWrap(false);
+        }
 
         if(Vars.mobile){
             buttons.button(Icon.export, Styles.flati, () -> {
                 new ExportReportDialog(ReportExporter.createFromDryRunPlan(plan, null)).show();
             }).size(60f, 60f).pad(4f);
         }else{
-            UIUtils.pad(buttons.button(getLocalizedText("packloader.report.button.plan"), Icon.export, () -> {
+            var exportBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.report.button.plan"), Icon.export, () -> {
                 new ExportReportDialog(ReportExporter.createFromDryRunPlan(plan, null)).show();
             }).size(170f, 60f).pad(4f).get());
+            if(exportBtn != null && exportBtn.getLabel() != null){
+                exportBtn.getLabel().setWrap(false);
+            }
         }
 
         var confirmBtn = UIUtils.pad(buttons.button(
@@ -177,6 +183,9 @@ public class DryRunDialog extends BaseDialog{
         ).size(Vars.mobile ? 180f : 240f, 60f).get());
         if(confirmBtn != null){
             confirmBtn.setDisabled(plan.totalSelected == 0);
+            if(confirmBtn.getLabel() != null){
+                confirmBtn.getLabel().setWrap(false);
+            }
         }
     }
 

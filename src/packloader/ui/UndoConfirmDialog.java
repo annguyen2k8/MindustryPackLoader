@@ -146,8 +146,11 @@ public class UndoConfirmDialog extends BaseDialog{
 
         // Bottom Action buttons
         buttons.clear();
-        UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, this::hide)
+        var backBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, this::hide)
             .size(Vars.mobile ? 140f : 180f, 60f).get());
+        if(backBtn != null && backBtn.getLabel() != null){
+            backBtn.getLabel().setWrap(false);
+        }
 
         var confirmBtn = UIUtils.pad(buttons.button(
             getLocalizedText("packloader.undo.confirm"),
@@ -159,6 +162,9 @@ public class UndoConfirmDialog extends BaseDialog{
         ).size(Vars.mobile ? 180f : 240f, 60f).get());
         if(confirmBtn != null){
             confirmBtn.setDisabled(!ver.canUndoAny());
+            if(confirmBtn.getLabel() != null){
+                confirmBtn.getLabel().setWrap(false);
+            }
         }
     }
 

@@ -256,4 +256,44 @@ public class BorderlessFlatRefinementTest{
         PackLoaderDialog dialog = new PackLoaderDialog();
         assertNotNull(dialog);
     }
+
+    @Test
+    public void testImportProgressIsSingleLineWithoutFileName(){
+        // English check
+        TestHelper.initBundle(Locale.ENGLISH);
+        String enDetail = packloader.util.Localization.getLocalizedText("packloader.import.progress.detail", 41, 845, 41, 0);
+        assertFalse(enDetail.contains("\n"), "Import progress must NOT contain newlines: " + enDetail);
+        assertFalse(enDetail.contains("File:"), "Import progress must NOT contain 'File:': " + enDetail);
+        assertTrue(enDetail.contains("41/845"), "Must contain progress ratio");
+        assertTrue(enDetail.contains("Success: 41"), "Must contain success count");
+        assertTrue(enDetail.contains("Failed: 0"), "Must contain failed count");
+
+        // Vietnamese check
+        TestHelper.initBundle(new Locale("vi"));
+        String viDetail = packloader.util.Localization.getLocalizedText("packloader.import.progress.detail", 41, 845, 41, 0);
+        assertFalse(viDetail.contains("\n"), "Import progress (vi) must NOT contain newlines: " + viDetail);
+        assertFalse(viDetail.contains("Tệp:"), "Import progress (vi) must NOT contain 'Tệp:': " + viDetail);
+        assertTrue(viDetail.contains("41/845"), "Must contain progress ratio");
+        assertTrue(viDetail.contains("Thành công: 41"), "Must contain success count");
+        assertTrue(viDetail.contains("Lỗi: 0"), "Must contain failed count");
+    }
+
+    @Test
+    public void testSelectionToolbarConciseLabels(){
+        TestHelper.initBundle(Locale.ENGLISH);
+        assertEquals("All", Core.bundle.get("packloader.select.all"));
+        assertEquals("None", Core.bundle.get("packloader.select.none"));
+        assertEquals("Invert", Core.bundle.get("packloader.select.invert"));
+        assertEquals("New", Core.bundle.get("packloader.select.new"));
+        assertEquals("Unique", Core.bundle.get("packloader.select.unique"));
+        assertEquals("Details", Core.bundle.get("packloader.meta.details"));
+
+        TestHelper.initBundle(new Locale("vi"));
+        assertEquals("Tất cả", Core.bundle.get("packloader.select.all"));
+        assertEquals("Bỏ chọn", Core.bundle.get("packloader.select.none"));
+        assertEquals("Đảo chọn", Core.bundle.get("packloader.select.invert"));
+        assertEquals("Mới", Core.bundle.get("packloader.select.new"));
+        assertEquals("Độc nhất", Core.bundle.get("packloader.select.unique"));
+        assertEquals("Chi tiết", Core.bundle.get("packloader.meta.details"));
+    }
 }

@@ -41,7 +41,10 @@ public class SchematicInfoDialog extends BaseDialog{
     public void show(PackEntry entry){
         cont.clear();
         buttons.clearChildren();
-        buttons.button("@back", Icon.left, this::hide).size(180f, 54f).pad(4f);
+        var backBtn = UIUtils.pad(buttons.button("@back", Icon.left, this::hide).size(180f, 54f).pad(4f).get());
+        if(backBtn != null && backBtn.getLabel() != null){
+            backBtn.getLabel().setWrap(false);
+        }
 
         if(entry == null){
             super.show();
@@ -170,12 +173,15 @@ public class SchematicInfoDialog extends BaseDialog{
         // Direct Placement button in game
         if(Vars.state != null && Vars.state.isGame()){
             final Schematic targetSchematic = s;
-            buttons.button(getLocalizedText("packloader.action.place"), Icon.paste, () -> {
+            var placeBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.action.place"), Icon.paste, () -> {
                 boolean placed = SchematicPlacementHelper.placeSchematic(entry, () -> {
                     hide();
                     if(onPlacedCallback != null) onPlacedCallback.run();
                 });
-            }).size(180f, 54f).pad(4f);
+            }).size(180f, 54f).pad(4f).get());
+            if(placeBtn != null && placeBtn.getLabel() != null){
+                placeBtn.getLabel().setWrap(false);
+            }
         }
 
         super.show();

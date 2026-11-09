@@ -763,7 +763,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         row1.add(conflictBox).right().padLeft(8f).padRight(4f);
         cont.add(row1).growX().pad(2f, 4f, 2f, 4f).row();
 
-        // Row 2: Selection & Filter Toolbar (Left) + Live Dry-Run Preview Summary (Right)
+        // Row 2: Selection & Filter Toolbar (Left) + Live Dry-Run Outcome Breakdown (Right)
         Table row2 = new Table();
         row2.margin(2f);
         row2.defaults().pad(2f);
@@ -786,7 +786,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             }).checked(b -> filterMode == FilterMode.SCHEMATICS).height(30f).padRight(2f);
         }
 
-        // Smart selection buttons (compact height 30f)
+        // --- Group 1: Bulk Selection (All, None, Invert) ---
         var selectAllBtn = UIUtils.pad(row2.button(
             getLocalizedText("packloader.select.all"),
             Icon.ok, Styles.flatt, () -> {
@@ -798,6 +798,32 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             if(selectAllBtn.getLabel() != null) selectAllBtn.getLabel().setWrap(false);
         }
 
+        var deselectBtn = UIUtils.pad(row2.button(
+            getLocalizedText("packloader.select.none"),
+            Icon.cancel, Styles.flatt, () -> {
+                EntryFilter.setVisibleSelected(entries, targetType, filterType(), searchText, false);
+                rebuildEntriesList();
+            }).height(30f).pad(1f).get());
+        if(deselectBtn != null){
+            deselectBtn.margin(3f, 6f, 3f, 6f);
+            if(deselectBtn.getLabel() != null) deselectBtn.getLabel().setWrap(false);
+        }
+
+        var invertBtn = UIUtils.pad(row2.button(
+            getLocalizedText("packloader.select.invert"),
+            Icon.refresh, Styles.flatt, () -> {
+                EntryFilter.invertVisibleSelected(entries, targetType, filterType(), searchText);
+                rebuildEntriesList();
+            }).height(30f).pad(1f).get());
+        if(invertBtn != null){
+            invertBtn.margin(3f, 6f, 3f, 6f);
+            if(invertBtn.getLabel() != null) invertBtn.getLabel().setWrap(false);
+        }
+
+        // Native Mindustry visual divider between Selection and Smart Filter groups
+        row2.image().color(Pal.gray).width(1f).height(18f).pad(0f, 4f, 0f, 4f);
+
+        // --- Group 2: Smart Selection (New, Unique) ---
         var selectNewBtn = UIUtils.pad(row2.button(
             getLocalizedText("packloader.select.new"),
             Icon.add, Styles.flatt, () -> {
@@ -820,28 +846,10 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             if(selectUniqueBtn.getLabel() != null) selectUniqueBtn.getLabel().setWrap(false);
         }
 
-        var invertBtn = UIUtils.pad(row2.button(
-            getLocalizedText("packloader.select.invert"),
-            Icon.refresh, Styles.flatt, () -> {
-                EntryFilter.invertVisibleSelected(entries, targetType, filterType(), searchText);
-                rebuildEntriesList();
-            }).height(30f).pad(1f).get());
-        if(invertBtn != null){
-            invertBtn.margin(3f, 6f, 3f, 6f);
-            if(invertBtn.getLabel() != null) invertBtn.getLabel().setWrap(false);
-        }
+        // Native Mindustry visual divider between Smart Filter and View options
+        row2.image().color(Pal.gray).width(1f).height(18f).pad(0f, 4f, 0f, 4f);
 
-        var deselectBtn = UIUtils.pad(row2.button(
-            getLocalizedText("packloader.select.none"),
-            Icon.cancel, Styles.flatt, () -> {
-                EntryFilter.setVisibleSelected(entries, targetType, filterType(), searchText, false);
-                rebuildEntriesList();
-            }).height(30f).pad(1f).get());
-        if(deselectBtn != null){
-            deselectBtn.margin(3f, 6f, 3f, 6f);
-            if(deselectBtn.getLabel() != null) deselectBtn.getLabel().setWrap(false);
-        }
-
+        // --- Group 3: View Toggle (Details) ---
         var metaToggleBtn = UIUtils.pad(row2.button(
             getLocalizedText("packloader.meta.details"),
             Icon.list, Styles.flatTogglet, () -> {
@@ -853,18 +861,25 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             if(metaToggleBtn.getLabel() != null) metaToggleBtn.getLabel().setWrap(false);
         }
 
-        row2.add().growX(); // Spacer pushes Live Dry-Run summary to the right
-
-        // Live Dry-Run Preview Summary (Right)
-        Table summaryBox = new Table(UIUtils.flatPane());
+        // --- Live Dry-Run Outcome Breakdown ---
+        Button summaryBox = new Button(Styles.flatt);
         summaryBox.margin(3f, 8f, 3f, 8f);
+        summaryBox.clicked(this::showDryRunDialog);
         summaryBox.image(Icon.eye).size(16f).color(Pal.accent).padRight(4f);
         DryRunPlan initialPlan = calculateDryRunPlan();
         previewSummaryLabel = summaryBox.add(formatDryRunSummary(initialPlan))
             .color(Pal.lightishGray).style(Styles.outlineLabel).left().get();
 
-        row2.add(summaryBox).right().padLeft(6f);
-        cont.add(row2).growX().pad(2f, 4f, 4f, 4f).row();
+        if(Vars.mobile){
+            cont.add(row2).growX().pad(2f, 4f, 2f, 4f).row();
+            Table summaryRow = new Table();
+            summaryRow.add(summaryBox).center();
+            cont.add(summaryRow).growX().pad(0f, 4f, 4f, 4f).row();
+        }else{
+            row2.add().growX(); // Spacer pushes Live Dry-Run outcome breakdown to the right
+            row2.add(summaryBox).right().padLeft(6f);
+            cont.add(row2).growX().pad(2f, 4f, 4f, 4f).row();
+        }
 
         // Scrollable Entries List Container
         cont.table(this::buildListTable).grow().minWidth(0f).pad(4f).name("listContainer").row();
@@ -1283,11 +1298,8 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         if(!finished && now - lastImportProgressPost < 80L) return;
         lastImportProgressPost = now;
 
-        String current = progress.currentFile == null || progress.currentFile.isEmpty() ?
-            getLocalizedText("packloader.import.finishing") :
-            truncateFileName(progress.currentFile, 36);
         Vars.ui.loadfrag.setText(getLocalizedText("packloader.import.progress.detail",
-            current, progress.processed, progress.total, progress.success, progress.failed));
+            progress.processed, progress.total, progress.success, progress.failed));
 
         float value = progress.total <= 0 ? 0f :
             Math.min(1f, progress.processed / (float)progress.total);

@@ -85,7 +85,7 @@ public class BundleTest{
         String renamed = Core.bundle.format("packloader.result.msg.renamed", "map_1.msav");
         assertEquals("Renamed to: map_1.msav", renamed);
 
-        assertEquals("Report a Bug", Core.bundle.get("packloader.bug.report"));
+        assertEquals("Report Bug", Core.bundle.get("packloader.bug.report"));
         assertEquals("Welcome to PackLoader", Core.bundle.get("packloader.welcome.title"));
         assertEquals("Info", Core.bundle.get("packloader.action.info"));
         assertEquals("Place in World", Core.bundle.get("packloader.action.place"));
@@ -302,14 +302,14 @@ public class BundleTest{
         // 1. English format test
         TestHelper.initBundle(Locale.ENGLISH);
         String enDetail = packloader.util.Localization.getLocalizedText("packloader.import.progress.detail",
-            "test.msch", 10, 50, 9, 1);
+            10, 50, 9, 1);
         assertNotNull(enDetail);
         assertFalse(enDetail.isEmpty());
 
         // 2. Vietnamese format test
         TestHelper.initBundle(new Locale("vi"));
         String viDetail = packloader.util.Localization.getLocalizedText("packloader.import.progress.detail",
-            "test.msch", 10, 50, 9, 1);
+            10, 50, 9, 1);
         assertNotNull(viDetail);
         assertFalse(viDetail.isEmpty());
 
