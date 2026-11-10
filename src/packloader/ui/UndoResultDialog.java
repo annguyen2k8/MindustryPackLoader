@@ -58,13 +58,12 @@ public class UndoResultDialog extends BaseDialog{
 
         // Close button
         buttons.clear();
-        var closeBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.welcome.close"), Icon.ok, () -> {
+        boolean isCompact = UIUtils.isCompact();
+        var closeBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.welcome.close"), Icon.ok, () -> {
             hide();
             if(onClosed != null) onClosed.run();
-        }).size(Vars.mobile ? 160f : 200f, 54f).get());
-        if(closeBtn != null && closeBtn.getLabel() != null){
-            closeBtn.getLabel().setWrap(false);
-        }
+        }).size(isCompact ? 180f : 210f, UIUtils.buttonHeight()).get());
+        addCloseListener();
     }
 
     private void addStatCard(Table parent, String label, int count, Color color){

@@ -161,74 +161,123 @@ public class PackResultDialog extends BaseDialog{
         buttons.clear();
         buttons.defaults().pad(4f);
 
-        // Left Action: Close (Dismissive)
-        var closeBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.result.close"), Icon.cancel, this::hide)
-            .size(Vars.mobile ? 100f : 120f, 54f).get());
-        if(closeBtn != null && closeBtn.getLabel() != null){
-            closeBtn.getLabel().setWrap(false);
-        }
-        addCloseListener();
+        boolean isPortraitMobile = Vars.mobile && UIUtils.isPortrait();
 
-        // On Desktop with primary CTA, push primary actions to the right
-        boolean hasCta = report.hasSuccess() && (
-            (report.results.contains(r -> r.entry.type == PackType.MAP && r.destinationFile != null) && Vars.ui != null && Vars.ui.custom != null) ||
-            (report.results.contains(r -> r.entry.type == PackType.SCHEMATIC && r.destinationFile != null) && Vars.ui != null && Vars.ui.schematics != null)
-        );
-        if(!Vars.mobile && hasCta){
-            buttons.add().growX();
-        }
+        if(isPortraitMobile){
+            // Mobile Portrait: Row 1 Close + Export (+ Undo)
+            var closeBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.result.close"), Icon.cancel, this::hide)
+                .growX().height(56f).get());
 
-        // Export (Utility / Secondary)
-        if(Vars.mobile){
             buttons.button(Icon.export, () -> {
                 new ExportReportDialog(ReportExporter.createFromImportReport(report, null)).show();
-            }).size(48f, 54f);
+            }).size(56f, 56f);
+
+            if(report.transaction != null && report.transaction.getActiveItemCount() > 0 && !report.transaction.undone){
+                var undoBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.undo.button"), Icon.undo, () -> {
+                    new UndoConfirmDialog(undoManager, report.transaction, this::hide).show();
+                }).growX().height(56f).get());
+                if(undoBtn != null && undoBtn.getLabel() != null){
+                    undoBtn.getLabel().setColor(Color.orange);
+                }
+            }
+
+            // Row 2: Primary CTA (Open Schematics / Open Custom Game)
+            if(report.hasSuccess()){
+                boolean hasMaps = report.results.contains(r -> r.entry.type == PackType.MAP && r.destinationFile != null);
+                boolean hasSchems = report.results.contains(r -> r.entry.type == PackType.SCHEMATIC && r.destinationFile != null);
+                boolean canOpenMaps = hasMaps && Vars.ui != null && Vars.ui.custom != null;
+                boolean canOpenSchems = hasSchems && Vars.ui != null && Vars.ui.schematics != null;
+
+                if(canOpenMaps || canOpenSchems){
+                    buttons.row();
+                    int ctaColspan = (report.transaction != null && report.transaction.getActiveItemCount() > 0 && !report.transaction.undone) ? 3 : 2;
+
+                    if(canOpenMaps && !canOpenSchems){
+                        var openMapsBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.result.open.custom"), Icon.terrain, () -> {
+                            hide();
+                            Vars.ui.custom.show();
+                        }).growX().colspan(ctaColspan).height(64f).get());
+                        if(openMapsBtn != null && openMapsBtn.getLabel() != null){
+                            openMapsBtn.getLabel().setColor(Pal.accent);
+                        }
+                    }else if(canOpenSchems && !canOpenMaps){
+                        var openSchemsBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.result.open.schematics"), Icon.paste, () -> {
+                            hide();
+                            Vars.ui.schematics.show();
+                        }).growX().colspan(ctaColspan).height(64f).get());
+                        if(openSchemsBtn != null && openSchemsBtn.getLabel() != null){
+                            openSchemsBtn.getLabel().setColor(Pal.accent);
+                        }
+                    }else if(canOpenMaps && canOpenSchems){
+                        var openMapsBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.result.open.custom"), Icon.terrain, () -> {
+                            hide();
+                            Vars.ui.custom.show();
+                        }).growX().height(64f).get());
+                        if(openMapsBtn != null && openMapsBtn.getLabel() != null){
+                            openMapsBtn.getLabel().setColor(Pal.accent);
+                        }
+
+                        var openSchemsBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.result.open.schematics"), Icon.paste, () -> {
+                            hide();
+                            Vars.ui.schematics.show();
+                        }).growX().height(64f).get());
+                        if(openSchemsBtn != null && openSchemsBtn.getLabel() != null){
+                            openSchemsBtn.getLabel().setColor(Pal.accent);
+                        }
+                    }
+                }
+            }
         }else{
-            var exportBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.report.button.export"), Icon.export, () -> {
-                new ExportReportDialog(ReportExporter.createFromImportReport(report, null)).show();
-            }).size(120f, 54f).get());
-            if(exportBtn != null && exportBtn.getLabel() != null){
-                exportBtn.getLabel().setWrap(false);
+            // Desktop & Landscape: Standard single-row action bar
+            var closeBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.result.close"), Icon.cancel, this::hide)
+                .size(180f, 64f).get());
+
+            if(Vars.mobile){
+                buttons.button(Icon.export, () -> {
+                    new ExportReportDialog(ReportExporter.createFromImportReport(report, null)).show();
+                }).size(64f, 64f);
+            }else{
+                var exportBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.report.button.export"), Icon.export, () -> {
+                    new ExportReportDialog(ReportExporter.createFromImportReport(report, null)).show();
+                }).size(160f, 64f).get());
             }
-        }
 
-        // Undo (Safety / Warning action, shown only when transaction is reversible)
-        if(report.transaction != null && report.transaction.getActiveItemCount() > 0 && !report.transaction.undone){
-            var undoBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.undo.button"), Icon.undo, () -> {
-                new UndoConfirmDialog(undoManager, report.transaction, this::hide).show();
-            }).size(Vars.mobile ? 100f : 110f, 54f).get());
-            if(undoBtn != null && undoBtn.getLabel() != null){
-                undoBtn.getLabel().setColor(Color.orange);
-                undoBtn.getLabel().setWrap(false);
-            }
-        }
-
-        // Primary CTA: Open Schematics / Open Custom Game (Tier 1)
-        if(report.hasSuccess()){
-            boolean hasMaps = report.results.contains(r -> r.entry.type == PackType.MAP && r.destinationFile != null);
-            boolean hasSchems = report.results.contains(r -> r.entry.type == PackType.SCHEMATIC && r.destinationFile != null);
-
-            if(hasMaps && Vars.ui != null && Vars.ui.custom != null){
-                var openMapsBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.result.open.custom"), Icon.terrain, () -> {
-                    hide();
-                    Vars.ui.custom.show();
-                }).size(Vars.mobile ? 120f : 140f, 54f).get());
-                if(openMapsBtn != null && openMapsBtn.getLabel() != null){
-                    openMapsBtn.getLabel().setColor(Pal.accent);
-                    openMapsBtn.getLabel().setWrap(false);
+            if(report.transaction != null && report.transaction.getActiveItemCount() > 0 && !report.transaction.undone){
+                var undoBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.undo.button"), Icon.undo, () -> {
+                    new UndoConfirmDialog(undoManager, report.transaction, this::hide).show();
+                }).size(160f, 64f).get());
+                if(undoBtn != null && undoBtn.getLabel() != null){
+                    undoBtn.getLabel().setColor(Color.orange);
                 }
             }
 
-            if(hasSchems && Vars.ui != null && Vars.ui.schematics != null){
-                var openSchemsBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.result.open.schematics"), Icon.paste, () -> {
-                    hide();
-                    Vars.ui.schematics.show();
-                }).size(Vars.mobile ? 120f : 140f, 54f).get());
-                if(openSchemsBtn != null && openSchemsBtn.getLabel() != null){
-                    openSchemsBtn.getLabel().setColor(Pal.accent);
-                    openSchemsBtn.getLabel().setWrap(false);
+            buttons.add().growX();
+
+            if(report.hasSuccess()){
+                boolean hasMaps = report.results.contains(r -> r.entry.type == PackType.MAP && r.destinationFile != null);
+                boolean hasSchems = report.results.contains(r -> r.entry.type == PackType.SCHEMATIC && r.destinationFile != null);
+
+                if(hasMaps && Vars.ui != null && Vars.ui.custom != null){
+                    var openMapsBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.result.open.custom"), Icon.terrain, () -> {
+                        hide();
+                        Vars.ui.custom.show();
+                    }).size(200f, 64f).get());
+                    if(openMapsBtn != null && openMapsBtn.getLabel() != null){
+                        openMapsBtn.getLabel().setColor(Pal.accent);
+                    }
+                }
+
+                if(hasSchems && Vars.ui != null && Vars.ui.schematics != null){
+                    var openSchemsBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.result.open.schematics"), Icon.paste, () -> {
+                        hide();
+                        Vars.ui.schematics.show();
+                    }).size(200f, 64f).get());
+                    if(openSchemsBtn != null && openSchemsBtn.getLabel() != null){
+                        openSchemsBtn.getLabel().setColor(Pal.accent);
+                    }
                 }
             }
         }
+        addCloseListener();
     }
 }

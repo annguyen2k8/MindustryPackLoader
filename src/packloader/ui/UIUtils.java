@@ -1,16 +1,48 @@
 package packloader.ui;
 
+import arc.Core;
 import arc.scene.style.Drawable;
 import arc.scene.ui.Button;
 import arc.scene.ui.CheckBox;
 import arc.scene.ui.TextButton;
 import arc.util.Scaling;
 import arc.util.Strings;
+import mindustry.Vars;
 import mindustry.ui.Styles;
 
 /** UI helper methods for consistent Mindustry styling. */
 public final class UIUtils{
     private UIUtils(){}
+
+    /** Returns current virtual scene width in UI units (or fallback to graphics). */
+    public static float screenWidth(){
+        return Core.scene != null ? Core.scene.getWidth() : (Core.graphics != null ? Core.graphics.getWidth() : 800f);
+    }
+
+    /** Returns current virtual scene height in UI units (or fallback to graphics). */
+    public static float screenHeight(){
+        return Core.scene != null ? Core.scene.getHeight() : (Core.graphics != null ? Core.graphics.getHeight() : 600f);
+    }
+
+    /** Returns whether the device viewport is in portrait orientation. */
+    public static boolean isPortrait(){
+        return Core.graphics != null && Core.graphics.isPortrait();
+    }
+
+    /** Returns whether UI should adapt to compact screens (mobile, portrait, or narrow viewports). */
+    public static boolean isCompact(){
+        return Vars.mobile || isPortrait() || screenWidth() < 640f;
+    }
+
+    /** Native Mindustry standard dialog button height (64f). */
+    public static float buttonHeight(){
+        return 64f;
+    }
+
+    /** Compact dialog button height for multi-row mobile layouts (56f). */
+    public static float compactButtonHeight(){
+        return 56f;
+    }
 
     /** Native Mindustry button card style with bevel border and hover/pressed feedback. */
     public static Button.ButtonStyle cardStyle(){
@@ -60,6 +92,24 @@ public final class UIUtils{
     public static <T extends TextButton> T pad(T btn){
         if(btn != null && btn.getCells().size > 1){
             btn.getCells().get(0).padRight(6f);
+        }
+        return btn;
+    }
+
+    /**
+     * Styles and constrains a TextButton so its label never clips or spills outside the button boundaries.
+     * Enforces clean icon padding, single-line text layout, and graceful ellipsis truncation if bounds are tight.
+     */
+    public static <T extends TextButton> T fitButton(T btn){
+        if(btn != null){
+            pad(btn);
+            if(btn.getLabel() != null){
+                btn.getLabel().setWrap(false);
+                btn.getLabel().setEllipsis(true);
+            }
+            if(btn.getLabelCell() != null){
+                btn.getLabelCell().minWidth(0f);
+            }
         }
         return btn;
     }

@@ -42,7 +42,7 @@ public class MapInfoDialog extends BaseDialog{
 
         // Preview thumbnail image
         Table previewHolder = new Table();
-        float previewSize = Math.min(260f, Core.graphics != null ? Core.graphics.getWidth() * 0.7f : 260f);
+        float previewSize = Math.min(260f, UIUtils.screenWidth() * 0.7f);
         previewHolder.setSize(previewSize, previewSize);
 
         Texture tex = PreviewManager.getCachedTexture(entry);
@@ -72,7 +72,7 @@ public class MapInfoDialog extends BaseDialog{
         details.margin(12f);
         details.defaults().left().pad(3f);
 
-        float maxW = Math.min(Core.graphics != null ? Core.graphics.getWidth() * 0.85f : 440f, 440f);
+        float maxW = Math.min(UIUtils.screenWidth() * 0.85f, 440f);
 
         if(info != null && !info.author.isEmpty()){
             details.add(getLocalizedText("packloader.preview.author", info.author))

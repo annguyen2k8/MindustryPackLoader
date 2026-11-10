@@ -62,23 +62,21 @@ public class ExportReportDialog extends BaseDialog{
         actions.defaults().pad(5f).minHeight(56f).growX();
 
         // 1. Export as JSON
-        var jsonBtn = UIUtils.pad(actions.button(getLocalizedText("packloader.report.format.json"), Icon.download, () -> {
+        var jsonBtn = UIUtils.fitButton(actions.button(getLocalizedText("packloader.report.format.json"), Icon.download, () -> {
             String defaultName = ReportExporter.defaultReportFileName(model, "json");
             exportWithChooser(defaultName, "json", dest -> ReportExporter.writeJson(model, dest));
         }).get());
-        if(jsonBtn != null && jsonBtn.getLabel() != null) jsonBtn.getLabel().setWrap(false);
         actions.row();
 
         // 2. Export as CSV
-        var csvBtn = UIUtils.pad(actions.button(getLocalizedText("packloader.report.format.csv"), Icon.download, () -> {
+        var csvBtn = UIUtils.fitButton(actions.button(getLocalizedText("packloader.report.format.csv"), Icon.download, () -> {
             String defaultName = ReportExporter.defaultReportFileName(model, "csv");
             exportWithChooser(defaultName, "csv", dest -> ReportExporter.writeCsv(model, dest));
         }).get());
-        if(csvBtn != null && csvBtn.getLabel() != null) csvBtn.getLabel().setWrap(false);
         actions.row();
 
         // 3. Copy to Clipboard (JSON)
-        var clipBtn = UIUtils.pad(actions.button(getLocalizedText("packloader.report.copy.clipboard"), Icon.copy, () -> {
+        var clipBtn = UIUtils.fitButton(actions.button(getLocalizedText("packloader.report.copy.clipboard"), Icon.copy, () -> {
             String json = ReportExporter.generateJson(model);
             if(Core.app != null){
                 Core.app.setClipboardText(json);
@@ -87,12 +85,11 @@ public class ExportReportDialog extends BaseDialog{
                 Vars.ui.showInfoFade(getLocalizedText("packloader.report.copied"));
             }
         }).get());
-        if(clipBtn != null && clipBtn.getLabel() != null) clipBtn.getLabel().setWrap(false);
         actions.row();
 
         root.add(actions).pad(8f).row();
 
-        cont.add(root).width(Math.min(Core.graphics != null ? Core.graphics.getWidth() * 0.9f : 440f, 440f)).row();
+        cont.add(root).width(Math.min(UIUtils.screenWidth() * 0.9f, 440f)).row();
 
         addCloseButton();
     }

@@ -174,38 +174,56 @@ public class DryRunDialog extends BaseDialog{
         // Bottom Action buttons
         buttons.clear();
         buttons.defaults().pad(4f);
-        var backBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, this::hide)
-            .size(Vars.mobile ? 100f : 130f, 54f).get());
-        if(backBtn != null && backBtn.getLabel() != null){
-            backBtn.getLabel().setWrap(false);
-        }
 
-        if(Vars.mobile){
+        if(Vars.mobile && UIUtils.isPortrait()){
+            // Mobile Portrait: 2-row layout with comfortable targets and zero clipping
+            var backBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, this::hide)
+                .growX().height(56f).get());
+
             buttons.button(Icon.export, () -> {
                 new ExportReportDialog(ReportExporter.createFromDryRunPlan(plan, null)).show();
-            }).size(48f, 54f);
-        }else{
-            var exportBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.report.button.plan"), Icon.export, () -> {
-                new ExportReportDialog(ReportExporter.createFromDryRunPlan(plan, null)).show();
-            }).size(130f, 54f).get());
-            if(exportBtn != null && exportBtn.getLabel() != null){
-                exportBtn.getLabel().setWrap(false);
-            }
-        }
+            }).size(56f, 56f);
 
-        var confirmBtn = UIUtils.pad(buttons.button(
-            getLocalizedText("packloader.dryrun.button.confirm", plan.totalSelected),
-            Icon.download, () -> {
-                hide();
-                if(onConfirm != null) onConfirm.run();
+            buttons.row();
+
+            var confirmBtn = UIUtils.fitButton(buttons.button(
+                getLocalizedText("packloader.dryrun.button.confirm", plan.totalSelected),
+                Icon.download, () -> {
+                    hide();
+                    if(onConfirm != null) onConfirm.run();
+                }
+            ).growX().colspan(2).height(64f).get());
+            if(confirmBtn != null){
+                confirmBtn.setDisabled(plan.totalSelected == 0);
             }
-        ).size(Vars.mobile ? 140f : 180f, 54f).get());
-        if(confirmBtn != null){
-            confirmBtn.setDisabled(plan.totalSelected == 0);
-            if(confirmBtn.getLabel() != null){
-                confirmBtn.getLabel().setWrap(false);
+        }else{
+            var backBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, this::hide)
+                .size(180f, 64f).get());
+
+            if(Vars.mobile){
+                buttons.button(Icon.export, () -> {
+                    new ExportReportDialog(ReportExporter.createFromDryRunPlan(plan, null)).show();
+                }).size(64f, 64f);
+            }else{
+                var exportBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.report.button.plan"), Icon.export, () -> {
+                    new ExportReportDialog(ReportExporter.createFromDryRunPlan(plan, null)).show();
+                }).size(180f, 64f).get());
+            }
+
+            buttons.add().growX();
+
+            var confirmBtn = UIUtils.fitButton(buttons.button(
+                getLocalizedText("packloader.dryrun.button.confirm", plan.totalSelected),
+                Icon.download, () -> {
+                    hide();
+                    if(onConfirm != null) onConfirm.run();
+                }
+            ).size(220f, 64f).get());
+            if(confirmBtn != null){
+                confirmBtn.setDisabled(plan.totalSelected == 0);
             }
         }
+        addCloseListener();
     }
 
     private void addStatCard(Table parent, String label, int count, Color color){

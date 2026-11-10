@@ -41,10 +41,12 @@ public class SchematicInfoDialog extends BaseDialog{
     public void show(PackEntry entry){
         cont.clear();
         buttons.clearChildren();
-        var backBtn = UIUtils.pad(buttons.button("@back", Icon.left, this::hide).size(Vars.mobile ? 140f : 180f, 54f).pad(4f).get());
-        if(backBtn != null && backBtn.getLabel() != null){
-            backBtn.getLabel().setWrap(false);
-        }
+        boolean isCompact = UIUtils.isCompact();
+        float btnW = isCompact ? Math.min(210f, (UIUtils.screenWidth() - 36f) / 2f) : 210f;
+        float btnH = UIUtils.buttonHeight();
+
+        var backBtn = UIUtils.fitButton(buttons.button("@back", Icon.left, this::hide).size(btnW, btnH).pad(4f).get());
+        addCloseListener();
 
         if(entry == null){
             super.show();
@@ -67,7 +69,7 @@ public class SchematicInfoDialog extends BaseDialog{
 
         // Preview thumbnail image
         Table previewHolder = new Table();
-        float previewSize = Math.min(260f, Core.graphics != null ? Core.graphics.getWidth() * 0.7f : 260f);
+        float previewSize = Math.min(260f, UIUtils.screenWidth() * 0.7f);
         previewHolder.setSize(previewSize, previewSize);
 
         Texture tex = PreviewManager.getCachedTexture(entry);
@@ -97,7 +99,7 @@ public class SchematicInfoDialog extends BaseDialog{
         details.margin(12f);
         details.defaults().left().pad(3f);
 
-        float maxW = Math.min(Core.graphics != null ? Core.graphics.getWidth() * 0.85f : 440f, 440f);
+        float maxW = Math.min(UIUtils.screenWidth() * 0.85f, 440f);
 
         // Dimensions: W x H
         if(s.width > 0 && s.height > 0){
@@ -173,15 +175,12 @@ public class SchematicInfoDialog extends BaseDialog{
         // Direct Placement button in game
         if(Vars.state != null && Vars.state.isGame()){
             final Schematic targetSchematic = s;
-            var placeBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.action.place"), Icon.paste, () -> {
+            var placeBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.action.place"), Icon.paste, () -> {
                 boolean placed = SchematicPlacementHelper.placeSchematic(entry, () -> {
                     hide();
                     if(onPlacedCallback != null) onPlacedCallback.run();
                 });
-            }).size(Vars.mobile ? 140f : 180f, 54f).pad(4f).get());
-            if(placeBtn != null && placeBtn.getLabel() != null){
-                placeBtn.getLabel().setWrap(false);
-            }
+            }).size(btnW, btnH).pad(4f).get());
         }
 
         super.show();

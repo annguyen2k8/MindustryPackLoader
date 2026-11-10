@@ -206,7 +206,9 @@ public class PackLoaderMod extends Mod{
         if(table == null || table.find(zipName) != null) return;
 
         table.row();
-        UIUtils.pad(table.button(zipText, zipIcon, zipAction).size(210f, 64f).name(zipName).get());
-        UIUtils.pad(table.button(folderText, folderIcon, folderAction).size(210f, 64f).name(folderName).get());
+        boolean isMobilePortrait = Vars.mobile && UIUtils.isPortrait();
+        float btnW = isMobilePortrait ? Math.min(210f, (UIUtils.screenWidth() - 36f) / 2f) : 210f;
+        UIUtils.fitButton(table.button(zipText, zipIcon, zipAction).size(btnW, 64f).name(zipName).get());
+        UIUtils.fitButton(table.button(folderText, folderIcon, folderAction).size(btnW, 64f).name(folderName).get());
     }
 }

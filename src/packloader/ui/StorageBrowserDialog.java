@@ -103,11 +103,13 @@ public class StorageBrowserDialog extends BaseDialog{
         background(UIUtils.solidBackground());
 
         buttons.clear();
-        buttons.defaults().size(Vars.mobile ? 140f : 210f, Vars.mobile ? 54f : 64f).pad(4f);
-        UIUtils.pad(buttons.button("@back", Icon.left, this::hide).get());
+        boolean isCompact = UIUtils.isCompact();
+        float btnW = isCompact ? Math.min(210f, (UIUtils.screenWidth() - 36f) / 2f) : 210f;
+        buttons.defaults().size(btnW, UIUtils.buttonHeight()).pad(4f);
+        UIUtils.fitButton(buttons.button("@back", Icon.left, this::hide).get());
         addCloseListener();
 
-        selectFolderButton = UIUtils.pad(buttons.button(getLocalizedText("packloader.browser.select.folder"), Icon.ok, () -> {
+        selectFolderButton = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.browser.select.folder"), Icon.ok, () -> {
             Fi chosen = selectedDirectory != null ? selectedDirectory : currentDirectory;
             hide();
             if(onFolderSelected != null && chosen != null){
