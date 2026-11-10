@@ -3,20 +3,21 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-10 20:55 +07:00
+- **Last updated:** 2026-11-10 21:05 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** Restore "Bug Report" button with text and link icon; completely eliminate the review view and streamline direct pack import.
+- **Task:** Restore full Review feature (View 2, entry table, DryRunDialog, configure conflict policy & skip identical content before import) while retaining native Bug Report button and responsive layout.
 - **Branch:** dev; upstream origin/dev.
 
 ## Results
 
-- [verified] Restored "Bug Report" Button with Native Mindustry Conventions:
-  - In `buildModeSelection` and `buildSourceSelection`, replaced the mobile icon-only button with full text button with link icon: `buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> Core.app.openURI(ISSUES_URL))`.
-  - Added responsive layout: on compact/mobile screens, Close/Back (140f) on left, Bug Report (140f) on right. When undo exists, Undo button spans row 2 cleanly (288f) without horizontal clipping.
-- [verified] Completely Eliminated the Review View:
-  - Removed `buildEntriesView()`, `buildListTable()`, `populateListTable()`, `formatDryRunSummary()`, and `DryRunDialog.java`.
-  - Removed the obsolete "Quick Import: Skip review and auto-import after scan" toggle; conflict policy selection and "Skip identical content" checkbox are now directly and permanently accessible on the selection screen.
-  - Streamlined `scanAsync`: scanning directly executes `executeImport()`, writing staged files atomically to game directories and immediately presenting `PackResultDialog`.
+- [verified] Full Review Feature & Workflow Restored:
+  - Restored `DryRunDialog.java` and all Review UI methods in `PackLoaderDialog.java` (`buildEntriesView()`, `buildListTable()`, `populateListTable()`, `formatDryRunSummary()`, `calculateDryRunPlan()`, etc.).
+  - Restored proper workflow: Scan → Review (View 2) → Configure Import → Execute Import → PackResultDialog.
+  - Eliminated auto-import after scan: scanning always navigates to Review view, allowing user inspection of items, duplicate badges, file details, and placement.
+  - Enhanced Review View controls: users can dynamically configure conflict policy (`On conflict: [Skip] [Overwrite] [Rename]`) and toggle `Skip identical content` directly inside View 2, with immediate live Dry-Run recalculation.
+- [verified] Retained Bug Report Text & Responsive Layout:
+  - Preserved full text button with link icon `Icon.link` across all dialog views (`Close`/`Back` on left, `Bug Report` on right on mobile).
+  - Preserved responsive 2-row layout when undo transactions exist on mobile screens.
 - [verified] Test Suite & Build Verification:
   - `./gradlew test --rerun`: 251/251 tests pass 100%.
   - `./gradlew verifyJar`: Desktop JAR bundle verification passed.
