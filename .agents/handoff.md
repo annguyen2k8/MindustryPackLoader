@@ -3,30 +3,24 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-10 14:02 +07:00
+- **Last updated:** 2026-11-10 14:27 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** Resolve Android SAF Virtual URI Path Resolution and Recent Sources Sanitization.
+- **Task:** Resolve Android Scoped Storage EACCES read failure on active SAF streams.
 - **Branch:** dev; upstream origin/dev.
 
 ## Results
 
-- [verified] Android SAF virtual URI path resolution (`StorageSources.resolveFi` & `resolvePath`):
-  - Automatically translates Android SAF document URIs (e.g. `/document/primary:mindustry-data-export.zip`, `/tree/primary:...`, `primary:...`, `raw:...`, `content://...`, `%3A` percent-encoded URIs, and SD card UUID patterns `1234-5678:...`) to physical filesystem paths (`/storage/emulated/0/...`, `/sdcard/...`).
-  - Includes smart fallback check into `Download/` subdirectories.
-- [verified] Recent Sources sanitization and backward compatibility:
-  - Sanitizes display names (`StorageSources.sanitizeSourceName`) removing ugly `primary:` prefix (e.g. `primary:mindustry-data-export.zip` -> `mindustry-data-export.zip`).
-  - `RecentSources.add` and `RecentSources.load` automatically resolve virtual SAF paths to physical files and re-persist clean entries.
-  - Clicking Recent Sources cards now resolves via `StorageSources.resolveFi`, eliminating the "Path not found: /document/primary:..." error popup and preventing unwarranted deletion from history.
-- [verified] Performance and zero-copy ZipFile scanning:
-  - `PackLoaderDialog.scanAsync` resolves virtual SAF inputs to physical files before starting the worker thread.
-  - `PackScanner.resolveZip` uses the resolved physical file directly with `java.util.zip.ZipFile`, avoiding copying 40MB+ archives into temporary cache files.
-- [verified] Automated Test Suite:
-  - Added unit tests `testIsVirtualSafPath()`, `testTranslateVirtualPath()`, `testSanitizeSourceName()` in `StorageSourcesTest`.
-  - Added unit tests `testVirtualSafNameSanitizedOnAdd()`, `testLegacyVirtualSafEntryMigrationOnLoad()` in `RecentSourcesTest`.
-  - Total 249 tests passing via `./gradlew test`.
-- [verified] Universal & Desktop JAR builds:
-  - `./gradlew jar verifyJar` -> BUILD SUCCESSFUL.
-  - `./gradlew deploy` -> BUILD SUCCESSFUL; copied to `/sdcard/Download/MindustryPackLoader.jar` for direct on-device testing.
+- [verified] Active SAF Stream Protection against Scoped Storage EACCES:
+  - Added `StorageSources.canReadDirectly(Fi fi)` and `canReadDirectly(String path)`: rigorously verifies that a physical file can actually be opened by Java `FileInputStream` rather than merely checking `File.exists()`.
+  - On Android 11+, raw POSIX access to `/storage/emulated/0/...` is restricted by Scoped Storage (`EACCES Permission denied`). `resolveFi` now verifies direct readability before returning a POSIX `Fi`.
+  - In `PackLoaderDialog.scanAsync`: active SAF streams (`AndroidLauncher$1$2`) are preserved intact when the POSIX file cannot be read directly, allowing the stream to be materialized via `ContentResolver.openInputStream(uri)` without triggering `"Failed to materialize ZIP from SAF: Error reading file (absolute)"`.
+- [verified] Safe Recent Sources Reselection on Android Mobile:
+  - When clicking a Recent Source card that was selected via SAF and cannot be read via POSIX due to Scoped Storage, PackLoader now prompts the user with a friendly re-select confirmation dialog rather than failing with a raw error or deleting the item from history.
+  - Added localized strings for `packloader.recent.saf-reselect.title` and `packloader.recent.saf-reselect.prompt` in both English and Vietnamese.
+- [verified] Automated Test Suite & Packaging:
+  - Total 250 tests passing via `./gradlew test`.
+  - Packaging verified via `./gradlew jar verifyJar`.
+  - Android universal JAR deployed to `/sdcard/Download/MindustryPackLoader.jar` via `./gradlew deploy`.
 
 ## Remaining
 
