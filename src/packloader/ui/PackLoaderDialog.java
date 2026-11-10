@@ -292,7 +292,9 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         ScrollPane pane = new ScrollPane(root);
         pane.setScrollingDisabled(true, false);
         pane.setFadeScrollBars(false);
-        cont.add(pane).grow().pad(4f).row();
+        cont.add().growY().minHeight(0f).row();
+        cont.add(pane).growX().maxHeight(UIUtils.screenHeight() * 0.72f).pad(4f).row();
+        cont.add().growY().minHeight(0f).row();
 
         buttons.clear();
         buttons.defaults().pad(4f);
@@ -412,7 +414,9 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         ScrollPane pane = new ScrollPane(root);
         pane.setScrollingDisabled(true, false);
         pane.setFadeScrollBars(false);
-        cont.add(pane).grow().pad(4f).row();
+        cont.add().growY().minHeight(0f).row();
+        cont.add(pane).growX().maxHeight(UIUtils.screenHeight() * 0.72f).pad(4f).row();
+        cont.add().growY().minHeight(0f).row();
 
         buttons.clear();
         buttons.defaults().pad(4f);
@@ -537,7 +541,11 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         btn.table(t -> {
             t.left().defaults().left().growX();
             t.add(title).style(Styles.defaultLabel).color(Color.white).ellipsis(true).growX().minWidth(0f).padBottom(3f).row();
-            t.add(desc).style(Styles.defaultLabel).color(Pal.lightishGray).wrap().growX().minWidth(0f);
+            Label descLabel = new Label(desc, Styles.defaultLabel);
+            descLabel.setColor(Pal.lightishGray);
+            descLabel.setWrap(true);
+            descLabel.setEllipsis(false);
+            t.add(descLabel).growX().minWidth(0f);
         }).growX().left();
 
         return btn;
@@ -774,31 +782,32 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         }
 
         if(Vars.mobile){
-            // Row 1a (Mobile): Search Bar takes full width
-            Table searchRow = new Table(UIUtils.flatPane());
-            searchRow.margin(4f, 8f, 4f, 8f);
-            searchRow.image(Icon.zoom).size(20f).color(Pal.accent).padLeft(6f).padRight(6f);
+            // Mobile: Unified compact toolbar card containing Search Bar and Conflict Policy
+            Table controlsCard = new Table(UIUtils.flatPane());
+            controlsCard.margin(4f, 8f, 4f, 8f);
+
+            // Row 1a (Mobile): Search Bar
+            Table searchBar = new Table();
+            searchBar.image(Icon.zoom).size(20f).color(Pal.accent).padLeft(4f).padRight(6f);
             TextField searchField = new TextField(searchText);
             searchField.setMessageText(getLocalizedText("packloader.search.placeholder"));
             searchField.changed(() -> {
                 searchText = searchField.getText();
                 rebuildEntriesList();
             });
-            searchRow.add(searchField).growX().height(32f);
+            searchBar.add(searchField).growX().height(32f);
             if(!searchText.isEmpty()){
-                searchRow.button(Icon.cancel, Styles.clearNonei, () -> {
+                searchBar.button(Icon.cancel, Styles.clearNonei, () -> {
                     searchText = "";
                     searchField.setText("");
                     rebuildEntriesList();
                 }).size(30f).padRight(4f);
             }
-            cont.add(searchRow).growX().pad(2f, 4f, 2f, 4f).row();
+            controlsCard.add(searchBar).growX().padBottom(3f).row();
 
-            // Row 1b (Mobile): Conflict Policy Selector takes full width
-            Table conflictRow = new Table(UIUtils.flatPane());
-            conflictRow.margin(3f, 8f, 3f, 8f);
-            conflictRow.add(conflictBox).center().growX();
-            cont.add(conflictRow).growX().pad(2f, 4f, 2f, 4f).row();
+            // Row 1b (Mobile): Conflict Policy Selector (compact, centered)
+            controlsCard.add(conflictBox).center().growX().padTop(2f);
+            cont.add(controlsCard).growX().pad(2f, 4f, 2f, 4f).row();
         }else{
             // Desktop: Search Bar (Left) + Conflict Policy Selector (Right) in a unified inline container
             Table row1 = new Table(UIUtils.flatPane());
