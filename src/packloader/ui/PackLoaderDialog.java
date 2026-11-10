@@ -132,11 +132,11 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
             welcomeDialog.buttons.defaults().size(180f, UIUtils.buttonHeight()).pad(4f);
 
+            UIUtils.fitButton(welcomeDialog.buttons.button(getLocalizedText("packloader.welcome.close"), Icon.ok, welcomeDialog::hide).get());
+
             UIUtils.fitButton(welcomeDialog.buttons.button(getLocalizedText("packloader.welcome.issues"), Icon.link, () -> {
                 Core.app.openURI(ISSUES_URL);
             }).get());
-
-            UIUtils.fitButton(welcomeDialog.buttons.button(getLocalizedText("packloader.welcome.close"), Icon.ok, welcomeDialog::hide).get());
 
             welcomeDialog.show();
         }

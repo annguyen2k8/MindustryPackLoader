@@ -3,27 +3,23 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-10 16:55 +07:00
+- **Last updated:** 2026-11-10 17:05 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** UI/UX audit & refinement based on device screenshots: anti-clipping for mobile toolbars, card description wrapping, and list item control separation.
+- **Task:** UI/UX audit & alignment: Ensure close/back/cancel dismissive buttons are consistently on the left across all dialogs.
 - **Branch:** dev; upstream origin/dev.
 
 ## Results
 
-- [verified] Card Description Anti-Truncation:
-  - Replaced `ellipsis(true)` with `wrap()` on card subtitle labels in `createSourceOptionButton`. Descriptions such as "Find all .msch files in folder and subfolders" now wrap cleanly to two lines instead of cutting off with ellipsis ("subfold...").
-- [verified] Mobile Selection Toolbar Anti-Clipping:
-  - Fixed vertical viewport clipping on `row2Pane` by setting explicit height `tbBtnH + 6f` and adding vertical margins (`row2.margin(2f, 4f, 2f, 4f)`).
-  - Increased spacing on `summaryRow` (`padTop(2f)`), eliminating overlap between toolbar buttons and the dry-run summary breakdown badge.
-- [verified] List Row Visual Clarity:
-  - Increased padding between `CheckBox` and `thumb` from 6f to 10f.
-  - Gave `thumb` a dedicated dark frame container (`UIUtils.flatPaneDark()`), clearly distinguishing the image preview frame from the round selection checkbox.
-- [verified] Initial Views Spacing:
-  - Added comfortable top margins in `buildModeSelection` and `buildSourceSelection` (`padTop(Vars.mobile ? 12f : 6f)`) preventing cards from cramming into the title bar line.
-- [verified] Test Suite & Deployment:
+- [verified] Consistent Left-Aligned Dismiss/Cancel Buttons:
+  - Audited all dialogs across `src/packloader/ui/`.
+  - Fixed button order in `UIUtils.showNoticeDialog`: swapped internal construction so `cancelText` (`Cancel` / `Close`) is created first (index 0, left) and `confirmText` (`Re-select` / `Import .zip`) is created second (index 1, right), conforming to native Mindustry conventions.
+  - Fixed `welcomeDialog` in `PackLoaderDialog`: placed `Close` on the left and `Issues` link on the right.
+  - Verified all other dialogs (`DryRunDialog`, `PackResultDialog`, `StorageBrowserDialog`, `UndoConfirmDialog`, `SchematicInfoDialog`, `MapInfoDialog`, `ExportReportDialog`) already enforce `Back` / `Close` on the left.
+- [verified] Test Suite & Verification:
+  - Updated `UIUtilsTest.testShowNoticeDialogBuildsValidDialog()` with assertions verifying that child 0 is the cancel/dismiss button and child 1 is the confirm button.
   - `./gradlew test --rerun`: 251/251 tests pass 100%.
   - `./gradlew verifyJar`: Desktop JAR verified.
-  - `./gradlew deploy`: Universal JAR with `classes.dex` deployed to `/sdcard/Download/MindustryPackLoader.jar`.
+  - `./gradlew deploy`: Universal JAR deployed to `/sdcard/Download/MindustryPackLoader.jar`.
 
 ## Remaining
 

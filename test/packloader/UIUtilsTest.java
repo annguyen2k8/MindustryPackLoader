@@ -142,6 +142,11 @@ public class UIUtilsTest{
             assertNotNull(d);
             assertNotNull(d.cont);
             assertEquals(2, d.buttons.getChildren().size);
+            // Verify dismiss/cancel button is on the left (index 0) per native Mindustry convention
+            arc.scene.ui.TextButton leftBtn = (arc.scene.ui.TextButton)d.buttons.getChildren().get(0);
+            arc.scene.ui.TextButton rightBtn = (arc.scene.ui.TextButton)d.buttons.getChildren().get(1);
+            assertEquals("Cancel", leftBtn.getText().toString());
+            assertEquals("Confirm", rightBtn.getText().toString());
         }finally{
             arc.Core.app = prevApp;
             arc.Core.gl = prevGl;

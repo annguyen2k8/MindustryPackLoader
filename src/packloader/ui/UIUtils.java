@@ -203,21 +203,7 @@ public final class UIUtils{
     ){
         BaseDialog[] dialogRef = new BaseDialog[1];
         dialogRef[0] = showNoticeDialog(title, header, message, Icon.info, Pal.accent, buttons -> {
-            if(confirmText != null){
-                Drawable cIcon = confirmIcon != null ? confirmIcon : Icon.ok;
-                Button b = cIcon != null ?
-                    buttons.button(confirmText, cIcon, () -> {
-                        if(dialogRef[0] != null) dialogRef[0].hide();
-                        if(onConfirm != null) onConfirm.run();
-                    }).get() :
-                    buttons.button(confirmText, () -> {
-                        if(dialogRef[0] != null) dialogRef[0].hide();
-                        if(onConfirm != null) onConfirm.run();
-                    }).get();
-                if(b instanceof TextButton tb){
-                    fitButton(tb);
-                }
-            }
+            // Native Mindustry convention: Dismiss/Cancel button is ALWAYS on the left
             if(cancelText != null){
                 Drawable cIcon = cancelIcon != null ? cancelIcon : Icon.cancel;
                 Button b = cIcon != null ?
@@ -228,6 +214,22 @@ public final class UIUtils{
                     buttons.button(cancelText, () -> {
                         if(dialogRef[0] != null) dialogRef[0].hide();
                         if(onCancel != null) onCancel.run();
+                    }).get();
+                if(b instanceof TextButton tb){
+                    fitButton(tb);
+                }
+            }
+            // Action/Confirm button is on the right
+            if(confirmText != null){
+                Drawable cIcon = confirmIcon != null ? confirmIcon : Icon.ok;
+                Button b = cIcon != null ?
+                    buttons.button(confirmText, cIcon, () -> {
+                        if(dialogRef[0] != null) dialogRef[0].hide();
+                        if(onConfirm != null) onConfirm.run();
+                    }).get() :
+                    buttons.button(confirmText, () -> {
+                        if(dialogRef[0] != null) dialogRef[0].hide();
+                        if(onConfirm != null) onConfirm.run();
                     }).get();
                 if(b instanceof TextButton tb){
                     fitButton(tb);
