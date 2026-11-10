@@ -301,22 +301,33 @@ val jarAndroid = tasks.register("jarAndroid"){
 
         val d8 = if(isWindows) "d8.bat" else "d8"
 
+        val dexDir = layout.buildDirectory.dir("intermediates/dex").get().asFile
+        dexDir.mkdirs()
+        val intermediateJar = File(dexDir, "${projectName}Android.jar")
+        val desktopJar = layout.buildDirectory.dir("libs").get().file("${projectName}Desktop.jar").asFile
+
         val command = buildList{
             add(d8)
             classpath.forEach{ addAll(listOf("--classpath", it.path)) }
             addAll(listOf("--min-api", "21"))
-            addAll(listOf("--output", "${projectName}Android.jar"))
-            add("${projectName}Desktop.jar")
+            addAll(listOf("--output", intermediateJar.absolutePath))
+            add(desktopJar.absolutePath)
         }
 
         //dex and desugar files - this requires d8 in your PATH
         val exitCode = ProcessBuilder(command)
-            .directory(layout.buildDirectory.dir("libs").get().asFile)
+            .directory(dexDir)
             .inheritIO()
             .start()
             .waitFor()
 
         if(exitCode != 0) throw GradleException("d8 failed with exit code $exitCode")
+
+        // Clean up legacy artifact in build/libs if present from previous builds
+        val legacyAndroidJar = layout.buildDirectory.dir("libs").get().file("${projectName}Android.jar").asFile
+        if (legacyAndroidJar.exists()) {
+            legacyAndroidJar.delete()
+        }
     }
 }
 
@@ -344,16 +355,15 @@ tasks.register<Jar>("deploy"){
     }
 
     val libs = layout.buildDirectory.dir("libs")
+    val dexDir = layout.buildDirectory.dir("intermediates/dex")
     from(provider{
         listOf(
             zipTree(libs.get().file("${projectName}Desktop.jar")),
-            zipTree(libs.get().file("${projectName}Android.jar"))
+            zipTree(dexDir.get().file("${projectName}Android.jar"))
         )
     })
 
     doLast{
-        libs.get().file("${projectName}Android.jar").asFile.delete()
-
         val deployJar = archiveFile.get().asFile
         verifyJarLocalization(deployJar)
 

@@ -3,24 +3,25 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-10 14:27 +07:00
+- **Last updated:** 2026-11-10 14:55 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** Resolve Android Scoped Storage EACCES read failure on active SAF streams.
+- **Task:** Fix intermediate build artifact leak by routing D8 output to dedicated intermediate directory.
 - **Branch:** dev; upstream origin/dev.
 
 ## Results
 
-- [verified] Active SAF Stream Protection against Scoped Storage EACCES:
-  - Added `StorageSources.canReadDirectly(Fi fi)` and `canReadDirectly(String path)`: rigorously verifies that a physical file can actually be opened by Java `FileInputStream` rather than merely checking `File.exists()`.
-  - On Android 11+, raw POSIX access to `/storage/emulated/0/...` is restricted by Scoped Storage (`EACCES Permission denied`). `resolveFi` now verifies direct readability before returning a POSIX `Fi`.
-  - In `PackLoaderDialog.scanAsync`: active SAF streams (`AndroidLauncher$1$2`) are preserved intact when the POSIX file cannot be read directly, allowing the stream to be materialized via `ContentResolver.openInputStream(uri)` without triggering `"Failed to materialize ZIP from SAF: Error reading file (absolute)"`.
-- [verified] Safe Recent Sources Reselection on Android Mobile:
-  - When clicking a Recent Source card that was selected via SAF and cannot be read via POSIX due to Scoped Storage, PackLoader now prompts the user with a friendly re-select confirmation dialog rather than failing with a raw error or deleting the item from history.
-  - Added localized strings for `packloader.recent.saf-reselect.title` and `packloader.recent.saf-reselect.prompt` in both English and Vietnamese.
-- [verified] Automated Test Suite & Packaging:
-  - Total 250 tests passing via `./gradlew test`.
-  - Packaging verified via `./gradlew jar verifyJar`.
-  - Android universal JAR deployed to `/sdcard/Download/MindustryPackLoader.jar` via `./gradlew deploy`.
+- [verified] Intermediate DEX Output Separation:
+  - Routed `jarAndroid` task output from `build/libs/` to a dedicated intermediate directory `build/intermediates/dex/MindustryPackLoaderAndroid.jar`.
+  - Updated task `deploy` to read `MindustryPackLoaderAndroid.jar` from `build/intermediates/dex/` instead of `build/libs/`.
+  - Maintained complete packaging of `MindustryPackLoader.jar` (universal jar containing both Desktop `.class` files and Android `classes.dex`, localization bundles, and mod metadata).
+- [verified] Legacy Residue Cleanup:
+  - Implemented migration cleanup in `jarAndroid.doLast` immediately following successful `d8` execution (`exitCode == 0`), ensuring any legacy `build/libs/MindustryPackLoaderAndroid.jar` is removed even when task `deploy` evaluates to `UP-TO-DATE`.
+  - Ensured `build/libs/` strictly contains only official release artifacts: `MindustryPackLoader.jar` and `MindustryPackLoaderDesktop.jar`.
+- [verified] Verification & Tests:
+  - `./gradlew jar`: built `MindustryPackLoaderDesktop.jar` successfully.
+  - `./gradlew deploy`: built universal `MindustryPackLoader.jar` successfully (including `classes.dex` verification).
+  - UP-TO-DATE scenario tested: `build/libs/` remains clean with no leftover intermediate jar.
+  - Total 250 tests passing via `./gradlew test --rerun verifyJar`.
 
 ## Remaining
 
@@ -28,11 +29,10 @@
 
 ## Next steps
 
-- Test live in Mindustry on Android device using the deployed `/sdcard/Download/MindustryPackLoader.jar`.
-- Merge `fix/android-saf-recent-sources` into `dev` when approved.
+- Proceed with responsive UI/UX improvements based on Android mobile screenshots.
 
 ## Verification
 
-- `./gradlew test` -> 249 tests completed, 0 failures.
+- `./gradlew test --rerun` -> 250 tests completed, 0 failures.
 - `./gradlew jar verifyJar` -> BUILD SUCCESSFUL; JAR verification passed.
-- `./gradlew deploy` -> BUILD SUCCESSFUL; `classes.dex` verified for Android.
+- `./gradlew deploy` -> BUILD SUCCESSFUL; `classes.dex` verified for Android in both fresh and UP-TO-DATE runs.
