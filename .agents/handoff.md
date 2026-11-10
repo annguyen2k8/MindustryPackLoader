@@ -3,25 +3,25 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-10 14:55 +07:00
+- **Last updated:** 2026-11-10 15:08 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** Fix intermediate build artifact leak by routing D8 output to dedicated intermediate directory.
+- **Task:** Synchronize Git branches (`dev` & `fix/android-saf-recent-sources`) and refine Android Recent Sources re-selection.
 - **Branch:** dev; upstream origin/dev.
 
 ## Results
 
-- [verified] Intermediate DEX Output Separation:
-  - Routed `jarAndroid` task output from `build/libs/` to a dedicated intermediate directory `build/intermediates/dex/MindustryPackLoaderAndroid.jar`.
-  - Updated task `deploy` to read `MindustryPackLoaderAndroid.jar` from `build/intermediates/dex/` instead of `build/libs/`.
-  - Maintained complete packaging of `MindustryPackLoader.jar` (universal jar containing both Desktop `.class` files and Android `classes.dex`, localization bundles, and mod metadata).
-- [verified] Legacy Residue Cleanup:
-  - Implemented migration cleanup in `jarAndroid.doLast` immediately following successful `d8` execution (`exitCode == 0`), ensuring any legacy `build/libs/MindustryPackLoaderAndroid.jar` is removed even when task `deploy` evaluates to `UP-TO-DATE`.
-  - Ensured `build/libs/` strictly contains only official release artifacts: `MindustryPackLoader.jar` and `MindustryPackLoaderDesktop.jar`.
-- [verified] Verification & Tests:
-  - `./gradlew jar`: built `MindustryPackLoaderDesktop.jar` successfully.
-  - `./gradlew deploy`: built universal `MindustryPackLoader.jar` successfully (including `classes.dex` verification).
-  - UP-TO-DATE scenario tested: `build/libs/` remains clean with no leftover intermediate jar.
-  - Total 250 tests passing via `./gradlew test --rerun verifyJar`.
+- [verified] Synchronized Git Branches & History:
+  - Branch `fix/android-saf-recent-sources` fast-forwarded to include all Scoped Storage EACCES stream protection and D8 build cleanup commits.
+  - Merged refined recent sources handling back into `dev` with `--ff-only`.
+  - Pushed both `dev` and `fix/android-saf-recent-sources` to `origin`.
+- [verified] Robust Android Recent Sources Re-selection:
+  - In `PackLoaderDialog.createRecentSourceCard`: expanded Scoped Storage protection to cover both virtual SAF paths (`/document/primary:...`) and physical restricted paths (`/storage/emulated/0/...` via `PackScanner.isScopedStorageRestricted`).
+  - Added source format awareness: re-selecting directory sources routes to `openFolderPicker`, while archive sources route to `pickZip`.
+  - Prevents premature deletion of recent sources from history when Scoped Storage blocks raw POSIX access on mobile.
+- [verified] Test Suite & Build Verification:
+  - `./gradlew test`: 250 tests passed 100%.
+  - `./gradlew jar verifyJar`: desktop jar and localization bundles verified.
+  - `./gradlew deploy`: universal `MindustryPackLoader.jar` built with valid `classes.dex` and deployed to `/sdcard/Download/MindustryPackLoader.jar`.
 
 ## Remaining
 
@@ -29,10 +29,10 @@
 
 ## Next steps
 
-- Proceed with responsive UI/UX improvements based on Android mobile screenshots.
+- Test the refined Recent Sources re-selection flow live on Mindustry Android.
 
 ## Verification
 
-- `./gradlew test --rerun` -> 250 tests completed, 0 failures.
+- `./gradlew test` -> 250 tests completed, 0 failures.
 - `./gradlew jar verifyJar` -> BUILD SUCCESSFUL; JAR verification passed.
-- `./gradlew deploy` -> BUILD SUCCESSFUL; `classes.dex` verified for Android in both fresh and UP-TO-DATE runs.
+- `./gradlew deploy` -> BUILD SUCCESSFUL; `classes.dex` verified for Android.
