@@ -447,7 +447,18 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         card.margin(8f, 12f, 8f, 12f);
         card.clicked(() -> {
             Fi file = packloader.util.StorageSources.resolveFi(item.path);
-            if(file == null || !file.exists()){
+            if(file == null || !packloader.util.StorageSources.canReadDirectly(file)){
+                if(Vars.mobile && packloader.util.StorageSources.isVirtualSafPath(item.path)){
+                    if(Vars.ui != null){
+                        Vars.ui.showConfirm(
+                            getLocalizedText("packloader.recent.saf-reselect.title"),
+                            getLocalizedText("packloader.recent.saf-reselect.prompt", item.name),
+                            () -> pickZip(activeType != null ? activeType : item.type)
+                        );
+                    }
+                    return;
+                }
+
                 RecentSources.remove(item.path, item.type);
                 if(Vars.ui != null){
                     String missingName = (item.name != null && !item.name.isEmpty()) ? item.name : item.path;
@@ -1589,11 +1600,11 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     public void scanAsync(PackType targetType, boolean append, Fi... rawSources){
         if(rawSources == null || rawSources.length == 0) return;
 
-        // Automatically resolve Android SAF virtual Fi to physical files when available
+        // Automatically resolve Android SAF virtual Fi to physical files ONLY if directly readable via POSIX
         final Fi[] sources = new Fi[rawSources.length];
         for(int i = 0; i < rawSources.length; i++){
             Fi resolved = packloader.util.StorageSources.resolveFi(rawSources[i]);
-            sources[i] = (resolved != null && resolved.exists()) ? resolved : rawSources[i];
+            sources[i] = (resolved != null && packloader.util.StorageSources.canReadDirectly(resolved)) ? resolved : rawSources[i];
         }
 
         this.targetType = targetType;

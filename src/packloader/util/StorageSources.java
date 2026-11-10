@@ -46,20 +46,56 @@ public final class StorageSources{
     }
 
     /**
+     * Checks whether a physical file can actually be opened and read via direct POSIX FileInputStream.
+     * On Android 11+ with Scoped Storage, File.exists() and File.canRead() can return true while
+     * opening an actual FileInputStream fails with EACCES (Permission denied).
+     *
+     * @param fi file handle to verify
+     * @return true if the file exists and a direct InputStream can actually be opened, false otherwise
+     */
+    public static boolean canReadDirectly(Fi fi){
+        if(fi == null) return false;
+        try{
+            File f = fi.file();
+            if(f == null || !f.exists()) return false;
+            if(f.isDirectory()) return f.canRead();
+            try(java.io.InputStream in = new java.io.FileInputStream(f)){
+                return true;
+            }
+        }catch(Throwable ignored){
+            return false;
+        }
+    }
+
+    /**
+     * Checks whether a physical file path can actually be opened and read via direct POSIX FileInputStream.
+     */
+    public static boolean canReadDirectly(String path){
+        if(path == null || path.trim().isEmpty()) return false;
+        try{
+            Fi fi = Core.files != null ? Core.files.absolute(path) : new Fi(path);
+            return canReadDirectly(fi);
+        }catch(Throwable ignored){
+            return false;
+        }
+    }
+
+    /**
      * Resolves a path (which may be a direct filesystem path, an Android SAF virtual document path,
-     * or a percent-encoded content URI) into a physical {@link Fi} that exists on disk.
+     * or a percent-encoded content URI) into a physical {@link Fi} that exists on disk and can
+     * actually be read directly via POSIX streaming.
      *
      * @param path file path or SAF virtual URI string
-     * @return existing {@link Fi} if found on disk, or null if resolution fails to find an existing file
+     * @return existing and readable {@link Fi} if found on disk, or null if resolution fails
      */
     public static Fi resolveFi(String path){
         if(path == null || path.trim().isEmpty()) return null;
         String clean = path.trim();
 
-        // 1. Direct check: if already a valid local file that exists, return immediately
+        // 1. Direct check: if already a valid local file that can actually be read directly, return immediately
         try{
             Fi direct = Core.files != null ? Core.files.absolute(clean) : new Fi(clean);
-            if(direct.exists()){
+            if(canReadDirectly(direct)){
                 return direct;
             }
         }catch(Throwable ignored){}
@@ -80,7 +116,7 @@ public final class StorageSources{
         // 4. Re-check direct path after URL decoding
         try{
             Fi directDecoded = Core.files != null ? Core.files.absolute(decoded) : new Fi(decoded);
-            if(directDecoded.exists()){
+            if(canReadDirectly(directDecoded)){
                 return directDecoded;
             }
         }catch(Throwable ignored){}
@@ -91,7 +127,7 @@ public final class StorageSources{
             String rawPath = decoded.substring(rawIdx + RAW_TAG.length()).trim();
             try{
                 Fi rawFi = Core.files != null ? Core.files.absolute(rawPath) : new Fi(rawPath);
-                if(rawFi.exists()){
+                if(canReadDirectly(rawFi)){
                     return rawFi;
                 }
             }catch(Throwable ignored){}
@@ -109,14 +145,16 @@ public final class StorageSources{
                 if(root == null || root.isEmpty()) continue;
                 try{
                     File f = rel.isEmpty() ? new File(root) : new File(root, rel);
-                    if(f.exists()){
-                        return Core.files != null ? Core.files.absolute(f.getAbsolutePath()) : new Fi(f);
+                    Fi candidate = Core.files != null ? Core.files.absolute(f.getAbsolutePath()) : new Fi(f);
+                    if(canReadDirectly(candidate)){
+                        return candidate;
                     }
                     // Fallback: check inside Download/ subdirectory if rel doesn't already specify it
                     if(!rel.isEmpty() && !rel.toLowerCase(Locale.ROOT).startsWith("download")){
                         File dl = new File(new File(root, "Download"), rel);
-                        if(dl.exists()){
-                            return Core.files != null ? Core.files.absolute(dl.getAbsolutePath()) : new Fi(dl);
+                        Fi dlCandidate = Core.files != null ? Core.files.absolute(dl.getAbsolutePath()) : new Fi(dl);
+                        if(canReadDirectly(dlCandidate)){
+                            return dlCandidate;
                         }
                     }
                 }catch(Throwable ignored){}
@@ -135,8 +173,9 @@ public final class StorageSources{
                 String secRoot = "/storage/" + volId;
                 try{
                     File f = rel.isEmpty() ? new File(secRoot) : new File(secRoot, rel);
-                    if(f.exists()){
-                        return Core.files != null ? Core.files.absolute(f.getAbsolutePath()) : new Fi(f);
+                    Fi candidate = Core.files != null ? Core.files.absolute(f.getAbsolutePath()) : new Fi(f);
+                    if(canReadDirectly(candidate)){
+                        return candidate;
                     }
                 }catch(Throwable ignored){}
             }
@@ -147,18 +186,19 @@ public final class StorageSources{
 
     /**
      * Resolves a {@link Fi} instance, converting Android SAF virtual file handles into physical
-     * filesystem {@link Fi} objects when the underlying file exists on local storage.
+     * filesystem {@link Fi} objects only when the underlying file exists on local storage AND
+     * can actually be read directly via POSIX streaming.
      */
     public static Fi resolveFi(Fi fi){
         if(fi == null) return null;
         try{
-            if(fi.file() != null && fi.file().exists()){
+            if(canReadDirectly(fi)){
                 return fi;
             }
         }catch(Throwable ignored){}
 
         Fi resolved = resolveFi(fi.path());
-        return (resolved != null && resolved.exists()) ? resolved : fi;
+        return (resolved != null && canReadDirectly(resolved)) ? resolved : fi;
     }
 
     /**

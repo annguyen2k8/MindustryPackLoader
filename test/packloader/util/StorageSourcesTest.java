@@ -166,6 +166,20 @@ public class StorageSourcesTest{
             StorageSources.sanitizeSourceName(null, null));
     }
 
+    @Test
+    public void testCanReadDirectlyWithTempFile() throws Exception{
+        File temp = File.createTempFile("test_read", ".tmp");
+        temp.deleteOnExit();
+
+        arc.files.Fi fi = new arc.files.Fi(temp);
+        assertTrue(StorageSources.canReadDirectly(fi));
+        assertTrue(StorageSources.canReadDirectly(temp.getAbsolutePath()));
+
+        assertFalse(StorageSources.canReadDirectly((arc.files.Fi)null));
+        assertFalse(StorageSources.canReadDirectly((String)null));
+        assertFalse(StorageSources.canReadDirectly("/path/to/nonexistent/file.zip"));
+    }
+
     private static File fakeDrive(String path, boolean exists, boolean directory){
         return new File(path){
             @Override

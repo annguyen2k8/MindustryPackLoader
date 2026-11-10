@@ -216,12 +216,10 @@ public class PackScanner{
     private ResolvedZip resolveZip(Fi zipFile) throws IOException{
         if(zipFile == null) throw new FileNotFoundException("ZIP file is null");
 
-        // If local file exists or can be resolved from SAF virtual path, read directly via ZipFile
+        // If local file exists and can actually be read directly via java.util.zip.ZipFile
         try{
-            Fi direct = packloader.util.StorageSources.resolveFi(zipFile);
-            Fi check = (direct != null && direct.exists()) ? direct : zipFile;
-            if(check.file() != null && check.file().exists() && check.file().isFile() && check.file().canRead()){
-                return new ResolvedZip(check, null);
+            if(packloader.util.StorageSources.canReadDirectly(zipFile)){
+                return new ResolvedZip(zipFile, null);
             }
         }catch(Throwable ignored){}
 
