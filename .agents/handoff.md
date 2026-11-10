@@ -6,7 +6,7 @@
 - **Last updated:** 2026-11-10 14:02 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
 - **Task:** Resolve Android SAF Virtual URI Path Resolution and Recent Sources Sanitization.
-- **Branch:** fix/android-saf-recent-sources (branched from dev at 16befcf).
+- **Branch:** dev; upstream origin/dev.
 
 ## Results
 
