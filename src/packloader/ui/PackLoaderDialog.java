@@ -448,12 +448,23 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         card.clicked(() -> {
             Fi file = packloader.util.StorageSources.resolveFi(item.path);
             if(file == null || !packloader.util.StorageSources.canReadDirectly(file)){
-                if(Vars.mobile && packloader.util.StorageSources.isVirtualSafPath(item.path)){
+                boolean isRestricted = Vars.mobile && (
+                    packloader.util.StorageSources.isVirtualSafPath(item.path) ||
+                    PackScanner.isScopedStorageRestricted(file != null ? file : new Fi(item.path))
+                );
+                if(isRestricted){
                     if(Vars.ui != null){
                         Vars.ui.showConfirm(
                             getLocalizedText("packloader.recent.saf-reselect.title"),
                             getLocalizedText("packloader.recent.saf-reselect.prompt", item.name),
-                            () -> pickZip(activeType != null ? activeType : item.type)
+                            () -> {
+                                PackType target = activeType != null ? activeType : item.type;
+                                if(item.isDirectory){
+                                    openFolderPicker(target);
+                                }else{
+                                    pickZip(target);
+                                }
+                            }
                         );
                     }
                     return;
