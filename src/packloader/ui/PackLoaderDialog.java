@@ -235,11 +235,11 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         Table root = new Table();
         root.top();
         float maxW = Math.min(UIUtils.screenWidth() * 0.92f, Vars.mobile ? 480f : 520f);
-        root.defaults().pad(4f).width(maxW);
+        root.defaults().pad(Vars.mobile ? 5f : 4f).width(maxW);
 
         // Prompt subtitle
         root.add(getLocalizedText("packloader.mode.prompt"))
-            .color(Pal.accent).style(Styles.outlineLabel).padTop(6f).padBottom(10f).row();
+            .color(Pal.accent).style(Styles.outlineLabel).padTop(Vars.mobile ? 12f : 6f).padBottom(10f).row();
 
         // Choice 1: Schematics (.msch)
         root.add(createSourceOptionButton(
@@ -334,7 +334,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         Table root = new Table();
         root.top();
         float maxW = Math.min(UIUtils.screenWidth() * 0.92f, Vars.mobile ? 480f : 520f);
-        root.defaults().pad(4f).width(maxW);
+        root.defaults().pad(Vars.mobile ? 5f : 4f).width(maxW);
 
         // Schematics Section
         if(targetType == PackType.SCHEMATIC){
@@ -344,7 +344,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                 getLocalizedText("packloader.source.scan-folder.schem.desc"),
                 () -> openFolderPicker(PackType.SCHEMATIC),
                 maxW
-            )).minHeight(72f).pad(4f).padTop(6f).row();
+            )).minHeight(72f).pad(4f).padTop(Vars.mobile ? 12f : 6f).row();
 
             root.add(createSourceOptionButton(
                 Icon.download,
@@ -533,11 +533,11 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         // Icon column
         btn.image(icon).size(36f).color(Pal.accent).left().padRight(14f);
 
-        // Text column: ellipsis prevents awkward multi-line word breaks while handling narrow windows cleanly
+        // Text column: wrap enables natural multi-line layout on narrow screens without truncating text
         btn.table(t -> {
             t.left().defaults().left().growX();
             t.add(title).style(Styles.defaultLabel).color(Color.white).ellipsis(true).growX().minWidth(0f).padBottom(3f).row();
-            t.add(desc).style(Styles.defaultLabel).color(Pal.lightishGray).ellipsis(true).growX().minWidth(0f);
+            t.add(desc).style(Styles.defaultLabel).color(Pal.lightishGray).wrap().growX().minWidth(0f);
         }).growX().left();
 
         return btn;
@@ -824,7 +824,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
         // Row 2: Selection & Filter Toolbar (Left) + Live Dry-Run Outcome Breakdown (Right)
         Table row2 = new Table();
-        row2.margin(2f);
+        row2.margin(2f, 4f, 2f, 4f);
         row2.defaults().pad(2f);
 
         // Filter buttons (only shown in general multi-type mode)
@@ -929,11 +929,11 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             ScrollPane row2Pane = new ScrollPane(row2, Styles.noBarPane);
             row2Pane.setScrollingDisabled(false, true);
             row2Pane.setOverscroll(false, false);
-            cont.add(row2Pane).growX().pad(2f, 4f, 2f, 4f).row();
+            cont.add(row2Pane).growX().height(tbBtnH + 6f).pad(2f, 4f, 2f, 4f).row();
 
             Table summaryRow = new Table();
             summaryRow.add(summaryBox).center();
-            cont.add(summaryRow).growX().pad(0f, 4f, 4f, 4f).row();
+            cont.add(summaryRow).growX().pad(2f, 4f, 4f, 4f).row();
         }else{
             row2.add().growX(); // Spacer pushes Live Dry-Run outcome breakdown to the right
             row2.add(summaryBox).right().padLeft(6f);
@@ -1111,7 +1111,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             box.setChecked(entry.selected);
             box.touchable = Touchable.disabled;
             UIUtils.squareCheck(box, 24f);
-            row.add(box).size(24f).padLeft(2f).padRight(6f);
+            row.add(box).size(24f).padLeft(2f).padRight(10f);
 
             // Clicking whole row toggles selection
             row.clicked(() -> {
@@ -1121,7 +1121,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             });
 
             // Thumbnail / Type Icon (fixed 36x36f)
-            Table thumb = new Table();
+            Table thumb = new Table(UIUtils.flatPaneDark());
             thumb.setSize(36f, 36f);
             Texture cached = PreviewManager.getCachedTexture(entry);
             if(cached != null && !cached.isDisposed()){
@@ -1145,7 +1145,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                     });
                 }
             }
-            row.add(thumb).size(36f).padRight(6f);
+            row.add(thumb).size(36f).padRight(8f);
 
             // Title & Subtitle Info
             row.table(t -> {
