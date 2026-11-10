@@ -3,25 +3,24 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-10 20:15 +07:00
+- **Last updated:** 2026-11-10 20:55 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** UI/UX audit & refinement based on device screenshots: vertical centering for selection views, anti-truncation for card descriptions, and unified mobile controls card.
+- **Task:** Restore "Bug Report" button with text and link icon; completely eliminate the review view and streamline direct pack import.
 - **Branch:** dev; upstream origin/dev.
 
 ## Results
 
-- [verified] Card Description Anti-Truncation:
-  - Replaced label creation in `createSourceOptionButton` with explicit `descLabel.setWrap(true)` and `descLabel.setEllipsis(false)`. Prevents descriptions ("Find all .msch files in folder and subfolders") from truncating with ellipsis ("subfold...").
-- [verified] Vertical Centering & Thumb-Zone Ergonomics on Initial Selection Views:
-  - In `buildModeSelection` and `buildSourceSelection`, wrapped `ScrollPane pane` between flexible vertical spacers (`cont.add().growY().minHeight(0f)`).
-  - Constrained pane to `maxHeight(UIUtils.screenHeight() * 0.72f)`, eliminating the 70% black void on tall mobile screens when few sources exist, while preserving smooth scrolling when many recent sources are present.
-- [verified] Unified Mobile Controls Card in Review View:
-  - Merged separated `searchRow` and `conflictRow` into a single cohesive `controlsCard` table styled with `UIUtils.flatPane()`.
-  - Stacks Search Bar and Conflict Policy cleanly without redundant pane borders or excessive vertical padding, reclaiming ~16f of vertical viewport height.
-- [verified] Test Suite & Deployment:
+- [verified] Restored "Bug Report" Button with Native Mindustry Conventions:
+  - In `buildModeSelection` and `buildSourceSelection`, replaced the mobile icon-only button with full text button with link icon: `buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> Core.app.openURI(ISSUES_URL))`.
+  - Added responsive layout: on compact/mobile screens, Close/Back (140f) on left, Bug Report (140f) on right. When undo exists, Undo button spans row 2 cleanly (288f) without horizontal clipping.
+- [verified] Completely Eliminated the Review View:
+  - Removed `buildEntriesView()`, `buildListTable()`, `populateListTable()`, `formatDryRunSummary()`, and `DryRunDialog.java`.
+  - Removed the obsolete "Quick Import: Skip review and auto-import after scan" toggle; conflict policy selection and "Skip identical content" checkbox are now directly and permanently accessible on the selection screen.
+  - Streamlined `scanAsync`: scanning directly executes `executeImport()`, writing staged files atomically to game directories and immediately presenting `PackResultDialog`.
+- [verified] Test Suite & Build Verification:
   - `./gradlew test --rerun`: 251/251 tests pass 100%.
-  - `./gradlew verifyJar`: Desktop JAR verified.
-  - `./gradlew deploy`: Universal JAR deployed to `/sdcard/Download/MindustryPackLoader.jar`.
+  - `./gradlew verifyJar`: Desktop JAR bundle verification passed.
+  - `./gradlew deploy`: Universal JAR deployed to `/sdcard/Download/MindustryPackLoader.jar` with verified `classes.dex`.
 
 ## Remaining
 

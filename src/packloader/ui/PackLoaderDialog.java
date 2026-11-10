@@ -3,7 +3,6 @@ package packloader.ui;
 import arc.Core;
 import arc.files.Fi;
 import arc.graphics.Color;
-import arc.graphics.Texture;
 import arc.input.KeyCode;
 import arc.scene.event.InputEvent;
 import arc.scene.event.InputListener;
@@ -24,23 +23,17 @@ import mindustry.game.Schematic;
 import mindustry.gen.Icon;
 import mindustry.gen.Tex;
 import mindustry.graphics.Pal;
-import mindustry.ui.BorderImage;
 import mindustry.ui.FileChooser;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
-import packloader.core.PackFormat;
 import packloader.core.PackImporter;
 import packloader.core.PackImporter.ImportProgress;
 import packloader.core.PackScanner;
-import packloader.model.DryRunAction;
-import packloader.model.DryRunPlan;
 import packloader.model.DuplicatePolicy;
-import packloader.model.EntryFilter;
 import packloader.model.ImportReport;
 import packloader.model.PackEntry;
 import packloader.model.PackType;
 import packloader.undo.ImportTransaction;
-import packloader.undo.UndoManager;
 import packloader.util.MainThread;
 import packloader.util.PackLoaderSettings;
 import packloader.util.RecentSources;
@@ -64,12 +57,6 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     private DuplicatePolicy mapDuplicatePolicy = PackLoaderSettings.getDuplicatePolicy(PackType.MAP);
     private DuplicatePolicy schemDuplicatePolicy = PackLoaderSettings.getDuplicatePolicy(PackType.SCHEMATIC);
     private PackType targetType = null;
-
-    private enum FilterMode{ ALL, MAPS, SCHEMATICS }
-    private FilterMode filterMode = FilterMode.ALL;
-    private String searchText = "";
-    private Label previewSummaryLabel;
-    private boolean showDetailedMeta = false;
 
     private final TaskGeneration scanGeneration = new TaskGeneration();
     private final TaskGeneration importGeneration = new TaskGeneration();
@@ -159,7 +146,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     }
 
     public boolean isInReviewMode(){
-        return isShown() && !entries.isEmpty();
+        return false;
     }
 
     public PackType getTargetType(){
@@ -200,14 +187,12 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     }
 
     private void resetFilters(){
-        filterMode = FilterMode.ALL;
-        searchText = "";
     }
 
     public void rebuild(){
         cont.clear();
 
-        // Contextual title: in source selection and review mode, respect targetType
+        // Contextual title: in source selection mode, respect targetType
         if(title != null){
             if(targetType == PackType.MAP){
                 title.setText(getLocalizedText("packloader.dialog.title.maps"));
@@ -218,14 +203,10 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             }
         }
 
-        if(entries.isEmpty() && sourceName.isEmpty()){
-            if(targetType == null){
-                buildModeSelection();
-            }else{
-                buildSourceSelection();
-            }
+        if(targetType == null){
+            buildModeSelection();
         }else{
-            buildEntriesView();
+            buildSourceSelection();
         }
     }
 
@@ -302,30 +283,47 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         boolean isCompact = UIUtils.isCompact();
         float btnH = UIUtils.buttonHeight();
 
-        var closeBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.action.close"), Icon.cancel, this::hide)
-            .size(isCompact ? 180f : 210f, btnH).get());
-        addCloseListener();
+        ImportTransaction latestTx = importer.undoManager.getLatestTransaction();
+        boolean hasUndo = latestTx != null && !latestTx.undone && latestTx.getActiveItemCount() > 0;
 
         if(isCompact){
-            buttons.button(Icon.link, () -> Core.app.openURI(ISSUES_URL)).size(btnH, btnH);
+            var closeBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.action.close"), Icon.cancel, this::hide)
+                .size(140f, btnH).get());
+            addCloseListener();
+
+            buttons.add().growX();
+
+            var bugBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
+                Core.app.openURI(ISSUES_URL);
+            }).size(140f, btnH).get());
+
+            if(hasUndo){
+                buttons.row();
+                var undoBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.undo.button.last"), Icon.undo, () -> {
+                    new UndoConfirmDialog(importer.undoManager, latestTx, this::rebuild).show();
+                }).size(288f, btnH).colspan(3).get());
+                if(undoBtn != null && undoBtn.getLabel() != null){
+                    undoBtn.getLabel().setColor(Color.orange);
+                }
+            }
         }else{
+            var closeBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.action.close"), Icon.cancel, this::hide)
+                .size(180f, btnH).get());
+            addCloseListener();
+
             var bugBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
                 Core.app.openURI(ISSUES_URL);
             }).size(180f, btnH).get());
-        }
 
-        ImportTransaction latestTx = importer.undoManager.getLatestTransaction();
-        boolean hasUndo = latestTx != null && !latestTx.undone && latestTx.getActiveItemCount() > 0;
-        if(!isCompact || hasUndo){
             buttons.add().growX();
-        }
 
-        if(hasUndo){
-            var undoBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.undo.button.last"), Icon.undo, () -> {
-                new UndoConfirmDialog(importer.undoManager, latestTx, this::rebuild).show();
-            }).size(isCompact ? 160f : 180f, btnH).get());
-            if(undoBtn != null && undoBtn.getLabel() != null){
-                undoBtn.getLabel().setColor(Color.orange);
+            if(hasUndo){
+                var undoBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.undo.button.last"), Icon.undo, () -> {
+                    new UndoConfirmDialog(importer.undoManager, latestTx, this::rebuild).show();
+                }).size(180f, btnH).get());
+                if(undoBtn != null && undoBtn.getLabel() != null){
+                    undoBtn.getLabel().setColor(Color.orange);
+                }
             }
         }
     }
@@ -423,22 +421,29 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         boolean isCompact = UIUtils.isCompact();
         float btnH = UIUtils.buttonHeight();
 
-        var backBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, () -> {
-            targetType = null;
-            rebuild();
-        }).size(isCompact ? 180f : 210f, btnH).get());
-        addCloseListener();
-
-        // Report Bug placed on the left side alongside Back
         if(isCompact){
-            buttons.button(Icon.link, () -> Core.app.openURI(ISSUES_URL)).size(btnH, btnH);
+            var backBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, () -> {
+                targetType = null;
+                rebuild();
+            }).size(140f, btnH).get());
+            addCloseListener();
+
+            buttons.add().growX();
+
+            var bugBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
+                Core.app.openURI(ISSUES_URL);
+            }).size(140f, btnH).get());
         }else{
+            var backBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, () -> {
+                targetType = null;
+                rebuild();
+            }).size(180f, btnH).get());
+            addCloseListener();
+
             var bugBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
                 Core.app.openURI(ISSUES_URL);
             }).size(180f, btnH).get());
-        }
 
-        if(!isCompact){
             buttons.add().growX();
         }
     }
@@ -560,55 +565,11 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         container.left().defaults().left().growX();
         container.margin(6f, 0f, 6f, 0f);
 
-        CheckBox quickBox = new CheckBox("");
-        quickBox.setChecked(PackLoaderSettings.isQuickImport());
-        quickBox.clearChildren();
-        quickBox.left().defaults().left();
-        quickBox.margin(0f);
-
-        quickBox.add(quickBox.getImage()).size(24f).padRight(10f).center();
-        UIUtils.squareCheck(quickBox, 24f);
-
-        float textWidth = Math.max(160f, rowWidth - 64f);
-        Table textTable = new Table();
-        textTable.left().defaults().left().growX();
-        textTable.touchable = Touchable.disabled;
-        textTable.add(getLocalizedText("packloader.quick-import"))
-            .style(Styles.defaultLabel)
-            .color(Color.white)
-            .padBottom(2f)
-            .row();
-        textTable.add(getLocalizedText("packloader.quick-import.desc"))
-            .style(Styles.defaultLabel)
-            .color(Pal.lightishGray)
-            .width(textWidth)
-            .wrap();
-
-        quickBox.add(textTable).growX().left().center();
-        container.add(quickBox).growX().row();
-
-        // Conflict Policy Preset Container (dynamically shown ONLY when Quick Import is ON)
+        // Conflict Policy Preset Container (always visible)
         Table conflictContainer = new Table();
         conflictContainer.left().defaults().left();
-
-        Runnable updateConflictVisibility = () -> {
-            conflictContainer.clearChildren();
-            if(quickBox.isChecked()){
-                conflictContainer.margin(2f, 34f, 4f, 0f);
-                populateConflictPresetContent(conflictContainer, type);
-            }else{
-                conflictContainer.margin(0f);
-            }
-            conflictContainer.invalidateHierarchy();
-        };
-
-        quickBox.changed(() -> {
-            PackLoaderSettings.setQuickImport(quickBox.isChecked());
-            updateConflictVisibility.run();
-        });
-
-        updateConflictVisibility.run();
-
+        conflictContainer.margin(2f, 0f, 4f, 0f);
+        populateConflictPresetContent(conflictContainer, type);
         container.add(conflictContainer).growX().row();
 
         // Sub-option: Skip identical content
@@ -687,619 +648,24 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         }
     }
 
-    private void buildConflictRowSection(Table targetTable, PackType type, boolean mixedMode){
-        Table section = new Table();
-        section.right().defaults().pad(1f);
-
-        boolean isMap = type == PackType.MAP;
-        Color typeColor = isMap ? Pal.heal : Pal.accent;
-        Drawable typeIcon = isMap ?
-            (Icon.terrainSmall != null ? Icon.terrainSmall : Icon.terrain) :
-            (Icon.pasteSmall != null ? Icon.pasteSmall : Icon.paste);
-
-        section.image(typeIcon).size(16f).color(typeColor).padRight(4f);
-        String labelKey = mixedMode ?
-            (isMap ? "packloader.conflict.label.map" : "packloader.conflict.label.schem") :
-            "packloader.conflict.label";
-        section.add(getLocalizedText(labelKey)).color(mixedMode ? typeColor : Pal.accent).padRight(6f);
-
-        for(DuplicatePolicy p : DuplicatePolicy.values()){
-            section.button(b -> {
-                b.margin(3f, 8f, 3f, 8f);
-                b.add(p.title()).padLeft(2f).padRight(2f);
-            }, Styles.flatTogglet, () -> {
-                setPolicyForType(type, p);
-                rebuildEntriesList();
-            }).checked(btn -> getPolicyForType(type) == p).height(Vars.mobile ? 38f : 34f).pad(2f);
-        }
-
-        targetTable.add(section).right().row();
-    }
-
-    /** View 2: File Review and Bulk Import Controls */
-    private void buildEntriesView(){
-        // Top Header: Source Info & Change Source
-        Table header = new Table(UIUtils.flatPane());
-        header.margin(6f, 10f, 6f, 10f);
-        header.defaults().pad(4f);
-
-        int mapsCount = entries.count(e -> e.type == PackType.MAP);
-        int schemsCount = entries.count(e -> e.type == PackType.SCHEMATIC);
-
-        header.table(t -> {
-            t.left();
-            t.add(getLocalizedText("packloader.source.info", sourceName))
-             .color(Pal.accent).ellipsis(true).growX().minWidth(0f).left().row();
-            String summary;
-            if(targetType == PackType.MAP){
-                summary = getLocalizedText("packloader.source.summary.single.map", mapsCount);
-            }else if(targetType == PackType.SCHEMATIC){
-                summary = getLocalizedText("packloader.source.summary.single.schem", schemsCount);
-            }else{
-                summary = getLocalizedText("packloader.source.summary", mapsCount, schemsCount, entries.size);
-            }
-            t.add(summary).color(Pal.lightishGray).ellipsis(true).growX().minWidth(0f).left();
-        }).growX().left().padLeft(6f).minWidth(0f);
-
-        var addBtn = UIUtils.pad(header.button(
-            getLocalizedText("packloader.source.add"),
-            Icon.add, this::openAddSourceMenu
-        ).height(40f).padRight(4f).get());
-        if(addBtn != null){
-            addBtn.margin(4f, 10f, 4f, 10f);
-            if(addBtn.getLabel() != null) addBtn.getLabel().setWrap(false);
-        }
-
-        if(!Vars.mobile){
-            var changeBtn = UIUtils.pad(header.button(
-                getLocalizedText("packloader.source.change"),
-                Icon.refresh, () -> {
-                    clearEntries();
-                    sourceName = "";
-                    targetType = null;
-                    resetFilters();
-                    rebuild();
-                }).height(40f).padRight(4f).get());
-            if(changeBtn != null){
-                changeBtn.margin(4f, 10f, 4f, 10f);
-                if(changeBtn.getLabel() != null) changeBtn.getLabel().setWrap(false);
-            }
-        }
-
-        cont.add(header).growX().pad(Vars.mobile ? 4f : 6f).row();
-
-        // Conflict Resolution Policy
-        Table conflictBox = new Table();
-        conflictBox.right().defaults().pad(1f);
-
-        if(targetType == PackType.MAP || (targetType == null && mapsCount > 0 && schemsCount == 0)){
-            buildConflictRowSection(conflictBox, PackType.MAP, false);
-        }else if(targetType == PackType.SCHEMATIC || (targetType == null && schemsCount > 0 && mapsCount == 0)){
-            buildConflictRowSection(conflictBox, PackType.SCHEMATIC, false);
-        }else{
-            buildConflictRowSection(conflictBox, PackType.MAP, true);
-            buildConflictRowSection(conflictBox, PackType.SCHEMATIC, true);
-        }
-
-        if(Vars.mobile){
-            // Mobile: Unified compact toolbar card containing Search Bar and Conflict Policy
-            Table controlsCard = new Table(UIUtils.flatPane());
-            controlsCard.margin(4f, 8f, 4f, 8f);
-
-            // Row 1a (Mobile): Search Bar
-            Table searchBar = new Table();
-            searchBar.image(Icon.zoom).size(20f).color(Pal.accent).padLeft(4f).padRight(6f);
-            TextField searchField = new TextField(searchText);
-            searchField.setMessageText(getLocalizedText("packloader.search.placeholder"));
-            searchField.changed(() -> {
-                searchText = searchField.getText();
-                rebuildEntriesList();
-            });
-            searchBar.add(searchField).growX().height(32f);
-            if(!searchText.isEmpty()){
-                searchBar.button(Icon.cancel, Styles.clearNonei, () -> {
-                    searchText = "";
-                    searchField.setText("");
-                    rebuildEntriesList();
-                }).size(30f).padRight(4f);
-            }
-            controlsCard.add(searchBar).growX().padBottom(3f).row();
-
-            // Row 1b (Mobile): Conflict Policy Selector (compact, centered)
-            controlsCard.add(conflictBox).center().growX().padTop(2f);
-            cont.add(controlsCard).growX().pad(2f, 4f, 2f, 4f).row();
-        }else{
-            // Desktop: Search Bar (Left) + Conflict Policy Selector (Right) in a unified inline container
-            Table row1 = new Table(UIUtils.flatPane());
-            row1.margin(4f, 8f, 4f, 8f);
-            row1.image(Icon.zoom).size(20f).color(Pal.accent).padLeft(6f).padRight(6f);
-            TextField searchField = new TextField(searchText);
-            searchField.setMessageText(getLocalizedText("packloader.search.placeholder"));
-            searchField.changed(() -> {
-                searchText = searchField.getText();
-                rebuildEntriesList();
-            });
-            row1.add(searchField).growX().minWidth(100f).height(32f);
-            if(!searchText.isEmpty()){
-                row1.button(Icon.cancel, Styles.clearNonei, () -> {
-                    searchText = "";
-                    searchField.setText("");
-                    rebuildEntriesList();
-                }).size(30f).padRight(4f);
-            }
-            row1.add(conflictBox).right().padLeft(8f).padRight(4f);
-            cont.add(row1).growX().pad(2f, 4f, 2f, 4f).row();
-        }
-
-        // Row 2: Selection & Filter Toolbar (Left) + Live Dry-Run Outcome Breakdown (Right)
-        Table row2 = new Table();
-        row2.margin(2f, 4f, 2f, 4f);
-        row2.defaults().pad(2f);
-
-        // Filter buttons (only shown in general multi-type mode)
-        if(targetType == null){
-            row2.button(getLocalizedText("packloader.filter.all", entries.size), Styles.flatTogglet, () -> {
-                filterMode = FilterMode.ALL;
-                rebuildEntriesList();
-            }).checked(b -> filterMode == FilterMode.ALL).height(30f).padRight(2f);
-
-            row2.button(getLocalizedText("packloader.filter.maps", mapsCount), Styles.flatTogglet, () -> {
-                filterMode = FilterMode.MAPS;
-                rebuildEntriesList();
-            }).checked(b -> filterMode == FilterMode.MAPS).height(30f).padRight(2f);
-
-            row2.button(getLocalizedText("packloader.filter.schematics", schemsCount), Styles.flatTogglet, () -> {
-                filterMode = FilterMode.SCHEMATICS;
-                rebuildEntriesList();
-            }).checked(b -> filterMode == FilterMode.SCHEMATICS).height(30f).padRight(2f);
-        }
-
-        float tbBtnH = Vars.mobile ? 38f : 34f;
-
-        // --- Group 1: Bulk Selection (All, None, Invert) ---
-        var selectAllBtn = UIUtils.fitButton(row2.button(
-            getLocalizedText("packloader.select.all"),
-            Icon.ok, Styles.flatt, () -> {
-                EntryFilter.setVisibleSelected(entries, targetType, filterType(), searchText, true);
-                rebuildEntriesList();
-            }).height(tbBtnH).pad(1f).get());
-        if(selectAllBtn != null){
-            selectAllBtn.margin(3f, Vars.mobile ? 6f : 8f, 3f, Vars.mobile ? 6f : 8f);
-        }
-
-        var deselectBtn = UIUtils.fitButton(row2.button(
-            getLocalizedText("packloader.select.none"),
-            Icon.cancel, Styles.flatt, () -> {
-                EntryFilter.setVisibleSelected(entries, targetType, filterType(), searchText, false);
-                rebuildEntriesList();
-            }).height(tbBtnH).pad(1f).get());
-        if(deselectBtn != null){
-            deselectBtn.margin(3f, Vars.mobile ? 6f : 8f, 3f, Vars.mobile ? 6f : 8f);
-        }
-
-        var invertBtn = UIUtils.fitButton(row2.button(
-            getLocalizedText("packloader.select.invert"),
-            Icon.refresh, Styles.flatt, () -> {
-                EntryFilter.invertVisibleSelected(entries, targetType, filterType(), searchText);
-                rebuildEntriesList();
-            }).height(tbBtnH).pad(1f).get());
-        if(invertBtn != null){
-            invertBtn.margin(3f, Vars.mobile ? 6f : 8f, 3f, Vars.mobile ? 6f : 8f);
-        }
-
-        // Native Mindustry visual divider between Selection and Smart Filter groups
-        row2.image().color(Pal.gray).width(1f).height(18f).pad(0f, Vars.mobile ? 3f : 6f, 0f, Vars.mobile ? 3f : 6f);
-
-        // --- Group 2: Smart Selection (New, Unique) ---
-        var selectNewBtn = UIUtils.fitButton(row2.button(
-            getLocalizedText("packloader.select.new"),
-            Icon.add, Styles.flatt, () -> {
-                EntryFilter.selectNewOnly(entries, targetType, filterType(), searchText);
-                rebuildEntriesList();
-            }).height(tbBtnH).pad(1f).get());
-        if(selectNewBtn != null){
-            selectNewBtn.margin(3f, Vars.mobile ? 6f : 8f, 3f, Vars.mobile ? 6f : 8f);
-        }
-
-        var selectUniqueBtn = UIUtils.fitButton(row2.button(
-            getLocalizedText("packloader.select.unique"),
-            Icon.star, Styles.flatt, () -> {
-                EntryFilter.selectUniqueContentOnly(entries, targetType, filterType(), searchText);
-                rebuildEntriesList();
-            }).height(tbBtnH).pad(1f).get());
-        if(selectUniqueBtn != null){
-            selectUniqueBtn.margin(3f, Vars.mobile ? 6f : 8f, 3f, Vars.mobile ? 6f : 8f);
-        }
-
-        // Native Mindustry visual divider between Smart Filter and View options
-        row2.image().color(Pal.gray).width(1f).height(18f).pad(0f, Vars.mobile ? 3f : 6f, 0f, Vars.mobile ? 3f : 6f);
-
-        // --- Group 3: View Toggle (Details) ---
-        var metaToggleBtn = UIUtils.fitButton(row2.button(
-            getLocalizedText("packloader.meta.details"),
-            Icon.list, Styles.flatTogglet, () -> {
-                showDetailedMeta = !showDetailedMeta;
-                rebuildEntriesList();
-            }).checked(b -> showDetailedMeta).height(tbBtnH).pad(1f).get());
-        if(metaToggleBtn != null){
-            metaToggleBtn.margin(3f, Vars.mobile ? 6f : 8f, 3f, Vars.mobile ? 6f : 8f);
-        }
-
-        // --- Live Dry-Run Outcome Breakdown ---
-        Button summaryBox = new Button(Styles.flatt);
-        summaryBox.margin(3f, 8f, 3f, 8f);
-        summaryBox.clicked(this::showDryRunDialog);
-        summaryBox.image(Icon.eye).size(16f).color(Pal.accent).padRight(4f);
-        DryRunPlan initialPlan = calculateDryRunPlan();
-        previewSummaryLabel = summaryBox.add(formatDryRunSummary(initialPlan))
-            .color(Pal.lightishGray).style(Styles.outlineLabel).left().get();
-
-        if(Vars.mobile){
-            ScrollPane row2Pane = new ScrollPane(row2, Styles.noBarPane);
-            row2Pane.setScrollingDisabled(false, true);
-            row2Pane.setOverscroll(false, false);
-            cont.add(row2Pane).growX().height(tbBtnH + 6f).pad(2f, 4f, 2f, 4f).row();
-
-            Table summaryRow = new Table();
-            summaryRow.add(summaryBox).center();
-            cont.add(summaryRow).growX().pad(2f, 4f, 4f, 4f).row();
-        }else{
-            row2.add().growX(); // Spacer pushes Live Dry-Run outcome breakdown to the right
-            row2.add(summaryBox).right().padLeft(6f);
-            cont.add(row2).growX().pad(2f, 4f, 4f, 4f).row();
-        }
-
-        // Scrollable Entries List Container
-        cont.table(this::buildListTable).grow().minWidth(0f).pad(4f).name("listContainer").row();
-
-        // Bottom Action Bar
-        buttons.clear();
-        buttons.defaults().pad(4f);
-
-        int selectedCount = visibleSelectedCount();
-        String initialImportText = getLocalizedText("packloader.import.action", selectedCount);
-
-        if(Vars.mobile && UIUtils.isPortrait()){
-            // Mobile Portrait: 2-row layout with generous touch targets and zero text overlap
-            // Row 1: Back (Dismissive) + Preview (Secondary)
-            var backBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, () -> {
-                clearEntries();
-                sourceName = "";
-                targetType = null;
-                resetFilters();
-                rebuild();
-            }).growX().height(56f).get());
-
-            var previewBtn = UIUtils.fitButton(buttons.button(
-                getLocalizedText("packloader.dryrun.button.preview"),
-                Icon.eye,
-                this::showDryRunDialog
-            ).growX().height(56f).get());
-            if(previewBtn != null){
-                previewBtn.update(() -> {
-                    previewBtn.setDisabled(visibleSelectedCount() == 0 || importRunning);
-                });
-            }
-
-            buttons.row();
-
-            // Row 2: Full-width Import CTA (Primary)
-            var importBtn = UIUtils.fitButton(buttons.button(initialImportText, Icon.download, this::executeImport)
-                .growX().colspan(2).height(64f).get());
-            importBtn.update(() -> {
-                int count = visibleSelectedCount();
-                String text = getLocalizedText("packloader.import.action", count);
-                importBtn.setText(text);
-                boolean disabled = count == 0 || importRunning;
-                importBtn.setDisabled(disabled);
-                if(importBtn.getLabel() != null){
-                    importBtn.getLabel().setColor(disabled ? Pal.gray : Pal.accent);
-                }
-            });
-        }else{
-            // Desktop & Landscape: Unified horizontal action bar with Mindustry 64f buttons
-            var backBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, () -> {
-                clearEntries();
-                sourceName = "";
-                targetType = null;
-                resetFilters();
-                rebuild();
-            }).size(180f, 64f).get());
-
-            if(!Vars.mobile){
-                var bugBtn = UIUtils.fitButton(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
-                    Core.app.openURI(ISSUES_URL);
-                }).size(180f, 64f).get());
-                buttons.add().growX();
-            }else{
-                buttons.add().growX();
-            }
-
-            var previewBtn = UIUtils.fitButton(buttons.button(
-                getLocalizedText("packloader.dryrun.button.preview"),
-                Icon.eye,
-                this::showDryRunDialog
-            ).size(180f, 64f).get());
-            if(previewBtn != null){
-                previewBtn.update(() -> {
-                    previewBtn.setDisabled(visibleSelectedCount() == 0 || importRunning);
-                });
-            }
-
-            var importBtn = UIUtils.fitButton(buttons.button(initialImportText, Icon.download, this::executeImport)
-                .size(220f, 64f).get());
-            importBtn.update(() -> {
-                int count = visibleSelectedCount();
-                String text = getLocalizedText("packloader.import.action", count);
-                importBtn.setText(text);
-                boolean disabled = count == 0 || importRunning;
-                importBtn.setDisabled(disabled);
-                if(importBtn.getLabel() != null){
-                    importBtn.getLabel().setColor(disabled ? Pal.gray : Pal.accent);
-                }
-            });
-        }
-        addCloseListener();
-    }
-
-    private void showDryRunDialog(){
-        DryRunPlan plan = calculateDryRunPlan();
-        new DryRunDialog(plan, this::executeImport).show();
-    }
-
-    private void updatePreviewSummary(){
-        if(previewSummaryLabel != null){
-            DryRunPlan plan = calculateDryRunPlan();
-            previewSummaryLabel.setText(formatDryRunSummary(plan));
-        }
-    }
-
-    private String formatDryRunSummary(DryRunPlan plan){
-        return getLocalizedText("packloader.dryrun.summary",
-            "[heal]" + plan.newCount + "[]",
-            "[accent]" + plan.overwriteCount + "[]",
-            "[gold]" + plan.renameCount + "[]",
-            "[lightgray]" + plan.skipCount + "[]"
-        );
-    }
-
-    public DryRunPlan calculateDryRunPlan(){
-        return DryRunPlan.calculate(entries, targetType, getPolicyForType(PackType.MAP), getPolicyForType(PackType.SCHEMATIC));
-    }
-
-    private Table listTableRef;
-
-    private void buildListTable(Table container){
-        listTableRef = new Table();
-        listTableRef.margin(6f);
-        populateListTable(listTableRef);
-
-        ScrollPane pane = new ScrollPane(listTableRef);
-        pane.setScrollingDisabled(true, false);
-        pane.setFadeScrollBars(false);
-        container.add(pane).grow().minWidth(0f);
-    }
-
-    private void rebuildEntriesList(){
-        updatePreviewSummary();
-        if(listTableRef != null){
-            listTableRef.clear();
-            populateListTable(listTableRef);
-        }
-    }
-
-    private Seq<PackEntry> visibleEntries(){
-        return entries.select(this::filterMatches);
-    }
-
-    private int visibleSelectedCount(){
-        // Called from a per-frame update callback; do not allocate a filtered Seq here.
-        return EntryFilter.countSelected(entries, targetType, filterType(), searchText);
-    }
-
-    private void populateListTable(Table table){
-        Seq<PackEntry> filtered = visibleEntries();
-
-        if(filtered.isEmpty()){
-            table.add(getLocalizedText("packloader.filter.none")).color(Pal.lightishGray).pad(20f).row();
-            return;
-        }
-
-        DryRunPlan plan = calculateDryRunPlan();
-
-        for(PackEntry entry : filtered){
-            DryRunPlan.DryRunItem dryItem = plan.getItem(entry);
-
-            // Flat button rows get hover/pressed feedback with subtle dark background.
-            Button row = new Button(UIUtils.rowStyle());
-            row.margin(6f, 8f, 6f, 8f);
-            row.defaults().pad(3f);
-
-            // Touch-friendly CheckBox (touch disabled so row click handles toggle cleanly)
-            CheckBox box = new CheckBox("");
-            box.setChecked(entry.selected);
-            box.touchable = Touchable.disabled;
-            UIUtils.squareCheck(box, 24f);
-            row.add(box).size(24f).padLeft(2f).padRight(10f);
-
-            // Clicking whole row toggles selection
-            row.clicked(() -> {
-                entry.selected = !entry.selected;
-                box.setChecked(entry.selected);
-                updatePreviewSummary();
-            });
-
-            // Thumbnail / Type Icon (fixed 36x36f)
-            Table thumb = new Table(UIUtils.flatPaneDark());
-            thumb.setSize(36f, 36f);
-            Texture cached = PreviewManager.getCachedTexture(entry);
-            if(cached != null && !cached.isDisposed()){
-                BorderImage b = new BorderImage(cached, 2f);
-                b.setScaling(Scaling.fit);
-                thumb.add(b).size(36f);
-            }else{
-                if(entry.type == PackType.MAP){
-                    thumb.image(Icon.terrain).size(26f).color(Pal.accent);
-                }else{
-                    thumb.image(Icon.paste).size(26f).color(Pal.accent);
-                }
-                if(entry.isValid){
-                    PreviewManager.loadPreviewAsync(entry, tex -> {
-                        if(tex != null && !tex.isDisposed()){
-                            thumb.clear();
-                            BorderImage b = new BorderImage(tex, 2f);
-                            b.setScaling(Scaling.fit);
-                            thumb.add(b).size(36f);
-                        }
-                    });
-                }
-            }
-            row.add(thumb).size(36f).padRight(8f);
-
-            // Title & Subtitle Info
-            row.table(t -> {
-                t.left().defaults().left().growX();
-
-                StringBuilder titleBuilder = new StringBuilder();
-                titleBuilder.append(entry.displayName);
-
-                String nameNoExt = entry.sanitizedFileName.contains(".") ?
-                    entry.sanitizedFileName.substring(0, entry.sanitizedFileName.lastIndexOf('.')) : entry.sanitizedFileName;
-
-                if(entry.isDuplicate){
-                    titleBuilder.append("  [gold]").append(getLocalizedText("packloader.badge.duplicate")).append("[]");
-                    if(dryItem != null){
-                        String actionColor = dryItem.action == DryRunAction.NEW ? "heal" :
-                                             dryItem.action == DryRunAction.OVERWRITE ? "accent" :
-                                             dryItem.action == DryRunAction.RENAME ? "gold" : "lightgray";
-                        titleBuilder.append(" -> [").append(actionColor).append("]").append(dryItem.action.localized()).append("[]");
-                    }
-                }
-                if(entry.isContentDuplicate){
-                    titleBuilder.append("  [cyan]").append(getLocalizedText("packloader.badge.content-duplicate")).append("[]");
-                }
-                if(!entry.isValid){
-                    titleBuilder.append("  [scarlet]").append(getLocalizedText("packloader.badge.invalid")).append("[]");
-                }
-
-                t.add(titleBuilder.toString() + "[]").color(Color.white).ellipsis(true).growX().minWidth(0f).left().row();
-
-                // Clean second line: status reasons, author, and optional detailed metadata
-                StringBuilder infoBuilder = new StringBuilder();
-                boolean hasInfo = false;
-
-                if(dryItem != null && dryItem.isRenamed()){
-                    infoBuilder.append("[gold]").append(getLocalizedText("packloader.dryrun.target.renamed", dryItem.plannedTargetName)).append("[]");
-                    hasInfo = true;
-                }else if(entry.isDuplicate && !entry.duplicateReason.isEmpty()){
-                    infoBuilder.append("[gold]").append(entry.duplicateReason).append("[]");
-                    hasInfo = true;
-                }
-
-                if(entry.isContentDuplicate && !entry.contentDuplicateReason.isEmpty()){
-                    if(hasInfo) infoBuilder.append("  •  ");
-                    infoBuilder.append("[cyan]").append(entry.contentDuplicateReason).append("[]");
-                    hasInfo = true;
-                }
-
-                if(!entry.isValid && !entry.errorReason.isEmpty()){
-                    if(hasInfo) infoBuilder.append("  •  ");
-                    infoBuilder.append("[scarlet]").append(entry.errorReason).append("[]");
-                    hasInfo = true;
-                }
-
-                if(entry.type == PackType.MAP && entry.mapInfo != null && !entry.mapInfo.author.isEmpty()){
-                    if(hasInfo) infoBuilder.append("  •  ");
-                    infoBuilder.append("[lightgray]").append(entry.mapInfo.author).append("[]");
-                    hasInfo = true;
-                }
-
-                if(!entry.displayName.equalsIgnoreCase(nameNoExt) && !entry.displayName.equalsIgnoreCase(entry.sanitizedFileName)){
-                    if(hasInfo) infoBuilder.append("  •  ");
-                    infoBuilder.append("[lightgray]").append(entry.sanitizedFileName).append("[]");
-                    hasInfo = true;
-                }
-
-                if(showDetailedMeta){
-                    if(hasInfo) infoBuilder.append("  •  ");
-                    infoBuilder.append("[lightgray]").append(PackScanner.formatSize(entry.size)).append("[]");
-                    String dims = entry.getDimensionsString();
-                    if(!dims.isEmpty()){
-                        infoBuilder.append("  •  [lightgray]").append(dims).append("[]");
-                    }
-                    hasInfo = true;
-                }
-
-                if(!hasInfo){
-                    infoBuilder.append("[heal]").append(getLocalizedText("packloader.status.ready")).append("[]");
-                }
-
-                t.add(infoBuilder.toString()).color(Color.white)
-                 .ellipsis(true).growX().minWidth(0f).left().padTop(2f);
-            }).growX().minWidth(0f).left().padLeft(6f).padRight(6f);
-
-            // Actions: Info (for both Maps & Schematics) & In-World Placement (for Schematics, docked right)
-            Table actions = new Table();
-            actions.right().defaults().size(36f).pad(2f);
-
-            if(entry.isValid){
-                if(entry.type == PackType.SCHEMATIC && Vars.state != null && Vars.state.isGame()){
-                    Button placeBtn = actions.button(Icon.paste, Styles.clearNonei, () -> {
-                        placeSchematic(entry);
-                    }).size(36f).get();
-                    placeBtn.addListener(new InputListener(){
-                        @Override
-                        public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
-                            event.stop();
-                            return true;
-                        }
-                    });
-                }
-
-                Button infoBtn = actions.button(Icon.info, Styles.clearNonei, () -> {
-                    if(entry.type == PackType.MAP){
-                        showMapInfo(entry);
-                    }else{
-                        showSchematicInfo(entry);
-                    }
-                }).size(36f).get();
-                infoBtn.addListener(new InputListener(){
-                    @Override
-                    public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
-                        event.stop();
-                        return true;
-                    }
-                });
-            }
-
-            row.add(actions).right();
-
-            table.add(row).growX().minWidth(0f).pad(2f).row();
-        }
-    }
-
-    private PackType filterType(){
-        return switch(filterMode){
-            case MAPS -> PackType.MAP;
-            case SCHEMATICS -> PackType.SCHEMATIC;
-            default -> null;
-        };
-    }
-
-    private boolean filterMatches(PackEntry e){
-        return EntryFilter.matches(e, targetType, filterType(), searchText);
-    }
-
     /**
-     * Starts an import on a daemon worker, importing only the selected entries that are
-     * currently visible under the active filter. File parsing/staging stays on the worker;
-     * the few game-registry operations are marshalled to the main thread by PackImporter.
+     * Starts an import on a daemon worker, importing all selected entries.
+     * File parsing/staging stays on the worker; the few game-registry operations
+     * are marshalled to the main thread by PackImporter.
      */
     private void executeImport(){
         if(importRunning) return;
 
-        Seq<PackEntry> toImport = EntryFilter.collectSelected(entries, targetType, filterType(), searchText);
-        if(toImport.isEmpty()) return;
+        Seq<PackEntry> toImport = entries.select(e -> e.selected);
+        if(toImport.isEmpty()){
+            if(Vars.ui != null){
+                String emptyMsg = targetType == PackType.MAP ? getLocalizedText("packloader.source.empty.maps") :
+                    targetType == PackType.SCHEMATIC ? getLocalizedText("packloader.source.empty.schematics") :
+                    getLocalizedText("packloader.source.empty");
+                Vars.ui.showInfo(emptyMsg);
+            }
+            return;
+        }
 
         importRunning = true;
         importCancelled.set(false);
@@ -1375,7 +741,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                     }
                     sourceName = "";
                     targetType = null;
-                    resetFilters();
+                    clearEntries();
                     // hide() also releases materialized SAF ZIPs once importing has finished.
                     hide();
                     new PackResultDialog(report, importer.undoManager).show();
@@ -1801,25 +1167,19 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                         // Duplicate badges read live game registries, so refresh them on the main thread.
                         scanner.checkGameDuplicates(entries);
                         scanner.checkContentDuplicates(entries);
-                        resetFilters();
 
                         mapDuplicatePolicy = PackLoaderSettings.getDuplicatePolicy(PackType.MAP);
                         schemDuplicatePolicy = PackLoaderSettings.getDuplicatePolicy(PackType.SCHEMATIC);
-                        if(!append && PackLoaderSettings.isQuickImport()){
-                            int eligible = EntryFilter.selectEligibleForQuickImport(entries, targetType,
-                                mapDuplicatePolicy, schemDuplicatePolicy);
-                            if(eligible > 0){
-                                executeImport();
-                                return;
-                            }
+
+                        for(PackEntry entry : entries){
+                            entry.selected = (targetType == null || entry.type == targetType) && entry.isValid;
                         }
 
-                        rebuild();
-                        if(!isShown()) super.show();
-
-                        if(!warningText.isEmpty() && Vars.ui != null){
-                            Vars.ui.showInfo(warningText);
+                        if(!warningText.isEmpty()){
+                            Log.warn("[PackLoader] Scan warnings: @", warningText);
                         }
+
+                        executeImport();
                     }
                 });
             }catch(PackScanner.ScanCancelledException e){
