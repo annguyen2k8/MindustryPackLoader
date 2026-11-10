@@ -29,6 +29,7 @@ import packloader.TestHelper;
 import packloader.model.DryRunAction;
 import packloader.model.DryRunPlan;
 import packloader.model.DuplicatePolicy;
+import packloader.model.EntryFilter;
 import packloader.model.PackEntry;
 import packloader.model.PackType;
 import packloader.util.PackLoaderSettings;
@@ -115,6 +116,13 @@ public class BorderlessFlatRefinementTest{
         if(Icon.zoom == null) Icon.zoom = dummyDrawable;
         if(Icon.link == null) Icon.link = dummyDrawable;
         if(Icon.undo == null) Icon.undo = dummyDrawable;
+        if(Icon.downOpenSmall == null) Icon.downOpenSmall = dummyDrawable;
+        if(Icon.rightOpenSmall == null) Icon.rightOpenSmall = dummyDrawable;
+        if(Icon.down == null) Icon.down = dummyDrawable;
+        if(Icon.right == null) Icon.right = dummyDrawable;
+        if(Icon.pasteSmall == null) Icon.pasteSmall = dummyDrawable;
+        if(Icon.terrainSmall == null) Icon.terrainSmall = dummyDrawable;
+        if(Icon.settingsSmall == null) Icon.settingsSmall = dummyDrawable;
 
         if(Core.atlas == null){
             Core.atlas = new TextureAtlas();
@@ -295,5 +303,80 @@ public class BorderlessFlatRefinementTest{
         assertEquals("Mới", Core.bundle.get("packloader.select.new"));
         assertEquals("Độc nhất", Core.bundle.get("packloader.select.unique"));
         assertEquals("Chi tiết", Core.bundle.get("packloader.meta.details"));
+    }
+
+    @Test
+    public void testCollapsibleConflictWidgetExpandsAndHidesOptionsWhileRetainingPolicy(){
+        TestHelper.initBundle(Locale.ENGLISH);
+        PackLoaderDialog dialog = new PackLoaderDialog();
+        dialog.setPolicyForType(PackType.SCHEMATIC, DuplicatePolicy.SKIP);
+
+        assertFalse(dialog.isConflictOptionsExpanded(), "Conflict options must start collapsed");
+
+        Table widget = dialog.buildCollapsibleConflictWidget(0, 10);
+        assertNotNull(widget);
+        assertEquals(2, widget.getChildren().size, "Widget must have toggle row and expanded table");
+
+        Button toggleBtn = (Button)widget.getChildren().get(0);
+        Table expandedTable = (Table)widget.getChildren().get(1);
+
+        // Initially collapsed: expandedTable has 0 children
+        assertEquals(0, expandedTable.getChildren().size, "Expanded table must have 0 children when collapsed");
+        String initialSummary = dialog.getConflictPolicySummary(0, 10);
+        assertTrue(initialSummary.contains("Skip"), "Summary must reflect active policy Skip");
+
+        // Toggle open
+        toggleBtn.fireClick();
+        assertTrue(dialog.isConflictOptionsExpanded(), "Must be expanded after click");
+        assertTrue(expandedTable.getChildren().size > 0, "Expanded table must be populated when open");
+
+        // Change policy to OVERWRITE
+        dialog.setPolicyForType(PackType.SCHEMATIC, DuplicatePolicy.OVERWRITE);
+        assertEquals(DuplicatePolicy.OVERWRITE, dialog.getPolicyForType(PackType.SCHEMATIC));
+        String updatedSummary = dialog.getConflictPolicySummary(0, 10);
+        assertTrue(updatedSummary.contains("Overwrite"), "Summary must reflect active policy Overwrite");
+
+        // Toggle closed
+        toggleBtn.fireClick();
+        assertFalse(dialog.isConflictOptionsExpanded(), "Must be collapsed after second click");
+        assertEquals(0, expandedTable.getChildren().size, "Expanded table must be cleared when collapsed");
+
+        // Policy is preserved when collapsed
+        assertEquals(DuplicatePolicy.OVERWRITE, dialog.getPolicyForType(PackType.SCHEMATIC), "Policy must be retained when collapsed");
+        String closedSummary = dialog.getConflictPolicySummary(0, 10);
+        assertTrue(closedSummary.contains("Overwrite"), "Summary must still reflect Overwrite when closed");
+    }
+
+    @Test
+    public void testQuickImportSelectionWorkflowVsReview(){
+        arc.struct.Seq<PackEntry> entries = new arc.struct.Seq<>();
+        PackEntry newEntry = new PackEntry(PackType.SCHEMATIC, "test/new.msch", "new.msch", 100L);
+        newEntry.isValid = true;
+        PackEntry dupEntry = new PackEntry(PackType.SCHEMATIC, "test/dup.msch", "dup.msch", 200L);
+        dupEntry.isValid = true;
+        dupEntry.isDuplicate = true;
+        entries.add(newEntry, dupEntry);
+
+        // Scenario 1: Quick Import ON with SKIP policy
+        int eligible = EntryFilter.selectEligibleForQuickImport(entries, PackType.SCHEMATIC,
+            DuplicatePolicy.SKIP, DuplicatePolicy.SKIP, false);
+        assertEquals(1, eligible, "Only new entry is eligible when duplicate policy is SKIP");
+        assertTrue(newEntry.selected);
+        assertFalse(dupEntry.selected);
+
+        // Scenario 2: Quick Import ON with OVERWRITE policy
+        eligible = EntryFilter.selectEligibleForQuickImport(entries, PackType.SCHEMATIC,
+            DuplicatePolicy.OVERWRITE, DuplicatePolicy.OVERWRITE, false);
+        assertEquals(2, eligible, "Both entries are eligible when duplicate policy is OVERWRITE");
+        assertTrue(newEntry.selected);
+        assertTrue(dupEntry.selected);
+
+        // Scenario 3: Review Mode (Quick Import OFF)
+        // In review mode, all valid entries matching targetType are selected initially for user review
+        for(PackEntry e : entries){
+            e.selected = (e.type == PackType.SCHEMATIC) && e.isValid;
+        }
+        assertTrue(newEntry.selected);
+        assertTrue(dupEntry.selected);
     }
 }

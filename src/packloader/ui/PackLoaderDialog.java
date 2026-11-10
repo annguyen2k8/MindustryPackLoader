@@ -11,6 +11,7 @@ import arc.scene.event.Touchable;
 import arc.scene.style.Drawable;
 import arc.scene.ui.Button;
 import arc.scene.ui.CheckBox;
+import arc.scene.ui.Image;
 import arc.scene.ui.Label;
 import arc.scene.ui.ScrollPane;
 import arc.scene.ui.TextField;
@@ -70,6 +71,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     private String searchText = "";
     private Label previewSummaryLabel;
     private boolean showDetailedMeta = false;
+    private boolean showConflictOptions = false;
 
     private final TaskGeneration scanGeneration = new TaskGeneration();
     private final TaskGeneration importGeneration = new TaskGeneration();
@@ -202,6 +204,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     private void resetFilters(){
         filterMode = FilterMode.ALL;
         searchText = "";
+        showConflictOptions = false;
     }
 
     public void rebuild(){
@@ -584,11 +587,54 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         container.left().defaults().left().growX();
         container.margin(6f, 0f, 6f, 0f);
 
-        // Conflict Policy Preset Container (always visible)
+        CheckBox quickBox = new CheckBox("");
+        quickBox.setChecked(PackLoaderSettings.isQuickImport());
+        quickBox.clearChildren();
+        quickBox.left().defaults().left();
+        quickBox.margin(0f);
+
+        quickBox.add(quickBox.getImage()).size(24f).padRight(10f).center();
+        UIUtils.squareCheck(quickBox, 24f);
+
+        float textWidth = Math.max(160f, rowWidth - 64f);
+        Table textTable = new Table();
+        textTable.left().defaults().left().growX();
+        textTable.touchable = Touchable.disabled;
+        textTable.add(getLocalizedText("packloader.quick-import"))
+            .style(Styles.defaultLabel)
+            .color(Color.white)
+            .padBottom(2f)
+            .row();
+        textTable.add(getLocalizedText("packloader.quick-import.desc"))
+            .style(Styles.defaultLabel)
+            .color(Pal.lightishGray)
+            .width(textWidth)
+            .wrap();
+
+        quickBox.add(textTable).growX().left().center();
+        container.add(quickBox).growX().row();
+
+        // Conflict Policy Preset Container (dynamically shown ONLY when Quick Import is ON)
         Table conflictContainer = new Table();
         conflictContainer.left().defaults().left();
-        conflictContainer.margin(2f, 0f, 4f, 0f);
-        populateConflictPresetContent(conflictContainer, type);
+
+        Runnable updateConflictVisibility = () -> {
+            conflictContainer.clearChildren();
+            if(quickBox.isChecked()){
+                conflictContainer.margin(2f, 34f, 4f, 0f);
+                populateConflictPresetContent(conflictContainer, type);
+            }else{
+                conflictContainer.margin(0f);
+            }
+            conflictContainer.invalidateHierarchy();
+        };
+
+        quickBox.changed(() -> {
+            PackLoaderSettings.setQuickImport(quickBox.isChecked());
+            updateConflictVisibility.run();
+        });
+
+        updateConflictVisibility.run();
         container.add(conflictContainer).growX().row();
 
         // Sub-option: Skip identical content
@@ -668,8 +714,12 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     }
 
     private void buildConflictRowSection(Table targetTable, PackType type, boolean mixedMode){
+        buildConflictRowSection(targetTable, type, mixedMode, null);
+    }
+
+    private void buildConflictRowSection(Table targetTable, PackType type, boolean mixedMode, Runnable onPolicyChanged){
         Table section = new Table();
-        section.right().defaults().pad(1f);
+        section.center().defaults().pad(1f);
 
         boolean isMap = type == PackType.MAP;
         Color typeColor = isMap ? Pal.heal : Pal.accent;
@@ -689,11 +739,121 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                 b.add(p.title()).padLeft(2f).padRight(2f);
             }, Styles.flatTogglet, () -> {
                 setPolicyForType(type, p);
+                if(onPolicyChanged != null) onPolicyChanged.run();
                 rebuildEntriesList();
             }).checked(btn -> getPolicyForType(type) == p).height(Vars.mobile ? 38f : 34f).pad(2f);
         }
 
-        targetTable.add(section).right().row();
+        targetTable.add(section).center().row();
+    }
+
+    String getConflictPolicySummary(int mapsCount, int schemsCount){
+        String base = getLocalizedText("packloader.conflict.label");
+        if(targetType == PackType.MAP || (targetType == null && mapsCount > 0 && schemsCount == 0)){
+            return base + " [accent]" + getPolicyForType(PackType.MAP).title() + "[]";
+        }else if(targetType == PackType.SCHEMATIC || (targetType == null && schemsCount > 0 && mapsCount == 0)){
+            return base + " [accent]" + getPolicyForType(PackType.SCHEMATIC).title() + "[]";
+        }else{
+            return base + " [heal]" + getLocalizedText("packloader.type.map") + ": " + getPolicyForType(PackType.MAP).title() + "[] / [accent]" + getLocalizedText("packloader.type.schematic") + ": " + getPolicyForType(PackType.SCHEMATIC).title() + "[]";
+        }
+    }
+
+    boolean isConflictOptionsExpanded(){
+        return showConflictOptions;
+    }
+
+    void setConflictOptionsExpanded(boolean expanded){
+        this.showConflictOptions = expanded;
+    }
+
+    Table buildCollapsibleConflictWidget(int mapsCount, int schemsCount){
+        Table root = new Table();
+        root.center().defaults().center();
+
+        Button toggleBtn = new Button(Styles.flatTogglet);
+        toggleBtn.margin(3f, 10f, 3f, 10f);
+
+        Drawable downIcon = Icon.downOpenSmall != null ? Icon.downOpenSmall : (Icon.down != null ? Icon.down : Icon.ok);
+        Drawable rightIcon = Icon.rightOpenSmall != null ? Icon.rightOpenSmall : (Icon.right != null ? Icon.right : Icon.left);
+
+        Image arrowImg = new Image(showConflictOptions ? downIcon : rightIcon);
+        arrowImg.setColor(Pal.accent);
+        toggleBtn.add(arrowImg).size(16f).padRight(6f);
+
+        Label label = new Label(getConflictPolicySummary(mapsCount, schemsCount), Styles.outlineLabel);
+        toggleBtn.add(label);
+
+        root.add(toggleBtn).center().row();
+
+        Table expandedTable = new Table();
+        expandedTable.center().defaults().center();
+
+        Runnable updateWidget = () -> {
+            toggleBtn.setChecked(showConflictOptions);
+            arrowImg.setDrawable(showConflictOptions ? downIcon : rightIcon);
+            label.setText(getConflictPolicySummary(mapsCount, schemsCount));
+
+            expandedTable.clearChildren();
+            if(showConflictOptions){
+                expandedTable.margin(3f, 4f, 3f, 4f);
+
+                Table conflictBox = new Table();
+                conflictBox.center().defaults().pad(1f);
+
+                Runnable onPolicyChanged = () -> {
+                    label.setText(getConflictPolicySummary(mapsCount, schemsCount));
+                };
+
+                if(targetType == PackType.MAP || (targetType == null && mapsCount > 0 && schemsCount == 0)){
+                    buildConflictRowSection(conflictBox, PackType.MAP, false, onPolicyChanged);
+                }else if(targetType == PackType.SCHEMATIC || (targetType == null && schemsCount > 0 && mapsCount == 0)){
+                    buildConflictRowSection(conflictBox, PackType.SCHEMATIC, false, onPolicyChanged);
+                }else{
+                    buildConflictRowSection(conflictBox, PackType.MAP, true, onPolicyChanged);
+                    buildConflictRowSection(conflictBox, PackType.SCHEMATIC, true, onPolicyChanged);
+                }
+
+                CheckBox skipIdenticalBox = new CheckBox("");
+                skipIdenticalBox.setChecked(PackLoaderSettings.isSkipIdenticalContent());
+                skipIdenticalBox.changed(() -> {
+                    PackLoaderSettings.setSkipIdenticalContent(skipIdenticalBox.isChecked());
+                    rebuildEntriesList();
+                });
+                skipIdenticalBox.clearChildren();
+                skipIdenticalBox.left().defaults().left();
+                skipIdenticalBox.margin(0f);
+                skipIdenticalBox.add(skipIdenticalBox.getImage()).size(20f).padRight(6f).center();
+                UIUtils.squareCheck(skipIdenticalBox, 20f);
+                Table skipTextTable = new Table();
+                skipTextTable.left().defaults().left();
+                skipTextTable.touchable = Touchable.disabled;
+                skipTextTable.add(getLocalizedText("packloader.quick-import.skip-identical"))
+                    .style(Styles.defaultLabel)
+                    .color(Color.lightGray);
+                skipIdenticalBox.add(skipTextTable).left().center();
+
+                if(Vars.mobile){
+                    expandedTable.add(conflictBox).center().padBottom(3f).row();
+                    expandedTable.add(skipIdenticalBox).center().padTop(2f).row();
+                }else{
+                    expandedTable.add(conflictBox).padRight(8f);
+                    expandedTable.add(skipIdenticalBox).padLeft(8f).row();
+                }
+            }else{
+                expandedTable.margin(0f);
+            }
+            expandedTable.invalidateHierarchy();
+        };
+
+        toggleBtn.clicked(() -> {
+            showConflictOptions = !showConflictOptions;
+            updateWidget.run();
+        });
+
+        updateWidget.run();
+        root.add(expandedTable).growX().center().row();
+
+        return root;
     }
 
     /** View 2: File Review and Bulk Import Controls */
@@ -748,21 +908,8 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
         cont.add(header).growX().pad(Vars.mobile ? 4f : 6f).row();
 
-        // Conflict Resolution Policy
-        Table conflictBox = new Table();
-        conflictBox.right().defaults().pad(1f);
-
-        if(targetType == PackType.MAP || (targetType == null && mapsCount > 0 && schemsCount == 0)){
-            buildConflictRowSection(conflictBox, PackType.MAP, false);
-        }else if(targetType == PackType.SCHEMATIC || (targetType == null && schemsCount > 0 && mapsCount == 0)){
-            buildConflictRowSection(conflictBox, PackType.SCHEMATIC, false);
-        }else{
-            buildConflictRowSection(conflictBox, PackType.MAP, true);
-            buildConflictRowSection(conflictBox, PackType.SCHEMATIC, true);
-        }
-
         if(Vars.mobile){
-            // Mobile: Unified compact toolbar card containing Search Bar and Conflict Policy
+            // Mobile: Unified compact toolbar card containing Search Bar and Collapsible Conflict Widget
             Table controlsCard = new Table(UIUtils.flatPane());
             controlsCard.margin(4f, 8f, 4f, 8f);
 
@@ -785,33 +932,12 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             }
             controlsCard.add(searchBar).growX().padBottom(3f).row();
 
-            // Row 1b (Mobile): Conflict Policy Selector (compact, centered)
-            controlsCard.add(conflictBox).center().growX().padTop(2f).row();
-
-            // Row 1c (Mobile): Skip Identical Content Checkbox
-            CheckBox skipIdenticalBox = new CheckBox("");
-            skipIdenticalBox.setChecked(PackLoaderSettings.isSkipIdenticalContent());
-            skipIdenticalBox.changed(() -> {
-                PackLoaderSettings.setSkipIdenticalContent(skipIdenticalBox.isChecked());
-                rebuildEntriesList();
-            });
-            skipIdenticalBox.clearChildren();
-            skipIdenticalBox.left().defaults().left();
-            skipIdenticalBox.margin(0f);
-            skipIdenticalBox.add(skipIdenticalBox.getImage()).size(20f).padRight(6f).center();
-            UIUtils.squareCheck(skipIdenticalBox, 20f);
-            Table skipTextTable = new Table();
-            skipTextTable.left().defaults().left();
-            skipTextTable.touchable = Touchable.disabled;
-            skipTextTable.add(getLocalizedText("packloader.quick-import.skip-identical"))
-                .style(Styles.defaultLabel)
-                .color(Color.lightGray);
-            skipIdenticalBox.add(skipTextTable).left().center();
-            controlsCard.add(skipIdenticalBox).center().padTop(3f);
+            // Row 1b (Mobile): Collapsible Conflict Policy & Skip Identical controls
+            controlsCard.add(buildCollapsibleConflictWidget(mapsCount, schemsCount)).growX().padTop(2f).row();
 
             cont.add(controlsCard).growX().pad(2f, 4f, 2f, 4f).row();
         }else{
-            // Desktop: Search Bar (Left) + Skip Identical (Center) + Conflict Policy (Right) in a unified inline container
+            // Desktop: Search Bar (Left) + Collapsible Conflict Controls (Right) in a unified inline container
             Table row1 = new Table(UIUtils.flatPane());
             row1.margin(4f, 8f, 4f, 8f);
             row1.image(Icon.zoom).size(20f).color(Pal.accent).padLeft(6f).padRight(6f);
@@ -830,27 +956,8 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                 }).size(30f).padRight(4f);
             }
 
-            CheckBox skipIdenticalBox = new CheckBox("");
-            skipIdenticalBox.setChecked(PackLoaderSettings.isSkipIdenticalContent());
-            skipIdenticalBox.changed(() -> {
-                PackLoaderSettings.setSkipIdenticalContent(skipIdenticalBox.isChecked());
-                rebuildEntriesList();
-            });
-            skipIdenticalBox.clearChildren();
-            skipIdenticalBox.left().defaults().left();
-            skipIdenticalBox.margin(0f);
-            skipIdenticalBox.add(skipIdenticalBox.getImage()).size(20f).padRight(6f).center();
-            UIUtils.squareCheck(skipIdenticalBox, 20f);
-            Table skipTextTable = new Table();
-            skipTextTable.left().defaults().left();
-            skipTextTable.touchable = Touchable.disabled;
-            skipTextTable.add(getLocalizedText("packloader.quick-import.skip-identical"))
-                .style(Styles.defaultLabel)
-                .color(Color.lightGray);
-            skipIdenticalBox.add(skipTextTable).left().center();
-            row1.add(skipIdenticalBox).padLeft(8f).padRight(4f);
-
-            row1.add(conflictBox).right().padLeft(8f).padRight(4f);
+            Table conflictWidget = buildCollapsibleConflictWidget(mapsCount, schemsCount);
+            row1.add(conflictWidget).padLeft(8f).padRight(4f);
             cont.add(row1).growX().pad(2f, 4f, 2f, 4f).row();
         }
 
@@ -1829,12 +1936,22 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                         mapDuplicatePolicy = PackLoaderSettings.getDuplicatePolicy(PackType.MAP);
                         schemDuplicatePolicy = PackLoaderSettings.getDuplicatePolicy(PackType.SCHEMATIC);
 
+                        // If Quick Import is ON and not appending: auto-import immediately, bypassing Review
+                        if(!append && PackLoaderSettings.isQuickImport()){
+                            int eligible = EntryFilter.selectEligibleForQuickImport(entries, targetType,
+                                mapDuplicatePolicy, schemDuplicatePolicy);
+                            if(eligible > 0){
+                                executeImport();
+                                return;
+                            }
+                        }
+
                         // Mark valid entries matching targetType selected by default
                         for(PackEntry entry : entries){
                             entry.selected = (targetType == null || entry.type == targetType) && entry.isValid;
                         }
 
-                        // Always navigate to Review screen; do not auto-import
+                        // Navigate to Review screen
                         rebuild();
                         if(!isShown()) super.show();
 

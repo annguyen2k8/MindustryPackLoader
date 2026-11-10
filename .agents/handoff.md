@@ -3,23 +3,31 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-10 21:05 +07:00
+- **Last updated:** 2026-11-10 21:35 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** Restore full Review feature (View 2, entry table, DryRunDialog, configure conflict policy & skip identical content before import) while retaining native Bug Report button and responsive layout.
+- **Task:** Complete import workflow UI/UX: restore Quick Import toggle (mode/source selection) and add collapsible conflict resolution controls in Review.
 - **Branch:** dev; upstream origin/dev.
 
 ## Results
 
-- [verified] Full Review Feature & Workflow Restored:
-  - Restored `DryRunDialog.java` and all Review UI methods in `PackLoaderDialog.java` (`buildEntriesView()`, `buildListTable()`, `populateListTable()`, `formatDryRunSummary()`, `calculateDryRunPlan()`, etc.).
-  - Restored proper workflow: Scan → Review (View 2) → Configure Import → Execute Import → PackResultDialog.
-  - Eliminated auto-import after scan: scanning always navigates to Review view, allowing user inspection of items, duplicate badges, file details, and placement.
-  - Enhanced Review View controls: users can dynamically configure conflict policy (`On conflict: [Skip] [Overwrite] [Rename]`) and toggle `Skip identical content` directly inside View 2, with immediate live Dry-Run recalculation.
-- [verified] Retained Bug Report Text & Responsive Layout:
-  - Preserved full text button with link icon `Icon.link` across all dialog views (`Close`/`Back` on left, `Bug Report` on right on mobile).
+- [verified] Quick Import Toggle Restored on Source & Mode Selection Screens:
+  - Checkbox `Quick Import` restored in `createQuickImportRow()` on both initial mode selection (`buildModeSelection`) and pack source selection (`buildSourceSelection`).
+  - Defaults to `false` (OFF).
+  - Dynamically shows indented conflict preset buttons when Quick Import is checked (`34f` left margin matching `CheckboxRowInteractionTest`).
+  - Preserved sub-option `Skip identical content` checkbox directly below.
+  - When Quick Import is ON: `scanAsync()` selects eligible entries via `EntryFilter.selectEligibleForQuickImport()` and executes import directly, bypassing Review.
+  - When Quick Import is OFF: `scanAsync()` marks all valid entries selected and navigates to Review View (View 2).
+- [verified] Collapsible Conflict Resolution Controls in Review View:
+  - Replaced bulky static conflict policy rows in Review with `buildCollapsibleConflictWidget()`.
+  - Uses native Mindustry accordion conventions: `Button` (`Styles.flatTogglet`) with dynamic chevron (`Icon.rightOpenSmall` / `Icon.downOpenSmall`) and colored summary label (`On conflict: [accent]Skip[]`).
+  - When open: displays policy choice buttons (`Skip` / `Overwrite` / `Rename`) and `Skip identical content` checkbox.
+  - When closed: hides the options while preserving the currently active policy and keeping Dry Run Outcome completely accurate.
+  - Changing policy immediately triggers `rebuildEntriesList()`, updating both the entry badges and the Dry Run breakdown (`previewSummaryLabel`).
+- [verified] Preserved Responsive Layout & Native Bug Report:
+  - Preserved full text Bug Report button with `Icon.link` across all views (`Close`/`Back` on left, `Bug Report` on right).
   - Preserved responsive 2-row layout when undo transactions exist on mobile screens.
 - [verified] Test Suite & Build Verification:
-  - `./gradlew test --rerun`: 251/251 tests pass 100%.
+  - `./gradlew test --rerun`: 253/253 tests pass 100% (added tests for collapsible conflict expansion/collapse, state preservation, and quick import workflow).
   - `./gradlew verifyJar`: Desktop JAR bundle verification passed.
   - `./gradlew deploy`: Universal JAR deployed to `/sdcard/Download/MindustryPackLoader.jar` with verified `classes.dex`.
 
@@ -33,6 +41,6 @@
 
 ## Verification
 
-- `./gradlew test --rerun` -> 251 tests completed, 0 failures.
+- `./gradlew test --rerun` -> 253 tests completed, 0 failures.
 - `./gradlew jar verifyJar` -> BUILD SUCCESSFUL.
 - `./gradlew deploy` -> BUILD SUCCESSFUL.
