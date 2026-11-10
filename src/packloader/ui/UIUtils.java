@@ -1,14 +1,20 @@
 package packloader.ui;
 
 import arc.Core;
+import arc.func.Cons;
+import arc.graphics.Color;
 import arc.scene.style.Drawable;
 import arc.scene.ui.Button;
 import arc.scene.ui.CheckBox;
 import arc.scene.ui.TextButton;
+import arc.scene.ui.layout.Table;
 import arc.util.Scaling;
 import arc.util.Strings;
 import mindustry.Vars;
+import mindustry.gen.Icon;
+import mindustry.graphics.Pal;
 import mindustry.ui.Styles;
+import mindustry.ui.dialogs.BaseDialog;
 
 /** UI helper methods for consistent Mindustry styling. */
 public final class UIUtils{
@@ -134,5 +140,100 @@ public final class UIUtils{
             }
         }
         return box;
+    }
+
+    /**
+     * Displays a standardized modal notice dialog matching native Mindustry look and feel.
+     * Features the signature gold accent underline on the title bar, an optional icon,
+     * styled sub-header, responsive wrapped message body, and custom action buttons.
+     */
+    public static BaseDialog showNoticeDialog(
+        String title,
+        String header,
+        String message,
+        Drawable icon,
+        Color iconColor,
+        Cons<Table> buttonBuilder
+    ){
+        BaseDialog d = new BaseDialog(title != null ? title : "");
+        d.setFillParent(false);
+        d.cont.margin(16f);
+
+        Table t = d.cont;
+        if(icon != null){
+            t.image(icon).size(48f).color(iconColor != null ? iconColor : Pal.accent).padBottom(10f).row();
+        }
+
+        if(header != null && !header.isEmpty()){
+            t.add(header).color(Pal.accent).fontScale(1.1f).padBottom(8f).row();
+        }
+
+        if(message != null && !message.isEmpty()){
+            float maxW = Math.min(screenWidth() * 0.88f, 480f);
+            t.add(message).width(maxW).wrap().color(Color.lightGray).padBottom(16f).row();
+        }
+
+        boolean isCompact = isCompact();
+        float btnW = isCompact ? Math.min(210f, (screenWidth() - 36f) / 2f) : 210f;
+        d.buttons.defaults().size(btnW, buttonHeight()).pad(4f);
+
+        if(buttonBuilder != null){
+            buttonBuilder.get(d.buttons);
+        }
+
+        if(Core.scene != null){
+            d.show();
+        }
+        return d;
+    }
+
+    /**
+     * Displays a standardized modal notice dialog with two action buttons (confirm & cancel).
+     */
+    public static BaseDialog showNoticeDialog(
+        String title,
+        String header,
+        String message,
+        String confirmText,
+        Drawable confirmIcon,
+        Runnable onConfirm,
+        String cancelText,
+        Drawable cancelIcon,
+        Runnable onCancel
+    ){
+        BaseDialog[] dialogRef = new BaseDialog[1];
+        dialogRef[0] = showNoticeDialog(title, header, message, Icon.info, Pal.accent, buttons -> {
+            if(confirmText != null){
+                Drawable cIcon = confirmIcon != null ? confirmIcon : Icon.ok;
+                Button b = cIcon != null ?
+                    buttons.button(confirmText, cIcon, () -> {
+                        if(dialogRef[0] != null) dialogRef[0].hide();
+                        if(onConfirm != null) onConfirm.run();
+                    }).get() :
+                    buttons.button(confirmText, () -> {
+                        if(dialogRef[0] != null) dialogRef[0].hide();
+                        if(onConfirm != null) onConfirm.run();
+                    }).get();
+                if(b instanceof TextButton tb){
+                    fitButton(tb);
+                }
+            }
+            if(cancelText != null){
+                Drawable cIcon = cancelIcon != null ? cancelIcon : Icon.cancel;
+                Button b = cIcon != null ?
+                    buttons.button(cancelText, cIcon, () -> {
+                        if(dialogRef[0] != null) dialogRef[0].hide();
+                        if(onCancel != null) onCancel.run();
+                    }).get() :
+                    buttons.button(cancelText, () -> {
+                        if(dialogRef[0] != null) dialogRef[0].hide();
+                        if(onCancel != null) onCancel.run();
+                    }).get();
+                if(b instanceof TextButton tb){
+                    fitButton(tb);
+                }
+            }
+        });
+        return dialogRef[0];
     }
 }

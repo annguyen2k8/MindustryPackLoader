@@ -3,29 +3,23 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-10 16:00 +07:00
+- **Last updated:** 2026-11-10 16:20 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** UI/UX optimization for native Mindustry look and feel: fix small buttons, button collisions, and text overflow on Android & PC.
+- **Task:** UI/UX unification: Standardize Android Scoped Storage notices into a single reusable BaseDialog component (`UIUtils.showNoticeDialog`).
 - **Branch:** dev; upstream origin/dev.
 
 ## Results
 
-- [verified] Native Mindustry Button Sizing & Touch Ergonomics:
-  - Standardized dialog bottom buttons to native Mindustry height (64f, with 56f for compact secondary rows) across all dialogs (`PackLoaderDialog`, `DryRunDialog`, `PackResultDialog`, `StorageBrowserDialog`, `UndoConfirmDialog`, `UndoResultDialog`, `SchematicInfoDialog`, `MapInfoDialog`).
-  - Increased toolbar and filter toggle button heights from 30f to 38f on mobile (34f on desktop), with comfortable touch margins and icon spacing.
-  - Sized injected buttons in `CustomGameDialog` and `SchematicsDialog` responsively (`(screenWidth - 36f) / 2f` in mobile portrait), preventing them from exceeding viewport bounds.
-- [verified] Anti-Overflow & Zero-Clipping Button Label Constraints:
-  - Added `UIUtils.fitButton(T btn)`: enforces clean icon padding, single-line text layout, `minWidth(0f)` on label cells, and graceful ellipsis truncation if bounds are tight, completely eliminating text spilling outside button boundaries.
-  - Replaced raw `Core.graphics.getWidth()` pixel calculations with `UIUtils.screenWidth()` (scene coordinate units), fixing 480f table blowout on 360f-width mobile screens.
-- [verified] Responsive Multi-Row Action Bars on Mobile Portrait:
-  - `PackLoaderDialog` (Review Mode): In mobile portrait, splits bottom actions into 2 rows: Row 1 has Back (growX) and Preview (growX), Row 2 has full-width Import CTA (growX, 64f). Completely solves the button overlap and text clashing seen in screenshots.
-  - `DryRunDialog`: In mobile portrait, Row 1 has Back (growX) and Export, Row 2 has full-width Confirm Import CTA (growX, 64f).
-  - `PackResultDialog`: In mobile portrait, Row 1 has Close (growX), Export, and Undo, Row 2 has full-width Open Custom Game / Schematics CTA (growX, 64f).
-  - Selection toolbar: In mobile, wrapped in horizontal scroll pane (`noBarPane`) with smooth touch scrolling and generous touch targets.
-- [verified] Test Suite & Build Verification:
-  - `./gradlew test --rerun`: 250 tests passed 100%.
-  - `./gradlew jar verifyJar`: Desktop jar verified with bundles.
-  - `./gradlew deploy`: Universal `MindustryPackLoader.jar` built with valid `classes.dex` and deployed to `/sdcard/Download/MindustryPackLoader.jar`.
+- [verified] Unification of Android Scoped Storage Notices:
+  - Identified the root cause of the visual inconsistency between Notice 1 (Recent SAF reselect prompt) and Notice 2 (Folder scan restriction warning): Notice 1 called Mindustry's built-in `Vars.ui.showConfirm` (plain Arc `Dialog` lacking title accent bar and header icon), whereas Notice 2 manually created a `BaseDialog` with `Icon.info` (48f) and sub-headers.
+  - Implemented `UIUtils.showNoticeDialog`: a standardized, reusable modal notice helper for MindustryPackLoader. It guarantees the signature Mindustry gold underline accent on the title bar, `Icon.info` (48f) in `Pal.accent`, responsive wrapped message text, and touch-ergonomic buttons (64f height, `UIUtils.fitButton`).
+  - Refactored both Notice 1 (`createRecentSourceCard`) and Notice 2 (`showScopedStorageDialog`) to use `UIUtils.showNoticeDialog`, achieving 100% visual consistency and code reuse.
+  - Added localization keys (`packloader.action.cancel`, `packloader.action.reselect`) to both `bundle.properties` and `bundle_vi.properties`.
+- [verified] Test Suite & Verification:
+  - Added `UIUtilsTest.testShowNoticeDialogBuildsValidDialog()` covering dialog construction and child hierarchy.
+  - `./gradlew test --rerun`: 251 tests passed 100%.
+  - `./gradlew jar verifyJar`: Desktop jar verified and auto-copied to Download folder.
+  - `./gradlew deploy`: Universal `MindustryPackLoader.jar` verified with `classes.dex` and deployed to `/sdcard/Download/MindustryPackLoader.jar`.
 
 ## Remaining
 
@@ -37,6 +31,6 @@
 
 ## Verification
 
-- `./gradlew test --rerun` -> 250 tests completed, 0 failures.
+- `./gradlew test --rerun` -> 251 tests completed, 0 failures.
 - `./gradlew jar verifyJar` -> BUILD SUCCESSFUL; JAR verification passed.
 - `./gradlew deploy` -> BUILD SUCCESSFUL; universal jar deployed.

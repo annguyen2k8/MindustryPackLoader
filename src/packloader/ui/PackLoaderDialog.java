@@ -450,20 +450,24 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                     PackScanner.isScopedStorageRestricted(file != null ? file : new Fi(item.path))
                 );
                 if(isRestricted){
-                    if(Vars.ui != null){
-                        Vars.ui.showConfirm(
-                            getLocalizedText("packloader.recent.saf-reselect.title"),
-                            getLocalizedText("packloader.recent.saf-reselect.prompt", item.name),
-                            () -> {
-                                PackType target = activeType != null ? activeType : item.type;
-                                if(item.isDirectory){
-                                    openFolderPicker(target);
-                                }else{
-                                    pickZip(target);
-                                }
+                    UIUtils.showNoticeDialog(
+                        getLocalizedText("packloader.recent.saf-reselect.title"),
+                        getLocalizedText("packloader.scoped.header"),
+                        getLocalizedText("packloader.recent.saf-reselect.prompt", item.name),
+                        getLocalizedText("packloader.action.reselect"),
+                        Icon.refresh,
+                        () -> {
+                            PackType target = activeType != null ? activeType : item.type;
+                            if(item.isDirectory){
+                                openFolderPicker(target);
+                            }else{
+                                pickZip(target);
                             }
-                        );
-                    }
+                        },
+                        getLocalizedText("packloader.action.cancel"),
+                        Icon.cancel,
+                        null
+                    );
                     return;
                 }
 
@@ -1849,37 +1853,25 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
     }
 
     public void showScopedStorageDialog(PackType targetType){
-        BaseDialog d = new BaseDialog(getLocalizedText("packloader.scoped.title"));
-        d.setFillParent(false);
-        d.cont.margin(16f);
-
-        Table t = d.cont;
-        t.image(Icon.info).size(48f).color(Pal.accent).padBottom(10f).row();
-
-        String headerText = getLocalizedText("packloader.scoped.header");
-        t.add(headerText).color(Pal.accent).fontScale(1.1f).padBottom(8f).row();
-
+        String title = getLocalizedText("packloader.scoped.title");
+        String header = getLocalizedText("packloader.scoped.header");
         String msgText = getLocalizedText("packloader.scoped.message");
-
-        float maxW = Math.min(UIUtils.screenWidth() * 0.88f, 480f);
-        t.add(msgText).width(maxW).wrap().color(Color.lightGray).padBottom(16f).row();
-
-        boolean isCompact = UIUtils.isCompact();
-        float btnW = isCompact ? Math.min(210f, (UIUtils.screenWidth() - 36f) / 2f) : 210f;
-        d.buttons.defaults().size(btnW, UIUtils.buttonHeight()).pad(4f);
 
         String zipText = targetType == PackType.MAP ? getLocalizedText("packloader.action.import-map-zip") :
             targetType == PackType.SCHEMATIC ? getLocalizedText("packloader.action.import-schem-zip") :
             getLocalizedText("packloader.action.import-zip");
 
-        UIUtils.fitButton(d.buttons.button(zipText, Icon.download, () -> {
-            d.hide();
-            pickZip(targetType);
-        }).get());
-
-        UIUtils.fitButton(d.buttons.button(getLocalizedText("packloader.action.close"), Icon.cancel, d::hide).get());
-
-        d.show();
+        UIUtils.showNoticeDialog(
+            title,
+            header,
+            msgText,
+            zipText,
+            Icon.download,
+            () -> pickZip(targetType),
+            getLocalizedText("packloader.action.close"),
+            Icon.cancel,
+            null
+        );
     }
 
     public void scanAsync(Fi... sources){

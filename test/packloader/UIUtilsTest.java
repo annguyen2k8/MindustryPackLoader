@@ -101,4 +101,53 @@ public class UIUtilsTest{
     void testSolidBackgroundNotNull(){
         assertNotNull(UIUtils.solidBackground());
     }
+
+    @Test
+    void testShowNoticeDialogBuildsValidDialog(){
+        arc.Application prevApp = arc.Core.app;
+        arc.graphics.GL20 prevGl = arc.Core.gl;
+        arc.graphics.GL20 prevGl20 = arc.Core.gl20;
+        arc.Graphics prevGraphics = arc.Core.graphics;
+        arc.scene.Scene prevScene = arc.Core.scene;
+        try{
+            arc.Core.app = new arc.mock.MockApplication();
+            arc.Core.gl = arc.Core.gl20 = new arc.mock.MockGL20();
+            arc.Core.graphics = new arc.mock.MockGraphics();
+            arc.Core.scene = new arc.scene.Scene();
+
+            arc.graphics.g2d.Font dummyFont = new arc.graphics.g2d.Font(new arc.graphics.g2d.Font.FontData(), new arc.graphics.g2d.TextureRegion(), false);
+            arc.scene.ui.Dialog.DialogStyle dialogStyle = new arc.scene.ui.Dialog.DialogStyle();
+            dialogStyle.titleFont = dummyFont;
+            arc.Core.scene.addStyle(arc.scene.ui.Dialog.DialogStyle.class, dialogStyle);
+
+            arc.scene.ui.TextButton.TextButtonStyle textButtonStyle = new arc.scene.ui.TextButton.TextButtonStyle();
+            textButtonStyle.font = dummyFont;
+            arc.Core.scene.addStyle(arc.scene.ui.TextButton.TextButtonStyle.class, textButtonStyle);
+            arc.Core.scene.addStyle(arc.scene.ui.Button.ButtonStyle.class, new arc.scene.ui.Button.ButtonStyle());
+            arc.Core.scene.addStyle(arc.scene.ui.Label.LabelStyle.class, new arc.scene.ui.Label.LabelStyle(dummyFont, arc.graphics.Color.white));
+
+            boolean[] confirmed = new boolean[1];
+            mindustry.ui.dialogs.BaseDialog d = UIUtils.showNoticeDialog(
+                "Test Notice",
+                "Test SubHeader",
+                "Test Message Body",
+                "Confirm",
+                null,
+                () -> confirmed[0] = true,
+                "Cancel",
+                null,
+                null
+            );
+
+            assertNotNull(d);
+            assertNotNull(d.cont);
+            assertEquals(2, d.buttons.getChildren().size);
+        }finally{
+            arc.Core.app = prevApp;
+            arc.Core.gl = prevGl;
+            arc.Core.gl20 = prevGl20;
+            arc.Core.graphics = prevGraphics;
+            arc.Core.scene = prevScene;
+        }
+    }
 }
