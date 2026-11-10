@@ -30,6 +30,7 @@ public class DryRunDialog extends BaseDialog{
         this.onConfirm = onConfirm;
 
         setFillParent(true);
+        background(UIUtils.solidBackground());
         setupUI();
     }
 
@@ -42,18 +43,35 @@ public class DryRunDialog extends BaseDialog{
 
         // Stat cards summary banner
         Table statsTable = new Table(Tex.pane);
-        statsTable.margin(8f);
-        statsTable.defaults().pad(4f);
+        statsTable.margin(6f, 8f, 6f, 8f);
+        statsTable.defaults().pad(3f);
 
-        addStatCard(statsTable, getLocalizedText("packloader.dryrun.stat.new"), plan.newCount, Pal.heal);
-        addStatCard(statsTable, getLocalizedText("packloader.dryrun.stat.overwrite"), plan.overwriteCount, Pal.accent);
-        addStatCard(statsTable, getLocalizedText("packloader.dryrun.stat.rename"), plan.renameCount, Color.gold);
-        addStatCard(statsTable, getLocalizedText("packloader.dryrun.stat.skip"), plan.skipCount, Pal.lightishGray);
-        if(plan.contentDuplicateCount > 0){
-            addStatCard(statsTable, getLocalizedText("packloader.dryrun.stat.content-duplicates"), plan.contentDuplicateCount, Color.cyan);
+        if(Vars.mobile){
+            Table r1 = new Table();
+            r1.defaults().pad(2f);
+            addStatCard(r1, getLocalizedText("packloader.dryrun.stat.new"), plan.newCount, Pal.heal);
+            addStatCard(r1, getLocalizedText("packloader.dryrun.stat.overwrite"), plan.overwriteCount, Pal.accent);
+            addStatCard(r1, getLocalizedText("packloader.dryrun.stat.rename"), plan.renameCount, Color.gold);
+            statsTable.add(r1).growX().row();
+
+            Table r2 = new Table();
+            r2.defaults().pad(2f);
+            addStatCard(r2, getLocalizedText("packloader.dryrun.stat.skip"), plan.skipCount, Pal.lightishGray);
+            if(plan.contentDuplicateCount > 0){
+                addStatCard(r2, getLocalizedText("packloader.dryrun.stat.content-duplicates"), plan.contentDuplicateCount, Color.cyan);
+            }
+            statsTable.add(r2).growX().row();
+        }else{
+            addStatCard(statsTable, getLocalizedText("packloader.dryrun.stat.new"), plan.newCount, Pal.heal);
+            addStatCard(statsTable, getLocalizedText("packloader.dryrun.stat.overwrite"), plan.overwriteCount, Pal.accent);
+            addStatCard(statsTable, getLocalizedText("packloader.dryrun.stat.rename"), plan.renameCount, Color.gold);
+            addStatCard(statsTable, getLocalizedText("packloader.dryrun.stat.skip"), plan.skipCount, Pal.lightishGray);
+            if(plan.contentDuplicateCount > 0){
+                addStatCard(statsTable, getLocalizedText("packloader.dryrun.stat.content-duplicates"), plan.contentDuplicateCount, Color.cyan);
+            }
         }
 
-        cont.add(statsTable).growX().pad(4f, 8f, 4f, 8f).row();
+        cont.add(statsTable).growX().minWidth(0f).pad(4f, 8f, 4f, 8f).row();
 
         // Scrollable planned entries list
         Table list = new Table();
@@ -103,7 +121,7 @@ public class DryRunDialog extends BaseDialog{
                     if(item.isRenamed()){
                         title.append(" -> [gold]").append(item.plannedTargetName).append("[]");
                     }
-                    t.add(title.toString()).color(Color.white).ellipsis(true).growX().minWidth(0f).row();
+                    t.add(title.toString() + "[]").color(Color.white).ellipsis(true).growX().minWidth(0f).row();
 
                     StringBuilder info = new StringBuilder();
                     info.append("[lightgray]").append(item.entry.sanitizedFileName).append("[]");
@@ -151,13 +169,13 @@ public class DryRunDialog extends BaseDialog{
 
         // Disclaimer notice at bottom
         cont.add(getLocalizedText("packloader.dryrun.disclaimer"))
-            .color(Pal.lightishGray).style(Styles.outlineLabel).fontScale(0.85f).pad(6f).wrap().growX().row();
+            .color(Pal.lightishGray).style(Styles.outlineLabel).fontScale(0.85f).pad(6f).wrap().growX().minWidth(0f).row();
 
         // Bottom Action buttons
         buttons.clear();
         buttons.defaults().pad(4f);
         var backBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, this::hide)
-            .size(Vars.mobile ? 110f : 130f, 54f).get());
+            .size(Vars.mobile ? 100f : 130f, 54f).get());
         if(backBtn != null && backBtn.getLabel() != null){
             backBtn.getLabel().setWrap(false);
         }
@@ -181,7 +199,7 @@ public class DryRunDialog extends BaseDialog{
                 hide();
                 if(onConfirm != null) onConfirm.run();
             }
-        ).size(Vars.mobile ? 150f : 180f, 54f).get());
+        ).size(Vars.mobile ? 140f : 180f, 54f).get());
         if(confirmBtn != null){
             confirmBtn.setDisabled(plan.totalSelected == 0);
             if(confirmBtn.getLabel() != null){

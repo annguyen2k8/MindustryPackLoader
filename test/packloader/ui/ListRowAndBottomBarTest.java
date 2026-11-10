@@ -159,6 +159,40 @@ public class ListRowAndBottomBarTest{
     }
 
     @Test
+    public void testMobileBottomBarFitsWithin360p(){
+        Table buttons = new Table();
+        buttons.setSize(360f, 64f);
+        buttons.defaults().pad(4f);
+
+        // Mobile layout: Back (100f) + Preview (105f) + Import (130f)
+        TextButton backBtn = new TextButton("Back", mindustry.ui.Styles.flatt);
+        buttons.add(backBtn).size(100f, 54f);
+
+        TextButton previewBtn = new TextButton("Preview", mindustry.ui.Styles.flatt);
+        buttons.add(previewBtn).size(105f, 54f);
+
+        TextButton importBtn = new TextButton("Import (845)");
+        buttons.add(importBtn).size(130f, 54f);
+
+        buttons.layout();
+
+        // Verification:
+        // 1. All 3 buttons fit strictly within 360f container width
+        assertTrue(backBtn.x >= 0f, "Back button must be within screen bounds");
+        float rightmostX = importBtn.x + importBtn.getWidth();
+        assertTrue(rightmostX <= 360f, "Rightmost button must not exceed 360f screen width: was " + rightmostX);
+
+        // 2. No buttons overlap
+        assertTrue(previewBtn.x >= backBtn.x + backBtn.getWidth(), "Preview button must not overlap Back button");
+        assertTrue(importBtn.x >= previewBtn.x + previewBtn.getWidth(), "Import button must not overlap Preview button");
+
+        // 3. Heights match
+        assertEquals(54f, backBtn.getHeight());
+        assertEquals(54f, previewBtn.getHeight());
+        assertEquals(54f, importBtn.getHeight());
+    }
+
+    @Test
     public void testBottomBarButtonStatesAndSemanticColor(){
         TextButton previewBtn = new TextButton("Preview", mindustry.ui.Styles.flatt);
         TextButton importBtn = new TextButton("Import (0)");

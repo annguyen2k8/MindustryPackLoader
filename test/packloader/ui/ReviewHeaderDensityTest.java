@@ -155,6 +155,34 @@ public class ReviewHeaderDensityTest{
     }
 
     @Test
+    public void testMobileStackedSearchAndConflictLayout(){
+        Table mobileContainer = new Table();
+        mobileContainer.setSize(360f, 100f);
+
+        // Mobile Row 1a: Search Row
+        Table searchRow = new Table();
+        searchRow.setSize(360f, 32f);
+        TextField searchField = new TextField("");
+        searchRow.add(searchField).growX().height(32f);
+        searchRow.layout();
+
+        // Verification: Search field takes nearly entire 360f mobile width (>= 300f)
+        assertTrue(searchField.getWidth() >= 300f, "Search field on mobile must have full width; was " + searchField.getWidth());
+
+        // Mobile Row 1b: Conflict Row
+        Table conflictRow = new Table();
+        conflictRow.setSize(360f, 32f);
+        Table conflictBox = new Table();
+        for(DuplicatePolicy p : DuplicatePolicy.values()){
+            conflictBox.add(new TextButton(p.title())).height(30f);
+        }
+        conflictRow.add(conflictBox).center().growX();
+        conflictRow.layout();
+
+        assertTrue(conflictBox.getWidth() <= 360f, "Conflict selector must fit within 360f width");
+    }
+
+    @Test
     public void testRow2SelectionToolbarAndLiveSummaryConsolidation(){
         Table row2 = new Table();
         row2.setSize(800f, 36f);

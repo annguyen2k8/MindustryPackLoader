@@ -5,6 +5,7 @@ import arc.scene.ui.Button;
 import arc.scene.ui.CheckBox;
 import arc.scene.ui.TextButton;
 import arc.util.Scaling;
+import arc.util.Strings;
 import mindustry.ui.Styles;
 
 /** UI helper methods for consistent Mindustry styling. */
@@ -38,6 +39,21 @@ public final class UIUtils{
     /** Returns a slightly darker subtle flat borderless panel background (black with 60% opacity). */
     public static Drawable flatPaneDark(){
         return Styles.black6 != null ? Styles.black6 : Styles.none;
+    }
+
+    /** Returns an opaque black background to prevent under-dialog element bleed/ghosting. */
+    public static Drawable solidBackground(){
+        if(Styles.black != null) return Styles.black;
+        if(Styles.none != null) return Styles.none;
+        return new arc.scene.style.BaseDrawable();
+    }
+
+    /** Formats elapsed time concisely (e.g., "850 ms" or "14.3s"). */
+    public static String formatDuration(long millis){
+        if(millis < 1000){
+            return millis + " ms";
+        }
+        return Strings.fixed(millis / 1000f, 1) + "s";
     }
 
     /** Adds clean spacing between icon and label in a TextButton without excessive padding. */

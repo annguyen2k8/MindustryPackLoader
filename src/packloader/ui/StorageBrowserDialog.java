@@ -100,7 +100,12 @@ public class StorageBrowserDialog extends BaseDialog{
 
     private void setupUI(){
         setFillParent(true);
-        addCloseButton();
+        background(UIUtils.solidBackground());
+
+        buttons.clear();
+        buttons.defaults().size(Vars.mobile ? 140f : 210f, Vars.mobile ? 54f : 64f).pad(4f);
+        UIUtils.pad(buttons.button("@back", Icon.left, this::hide).get());
+        addCloseListener();
 
         selectFolderButton = UIUtils.pad(buttons.button(getLocalizedText("packloader.browser.select.folder"), Icon.ok, () -> {
             Fi chosen = selectedDirectory != null ? selectedDirectory : currentDirectory;

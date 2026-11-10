@@ -31,6 +31,7 @@ public class PackResultDialog extends BaseDialog{
         this.undoManager = undoManager != null ? undoManager : new UndoManager();
 
         setFillParent(true);
+        background(UIUtils.solidBackground());
         setupUI();
     }
 
@@ -72,7 +73,7 @@ public class PackResultDialog extends BaseDialog{
 
         // Secondary metadata line: Time elapsed and transaction ID (if present)
         StringBuilder meta = new StringBuilder();
-        meta.append(getLocalizedText("packloader.result.time", report.elapsedMillis));
+        meta.append(getLocalizedText("packloader.result.time", UIUtils.formatDuration(report.elapsedMillis)));
         if(report.transaction != null && report.transaction.id != null && !report.transaction.id.isEmpty()){
             meta.append("  •  ").append(getLocalizedText("packloader.result.transaction", report.transaction.id));
         }
@@ -136,7 +137,9 @@ public class PackResultDialog extends BaseDialog{
                 Color typeColor = res.entry.type == PackType.MAP ? Pal.heal : Pal.accent;
                 line1.add(typeTag).color(typeColor).padRight(6f);
 
-                line1.add(res.entry.sanitizedFileName).color(Color.white).ellipsis(true).growX().minWidth(0f);
+                String displayName = (res.entry.displayName != null && !res.entry.displayName.isEmpty()) ?
+                    res.entry.displayName : res.entry.sanitizedFileName;
+                line1.add(displayName + "[]").color(Color.white).ellipsis(true).growX().minWidth(0f);
                 t.add(line1).growX().minWidth(0f).left().row();
 
                 // Line 2: Message detail (Success message, destination, or failure reason)
@@ -166,8 +169,14 @@ public class PackResultDialog extends BaseDialog{
         }
         addCloseListener();
 
-        // Spacer pushes secondary & primary actions to the right
-        buttons.add().growX();
+        // On Desktop with primary CTA, push primary actions to the right
+        boolean hasCta = report.hasSuccess() && (
+            (report.results.contains(r -> r.entry.type == PackType.MAP && r.destinationFile != null) && Vars.ui != null && Vars.ui.custom != null) ||
+            (report.results.contains(r -> r.entry.type == PackType.SCHEMATIC && r.destinationFile != null) && Vars.ui != null && Vars.ui.schematics != null)
+        );
+        if(!Vars.mobile && hasCta){
+            buttons.add().growX();
+        }
 
         // Export (Utility / Secondary)
         if(Vars.mobile){

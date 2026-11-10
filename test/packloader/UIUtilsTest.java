@@ -86,4 +86,19 @@ public class UIUtilsTest{
         assertTrue(truncatedNoExt.length() <= 20);
         assertTrue(truncatedNoExt.endsWith("..."));
     }
+
+    @Test
+    void testFormatDuration(){
+        assertEquals("0 ms", UIUtils.formatDuration(0L));
+        assertEquals("450 ms", UIUtils.formatDuration(450L));
+        assertEquals("999 ms", UIUtils.formatDuration(999L));
+        assertEquals("1.0s", UIUtils.formatDuration(1000L));
+        assertEquals("14.3s", UIUtils.formatDuration(14332L));
+        assertEquals("60.0s", UIUtils.formatDuration(60000L));
+    }
+
+    @Test
+    void testSolidBackgroundNotNull(){
+        assertNotNull(UIUtils.solidBackground());
+    }
 }

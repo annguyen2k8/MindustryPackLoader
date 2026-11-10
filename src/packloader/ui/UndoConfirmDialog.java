@@ -28,6 +28,7 @@ public class UndoConfirmDialog extends BaseDialog{
         this.onCompleted = onCompleted;
 
         setFillParent(true);
+        background(UIUtils.solidBackground());
         setupUI();
     }
 
@@ -147,7 +148,7 @@ public class UndoConfirmDialog extends BaseDialog{
         // Bottom Action buttons
         buttons.clear();
         var backBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, this::hide)
-            .size(Vars.mobile ? 140f : 180f, 60f).get());
+            .size(Vars.mobile ? 120f : 180f, 54f).get());
         if(backBtn != null && backBtn.getLabel() != null){
             backBtn.getLabel().setWrap(false);
         }
@@ -159,7 +160,7 @@ public class UndoConfirmDialog extends BaseDialog{
                 hide();
                 executeUndo();
             }
-        ).size(Vars.mobile ? 180f : 240f, 60f).get());
+        ).size(Vars.mobile ? 160f : 220f, 54f).get());
         if(confirmBtn != null){
             confirmBtn.setDisabled(!ver.canUndoAny());
             if(confirmBtn.getLabel() != null){

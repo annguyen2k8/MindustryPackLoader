@@ -41,7 +41,7 @@ public class SchematicInfoDialog extends BaseDialog{
     public void show(PackEntry entry){
         cont.clear();
         buttons.clearChildren();
-        var backBtn = UIUtils.pad(buttons.button("@back", Icon.left, this::hide).size(180f, 54f).pad(4f).get());
+        var backBtn = UIUtils.pad(buttons.button("@back", Icon.left, this::hide).size(Vars.mobile ? 140f : 180f, 54f).pad(4f).get());
         if(backBtn != null && backBtn.getLabel() != null){
             backBtn.getLabel().setWrap(false);
         }
@@ -178,7 +178,7 @@ public class SchematicInfoDialog extends BaseDialog{
                     hide();
                     if(onPlacedCallback != null) onPlacedCallback.run();
                 });
-            }).size(180f, 54f).pad(4f).get());
+            }).size(Vars.mobile ? 140f : 180f, 54f).pad(4f).get());
             if(placeBtn != null && placeBtn.getLabel() != null){
                 placeBtn.getLabel().setWrap(false);
             }

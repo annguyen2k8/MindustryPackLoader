@@ -83,6 +83,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
         shouldPause = true;
         setFillParent(true);
+        background(UIUtils.solidBackground());
         addCloseButton();
 
         shown(this::rebuild);
@@ -311,10 +312,13 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             }
         }
 
-        buttons.add().growX();
-
         ImportTransaction latestTx = importer.undoManager.getLatestTransaction();
-        if(latestTx != null && !latestTx.undone && latestTx.getActiveItemCount() > 0){
+        boolean hasUndo = latestTx != null && !latestTx.undone && latestTx.getActiveItemCount() > 0;
+        if(!Vars.mobile || hasUndo){
+            buttons.add().growX();
+        }
+
+        if(hasUndo){
             var undoBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.undo.button.last"), Icon.undo, () -> {
                 new UndoConfirmDialog(importer.undoManager, latestTx, this::rebuild).show();
             }).size(Vars.mobile ? 140f : 180f, 54f).get());
@@ -432,7 +436,9 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             }
         }
 
-        buttons.add().growX();
+        if(!Vars.mobile){
+            buttons.add().growX();
+        }
     }
 
     private Button createRecentSourceCard(RecentSources.SourceItem item, PackType activeType){
@@ -707,48 +713,29 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             Icon.add, this::openAddSourceMenu
         ).height(40f).padRight(4f).get());
         if(addBtn != null){
-            addBtn.margin(4f, 12f, 4f, 12f);
+            addBtn.margin(4f, 10f, 4f, 10f);
             if(addBtn.getLabel() != null) addBtn.getLabel().setWrap(false);
         }
 
-        var changeBtn = UIUtils.pad(header.button(
-            getLocalizedText("packloader.source.change"),
-            Icon.refresh, () -> {
-                clearEntries();
-                sourceName = "";
-                targetType = null;
-                resetFilters();
-                rebuild();
-            }).height(40f).padRight(4f).get());
-        if(changeBtn != null){
-            changeBtn.margin(4f, 12f, 4f, 12f);
-            if(changeBtn.getLabel() != null) changeBtn.getLabel().setWrap(false);
+        if(!Vars.mobile){
+            var changeBtn = UIUtils.pad(header.button(
+                getLocalizedText("packloader.source.change"),
+                Icon.refresh, () -> {
+                    clearEntries();
+                    sourceName = "";
+                    targetType = null;
+                    resetFilters();
+                    rebuild();
+                }).height(40f).padRight(4f).get());
+            if(changeBtn != null){
+                changeBtn.margin(4f, 10f, 4f, 10f);
+                if(changeBtn.getLabel() != null) changeBtn.getLabel().setWrap(false);
+            }
         }
 
-        cont.add(header).growX().pad(6f).row();
+        cont.add(header).growX().pad(Vars.mobile ? 4f : 6f).row();
 
-        // Row 1: Search Bar (Left) + Conflict Policy Selector (Right) in a unified flat container
-        Table row1 = new Table(UIUtils.flatPane());
-        row1.margin(4f, 8f, 4f, 8f);
-
-        // Search Bar (Left)
-        row1.image(Icon.zoom).size(20f).color(Pal.accent).padLeft(6f).padRight(6f);
-        TextField searchField = new TextField(searchText);
-        searchField.setMessageText(getLocalizedText("packloader.search.placeholder"));
-        searchField.changed(() -> {
-            searchText = searchField.getText();
-            rebuildEntriesList();
-        });
-        row1.add(searchField).growX().minWidth(100f).height(32f);
-        if(!searchText.isEmpty()){
-            row1.button(Icon.cancel, Styles.clearNonei, () -> {
-                searchText = "";
-                searchField.setText("");
-                rebuildEntriesList();
-            }).size(30f).padRight(4f);
-        }
-
-        // Conflict Resolution Policy (Right)
+        // Conflict Resolution Policy
         Table conflictBox = new Table();
         conflictBox.right().defaults().pad(1f);
 
@@ -761,8 +748,54 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             buildConflictRowSection(conflictBox, PackType.SCHEMATIC, true);
         }
 
-        row1.add(conflictBox).right().padLeft(8f).padRight(4f);
-        cont.add(row1).growX().pad(2f, 4f, 2f, 4f).row();
+        if(Vars.mobile){
+            // Row 1a (Mobile): Search Bar takes full width
+            Table searchRow = new Table(UIUtils.flatPane());
+            searchRow.margin(4f, 8f, 4f, 8f);
+            searchRow.image(Icon.zoom).size(20f).color(Pal.accent).padLeft(6f).padRight(6f);
+            TextField searchField = new TextField(searchText);
+            searchField.setMessageText(getLocalizedText("packloader.search.placeholder"));
+            searchField.changed(() -> {
+                searchText = searchField.getText();
+                rebuildEntriesList();
+            });
+            searchRow.add(searchField).growX().height(32f);
+            if(!searchText.isEmpty()){
+                searchRow.button(Icon.cancel, Styles.clearNonei, () -> {
+                    searchText = "";
+                    searchField.setText("");
+                    rebuildEntriesList();
+                }).size(30f).padRight(4f);
+            }
+            cont.add(searchRow).growX().pad(2f, 4f, 2f, 4f).row();
+
+            // Row 1b (Mobile): Conflict Policy Selector takes full width
+            Table conflictRow = new Table(UIUtils.flatPane());
+            conflictRow.margin(3f, 8f, 3f, 8f);
+            conflictRow.add(conflictBox).center().growX();
+            cont.add(conflictRow).growX().pad(2f, 4f, 2f, 4f).row();
+        }else{
+            // Desktop: Search Bar (Left) + Conflict Policy Selector (Right) in a unified inline container
+            Table row1 = new Table(UIUtils.flatPane());
+            row1.margin(4f, 8f, 4f, 8f);
+            row1.image(Icon.zoom).size(20f).color(Pal.accent).padLeft(6f).padRight(6f);
+            TextField searchField = new TextField(searchText);
+            searchField.setMessageText(getLocalizedText("packloader.search.placeholder"));
+            searchField.changed(() -> {
+                searchText = searchField.getText();
+                rebuildEntriesList();
+            });
+            row1.add(searchField).growX().minWidth(100f).height(32f);
+            if(!searchText.isEmpty()){
+                row1.button(Icon.cancel, Styles.clearNonei, () -> {
+                    searchText = "";
+                    searchField.setText("");
+                    rebuildEntriesList();
+                }).size(30f).padRight(4f);
+            }
+            row1.add(conflictBox).right().padLeft(8f).padRight(4f);
+            cont.add(row1).growX().pad(2f, 4f, 2f, 4f).row();
+        }
 
         // Row 2: Selection & Filter Toolbar (Left) + Live Dry-Run Outcome Breakdown (Right)
         Table row2 = new Table();
@@ -795,7 +828,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                 rebuildEntriesList();
             }).height(30f).pad(1f).get());
         if(selectAllBtn != null){
-            selectAllBtn.margin(3f, 6f, 3f, 6f);
+            selectAllBtn.margin(3f, Vars.mobile ? 4f : 6f, 3f, Vars.mobile ? 4f : 6f);
             if(selectAllBtn.getLabel() != null) selectAllBtn.getLabel().setWrap(false);
         }
 
@@ -806,7 +839,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                 rebuildEntriesList();
             }).height(30f).pad(1f).get());
         if(deselectBtn != null){
-            deselectBtn.margin(3f, 6f, 3f, 6f);
+            deselectBtn.margin(3f, Vars.mobile ? 4f : 6f, 3f, Vars.mobile ? 4f : 6f);
             if(deselectBtn.getLabel() != null) deselectBtn.getLabel().setWrap(false);
         }
 
@@ -817,12 +850,12 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                 rebuildEntriesList();
             }).height(30f).pad(1f).get());
         if(invertBtn != null){
-            invertBtn.margin(3f, 6f, 3f, 6f);
+            invertBtn.margin(3f, Vars.mobile ? 4f : 6f, 3f, Vars.mobile ? 4f : 6f);
             if(invertBtn.getLabel() != null) invertBtn.getLabel().setWrap(false);
         }
 
         // Native Mindustry visual divider between Selection and Smart Filter groups
-        row2.image().color(Pal.gray).width(1f).height(18f).pad(0f, 6f, 0f, 6f);
+        row2.image().color(Pal.gray).width(1f).height(18f).pad(0f, Vars.mobile ? 3f : 6f, 0f, Vars.mobile ? 3f : 6f);
 
         // --- Group 2: Smart Selection (New, Unique) ---
         var selectNewBtn = UIUtils.pad(row2.button(
@@ -832,7 +865,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                 rebuildEntriesList();
             }).height(30f).pad(1f).get());
         if(selectNewBtn != null){
-            selectNewBtn.margin(3f, 6f, 3f, 6f);
+            selectNewBtn.margin(3f, Vars.mobile ? 4f : 6f, 3f, Vars.mobile ? 4f : 6f);
             if(selectNewBtn.getLabel() != null) selectNewBtn.getLabel().setWrap(false);
         }
 
@@ -843,12 +876,12 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                 rebuildEntriesList();
             }).height(30f).pad(1f).get());
         if(selectUniqueBtn != null){
-            selectUniqueBtn.margin(3f, 6f, 3f, 6f);
+            selectUniqueBtn.margin(3f, Vars.mobile ? 4f : 6f, 3f, Vars.mobile ? 4f : 6f);
             if(selectUniqueBtn.getLabel() != null) selectUniqueBtn.getLabel().setWrap(false);
         }
 
         // Native Mindustry visual divider between Smart Filter and View options
-        row2.image().color(Pal.gray).width(1f).height(18f).pad(0f, 6f, 0f, 6f);
+        row2.image().color(Pal.gray).width(1f).height(18f).pad(0f, Vars.mobile ? 3f : 6f, 0f, Vars.mobile ? 3f : 6f);
 
         // --- Group 3: View Toggle (Details) ---
         var metaToggleBtn = UIUtils.pad(row2.button(
@@ -858,7 +891,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                 rebuildEntriesList();
             }).checked(b -> showDetailedMeta).height(30f).pad(1f).get());
         if(metaToggleBtn != null){
-            metaToggleBtn.margin(3f, 6f, 3f, 6f);
+            metaToggleBtn.margin(3f, Vars.mobile ? 4f : 6f, 3f, Vars.mobile ? 4f : 6f);
             if(metaToggleBtn.getLabel() != null) metaToggleBtn.getLabel().setWrap(false);
         }
 
@@ -889,39 +922,35 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         buttons.clear();
         buttons.defaults().pad(4f);
 
-        // Left Actions: Back (Dismissive) + Bug Report (Utility Icon)
+        // Left Actions: Back (Dismissive)
         var backBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.action.back"), Icon.left, () -> {
             clearEntries();
             sourceName = "";
             targetType = null;
             resetFilters();
             rebuild();
-        }).size(Vars.mobile ? 120f : 160f, 54f).get());
+        }).size(Vars.mobile ? 100f : 160f, 54f).get());
         if(backBtn != null && backBtn.getLabel() != null){
             backBtn.getLabel().setWrap(false);
         }
         addCloseListener();
 
-        if(Vars.mobile){
-            buttons.button(Icon.link, () -> Core.app.openURI(ISSUES_URL)).size(54f, 54f);
-        }else{
+        if(!Vars.mobile){
             var bugBtn = UIUtils.pad(buttons.button(getLocalizedText("packloader.bug.report"), Icon.link, () -> {
                 Core.app.openURI(ISSUES_URL);
             }).size(180f, 54f).get());
             if(bugBtn != null && bugBtn.getLabel() != null){
                 bugBtn.getLabel().setWrap(false);
             }
+            buttons.add().growX();
         }
-
-        // Spacer pushes primary actions to the right
-        buttons.add().growX();
 
         // Right Actions: Preview (Secondary) + Import (Primary CTA)
         var previewBtn = UIUtils.pad(buttons.button(
             getLocalizedText("packloader.dryrun.button.preview"),
             Icon.eye,
             this::showDryRunDialog
-        ).size(Vars.mobile ? 130f : 160f, 54f).get());
+        ).size(Vars.mobile ? 105f : 160f, 54f).get());
         if(previewBtn != null){
             if(previewBtn.getLabel() != null) previewBtn.getLabel().setWrap(false);
             previewBtn.update(() -> {
@@ -931,7 +960,8 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
         int selectedCount = visibleSelectedCount();
         String initialImportText = getLocalizedText("packloader.import.action", selectedCount);
-        var importBtn = UIUtils.pad(buttons.button(initialImportText, Icon.download, this::executeImport).size(Vars.mobile ? 160f : 200f, 54f).get());
+        var importBtn = UIUtils.pad(buttons.button(initialImportText, Icon.download, this::executeImport)
+            .size(Vars.mobile ? 130f : 200f, 54f).get());
         if(importBtn != null && importBtn.getLabel() != null){
             importBtn.getLabel().setWrap(false);
         }
@@ -1088,7 +1118,7 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
                     titleBuilder.append("  [scarlet]").append(getLocalizedText("packloader.badge.invalid")).append("[]");
                 }
 
-                t.add(titleBuilder.toString()).color(Color.white).ellipsis(true).growX().minWidth(0f).left().row();
+                t.add(titleBuilder.toString() + "[]").color(Color.white).ellipsis(true).growX().minWidth(0f).left().row();
 
                 // Clean second line: status reasons, author, and optional detailed metadata
                 StringBuilder infoBuilder = new StringBuilder();
@@ -1590,13 +1620,12 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
 
                 MainThread.post(() -> {
                     if(!scanGeneration.isCurrent(token) || Vars.ui == null || Vars.ui.loadfrag == null) return;
-                    String fileName = currentFile == null ? "" : truncateFileName(currentFile, 36);
                     if(totalKnown){
                         Vars.ui.loadfrag.setText(getLocalizedText("packloader.scan.progress.total",
-                            Math.min(found, total), total, fileName));
+                            Math.min(found, total), total));
                         Vars.ui.loadfrag.setProgress(Math.min(1f, found / (float)total));
                     }else{
-                        Vars.ui.loadfrag.setText(getLocalizedText("packloader.scan.progress", found, fileName));
+                        Vars.ui.loadfrag.setText(getLocalizedText("packloader.scan.progress", found));
                     }
                 });
             }
