@@ -44,6 +44,7 @@ import packloader.undo.UndoManager;
 import packloader.util.MainThread;
 import packloader.util.PackLoaderSettings;
 import packloader.util.RecentSources;
+import packloader.util.StorageSources;
 import packloader.util.TaskGeneration;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -445,11 +446,12 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         Button card = new Button(UIUtils.cardStyle());
         card.margin(8f, 12f, 8f, 12f);
         card.clicked(() -> {
-            Fi file = Core.files.absolute(item.path);
-            if(!file.exists()){
+            Fi file = packloader.util.StorageSources.resolveFi(item.path);
+            if(file == null || !file.exists()){
                 RecentSources.remove(item.path, item.type);
                 if(Vars.ui != null){
-                    Vars.ui.showErrorMessage(getLocalizedText("packloader.source.path.notfound", item.path));
+                    String missingName = (item.name != null && !item.name.isEmpty()) ? item.name : item.path;
+                    Vars.ui.showErrorMessage(getLocalizedText("packloader.source.path.notfound", missingName));
                 }
                 rebuild();
                 return;
@@ -1470,8 +1472,9 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         Seq<RecentSources.SourceItem> recents = RecentSources.getForType(targetType);
         if(!recents.isEmpty()){
             for(RecentSources.SourceItem item : recents){
-                if(Core.files.absolute(item.path).exists()){
-                    defaultPath = item.path;
+                Fi resolved = StorageSources.resolveFi(item.path);
+                if(resolved != null && resolved.exists()){
+                    defaultPath = resolved.path();
                     break;
                 }
             }
@@ -1498,8 +1501,8 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
             for(String p : parts){
                 String trimmed = p.trim();
                 if(trimmed.isEmpty()) continue;
-                Fi file = Core.files.absolute(trimmed);
-                if(!file.exists()){
+                Fi file = StorageSources.resolveFi(trimmed);
+                if(file == null || !file.exists()){
                     if(Vars.ui != null){
                         Vars.ui.showErrorMessage(getLocalizedText("packloader.source.path.notfound", trimmed));
                     }
@@ -1583,11 +1586,19 @@ public class PackLoaderDialog extends BaseDialog implements FileDropHandler.Drop
         scanAsync(targetType, false, sources);
     }
 
-    public void scanAsync(PackType targetType, boolean append, Fi... sources){
-        if(sources == null || sources.length == 0) return;
+    public void scanAsync(PackType targetType, boolean append, Fi... rawSources){
+        if(rawSources == null || rawSources.length == 0) return;
+
+        // Automatically resolve Android SAF virtual Fi to physical files when available
+        final Fi[] sources = new Fi[rawSources.length];
+        for(int i = 0; i < rawSources.length; i++){
+            Fi resolved = packloader.util.StorageSources.resolveFi(rawSources[i]);
+            sources[i] = (resolved != null && resolved.exists()) ? resolved : rawSources[i];
+        }
 
         this.targetType = targetType;
-        String name = sources.length == 1 ? sources[0].name() :
+        String name = sources.length == 1 ?
+            packloader.util.StorageSources.sanitizeSourceName(sources[0].name(), sources[0].path()) :
             getLocalizedText("packloader.source.multiple", sources.length);
         int token = scanGeneration.begin();
         lastScanProgressPost = 0L;

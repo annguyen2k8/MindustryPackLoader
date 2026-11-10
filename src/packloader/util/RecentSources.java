@@ -1,6 +1,7 @@
 package packloader.util;
 
 import arc.Core;
+import arc.files.Fi;
 import arc.struct.Seq;
 import arc.util.Log;
 import arc.util.serialization.Jval;
@@ -35,13 +36,26 @@ public final class RecentSources{
         String raw = Core.settings.getString(SETTING_KEY, "[]");
         if(raw == null || raw.trim().isEmpty()) return list;
 
+        boolean migrated = false;
         try{
             Jval json = Jval.read(raw);
             if(json != null && json.isArray()){
                 for(Jval item : json.asArray()){
                     String path = item.getString("path", "");
                     String name = item.getString("name", "");
-                    if(path.isEmpty() || name.isEmpty()) continue;
+                    if(path.isEmpty() && name.isEmpty()) continue;
+
+                    // Backward compatibility: resolve virtual SAF paths stored in older sessions
+                    String resolvedPath = path;
+                    Fi resolvedFi = StorageSources.resolveFi(path);
+                    if(resolvedFi != null && resolvedFi.exists()){
+                        resolvedPath = resolvedFi.path();
+                    }
+
+                    String sanitizedName = StorageSources.sanitizeSourceName(name, resolvedPath);
+                    if(!resolvedPath.equals(path) || !sanitizedName.equals(name)){
+                        migrated = true;
+                    }
 
                     String typeStr = item.getString("type", null);
                     PackType type = null;
@@ -53,12 +67,18 @@ public final class RecentSources{
 
                     boolean isDir = item.getBool("isDir", false);
                     long lastUsed = item.getLong("lastUsed", 0L);
-                    list.add(new SourceItem(path, name, type, isDir, lastUsed));
+                    list.add(new SourceItem(resolvedPath, sanitizedName, type, isDir, lastUsed));
                 }
             }
         }catch(Throwable t){
             Log.warn("[PackLoader] Failed to read recent sources: @", t.getMessage());
         }
+
+        // Persist normalized paths and names if any virtual SAF entry was healed
+        if(migrated && !list.isEmpty()){
+            save(list);
+        }
+
         return list;
     }
 
@@ -84,14 +104,20 @@ public final class RecentSources{
     }
 
     public static void add(String path, String name, PackType type, boolean isDirectory){
-        if(path == null || path.trim().isEmpty() || name == null || name.trim().isEmpty()) return;
+        if(path == null || path.trim().isEmpty()) return;
+
+        // Resolve virtual SAF path to physical filesystem path if available
+        Fi resolved = StorageSources.resolveFi(path);
+        String finalPath = (resolved != null && resolved.exists()) ? resolved.path() : path.trim();
+        String finalName = StorageSources.sanitizeSourceName(name, finalPath);
+
         Seq<SourceItem> items = load();
 
-        // Remove existing entry for the same path and type
-        items.removeAll(it -> it.path.equalsIgnoreCase(path) && it.type == type);
+        // Remove existing entry for the same path (matching both original and resolved forms) and type
+        items.removeAll(it -> (it.path.equalsIgnoreCase(finalPath) || it.path.equalsIgnoreCase(path)) && it.type == type);
 
         // Add to front
-        items.insert(0, new SourceItem(path, name, type, isDirectory, System.currentTimeMillis()));
+        items.insert(0, new SourceItem(finalPath, finalName, type, isDirectory, System.currentTimeMillis()));
 
         // Trim
         while(items.size > MAX_RECENT){

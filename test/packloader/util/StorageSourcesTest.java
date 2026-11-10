@@ -105,6 +105,67 @@ public class StorageSourcesTest{
         assertTrue(StorageSources.collectWindowsRoots(new File[0], root -> "Drive", "Drive").isEmpty());
     }
 
+    @Test
+    public void testIsVirtualSafPath(){
+        assertTrue(StorageSources.isVirtualSafPath("/document/primary:mindustry-data-export.zip"));
+        assertTrue(StorageSources.isVirtualSafPath("/tree/primary:Download"));
+        assertTrue(StorageSources.isVirtualSafPath("primary:mindustry-data-export.zip"));
+        assertTrue(StorageSources.isVirtualSafPath("content://com.android.externalstorage.documents/document/primary%3Atest.zip"));
+        assertTrue(StorageSources.isVirtualSafPath("/document/raw:/storage/emulated/0/Download/test.zip"));
+        assertTrue(StorageSources.isVirtualSafPath("raw:/sdcard/pack.zip"));
+
+        assertFalse(StorageSources.isVirtualSafPath("C:\\maps\\pack.zip"));
+        assertFalse(StorageSources.isVirtualSafPath("/home/user/downloads/pack.zip"));
+        assertFalse(StorageSources.isVirtualSafPath("/sdcard/Download/pack.zip"));
+        assertFalse(StorageSources.isVirtualSafPath(null));
+        assertFalse(StorageSources.isVirtualSafPath(""));
+    }
+
+    @Test
+    public void testTranslateVirtualPath(){
+        assertEquals("/storage/emulated/0/mindustry-data-export.zip",
+            StorageSources.translateVirtualPath("/document/primary:mindustry-data-export.zip", "/storage/emulated/0"));
+
+        assertEquals("/storage/emulated/0/Download/pack.zip",
+            StorageSources.translateVirtualPath("/document/primary:Download/pack.zip", "/storage/emulated/0"));
+
+        assertEquals("/sdcard/maps",
+            StorageSources.translateVirtualPath("/tree/primary:maps", "/sdcard"));
+
+        assertEquals("/storage/emulated/0/test.zip",
+            StorageSources.translateVirtualPath("content://com.android.externalstorage.documents/document/primary%3Atest.zip", "/storage/emulated/0"));
+
+        assertEquals("/storage/1234-5678/Download/maps.zip",
+            StorageSources.translateVirtualPath("/document/1234-5678:Download/maps.zip", "/storage/emulated/0"));
+
+        assertEquals("/storage/emulated/0/Download/foo.zip",
+            StorageSources.translateVirtualPath("/document/raw:/storage/emulated/0/Download/foo.zip", "/storage/emulated/0"));
+
+        assertEquals("C:\\maps\\pack.zip",
+            StorageSources.translateVirtualPath("C:\\maps\\pack.zip", "/storage/emulated/0"));
+    }
+
+    @Test
+    public void testSanitizeSourceName(){
+        assertEquals("mindustry-data-export.zip",
+            StorageSources.sanitizeSourceName("primary:mindustry-data-export.zip", "/document/primary:mindustry-data-export.zip"));
+
+        assertEquals("pack.zip",
+            StorageSources.sanitizeSourceName("primary:Download/pack.zip", "/document/primary:Download/pack.zip"));
+
+        assertEquals("data.zip",
+            StorageSources.sanitizeSourceName("primary%3Adata.zip", null));
+
+        assertEquals("my_map.msav",
+            StorageSources.sanitizeSourceName("my_map.msav", "/storage/emulated/0/my_map.msav"));
+
+        assertEquals("pack.zip",
+            StorageSources.sanitizeSourceName(null, "/document/primary:pack.zip"));
+
+        assertEquals("unnamed",
+            StorageSources.sanitizeSourceName(null, null));
+    }
+
     private static File fakeDrive(String path, boolean exists, boolean directory){
         return new File(path){
             @Override

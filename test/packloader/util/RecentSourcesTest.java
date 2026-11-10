@@ -167,4 +167,26 @@ public class RecentSourcesTest{
         assertEquals(DuplicatePolicy.RENAME, PackLoaderSettings.getDuplicatePolicy(PackType.MAP));
         assertEquals(DuplicatePolicy.OVERWRITE, PackLoaderSettings.getDuplicatePolicy(PackType.SCHEMATIC));
     }
+
+    @Test
+    public void testVirtualSafNameSanitizedOnAdd(){
+        RecentSources.add("/document/primary:mindustry-data-export.zip", "primary:mindustry-data-export.zip", PackType.SCHEMATIC, false);
+
+        Seq<RecentSources.SourceItem> list = RecentSources.load();
+        assertEquals(1, list.size);
+        assertEquals("mindustry-data-export.zip", list.get(0).name, "Display name must be sanitized of primary: prefix");
+        assertEquals(PackType.SCHEMATIC, list.get(0).type);
+    }
+
+    @Test
+    public void testLegacyVirtualSafEntryMigrationOnLoad(){
+        // Simulate an existing entry in settings that had primary: in both name and path (as in user screenshot)
+        String legacyJson = "[{\"path\":\"/document/primary:mindustry-data-export.zip\",\"name\":\"primary:mindustry-data-export.zip\",\"type\":\"SCHEMATIC\",\"isDir\":false,\"lastUsed\":12345}]";
+        Core.settings.put(RecentSources.SETTING_KEY, legacyJson);
+
+        Seq<RecentSources.SourceItem> list = RecentSources.load();
+        assertEquals(1, list.size);
+        assertEquals("mindustry-data-export.zip", list.get(0).name, "Legacy virtual name must be sanitized automatically on load");
+        assertEquals(PackType.SCHEMATIC, list.get(0).type);
+    }
 }

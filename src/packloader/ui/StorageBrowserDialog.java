@@ -64,8 +64,8 @@ public class StorageBrowserDialog extends BaseDialog{
         if(!recents.isEmpty()){
             for(RecentSources.SourceItem item : recents){
                 try{
-                    Fi f = Core.files.absolute(item.path);
-                    if(f.exists()){
+                    Fi f = StorageSources.resolveFi(item.path);
+                    if(f != null && f.exists()){
                         return f.isDirectory() ? f : f.parent();
                     }
                 }catch(Throwable ignored){}
