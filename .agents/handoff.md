@@ -3,33 +3,30 @@
 > Replace this file at the end of each task. Keep only the current state; do not append an endless history.
 
 - **Status:** complete
-- **Last updated:** 2026-11-10 13:50 +07:00
+- **Last updated:** 2026-11-10 14:02 +07:00
 - **Updated by:** Antigravity / Gemini 3.8 Flash (High)
-- **Task:** Comprehensive Responsive UI/UX Audit & Optimization (Android Mobile & PC Desktop).
-- **Branch:** dev; upstream origin/dev.
+- **Task:** Resolve Android SAF Virtual URI Path Resolution and Recent Sources Sanitization.
+- **Branch:** fix/android-saf-recent-sources (branched from dev at 16befcf).
 
 ## Results
 
-- [verified] Multi-platform responsive UI/UX optimization:
-  - **Screen width cascade overflow fixed in `DryRunDialog`**: Stat cards wrap into 2 rows on mobile (`Vars.mobile`) preventing horizontal table blowout that was clipping leftmost/rightmost cards, entry rows, and disclaimer labels.
-  - **Eliminated ghosting / double rendering**: Added opaque solid background (`UIUtils.solidBackground()`) to `DryRunDialog`, `PackResultDialog`, `UndoConfirmDialog`, and `PackLoaderDialog` to prevent background bleed-through.
-  - **Eliminated bottom bar action clipping on mobile**:
-    - Removed non-essential `Icon.link` button from mobile review bottom bar.
-    - Sized mobile buttons responsively (`Back` 100f, `Preview` 105f, `Import` 130f; total 351f <= 360dp).
-    - Removed aggressive spacer `growX()` when only Close and Export are present in `PackResultDialog` and mode selection dialog.
-  - **Responsive Search & Conflict Layout**:
-    - Mobile portrait: Stacked search row (full width) above conflict resolution selector row, restoring full typing area for search.
-    - Desktop: Retained consolidated inline row for high information density.
-  - **Eliminated header redundancy**: Removed duplicate `[Change]` button from review header on mobile where `[Back]` is already visible.
-  - **Scan progress UI streamlined**: Removed flickering file names from scan progress (`packloader.scan.progress` and `packloader.scan.progress.total`), avoiding rapid label resizing and text overflow.
-  - **Color markup bleeding prevented**: Appended reset tag `[]` in `PackResultDialog`, `DryRunDialog`, and `PackLoaderDialog` to prevent unclosed color tags (e.g. `[Ground]`) from bleeding into `.msch` extensions.
-  - **Human-readable elapsed duration**: Formatted milliseconds cleanly (`UIUtils.formatDuration` -> `14.3s` instead of `14,332 ms`).
+- [verified] Android SAF virtual URI path resolution (`StorageSources.resolveFi` & `resolvePath`):
+  - Automatically translates Android SAF document URIs (e.g. `/document/primary:mindustry-data-export.zip`, `/tree/primary:...`, `primary:...`, `raw:...`, `content://...`, `%3A` percent-encoded URIs, and SD card UUID patterns `1234-5678:...`) to physical filesystem paths (`/storage/emulated/0/...`, `/sdcard/...`).
+  - Includes smart fallback check into `Download/` subdirectories.
+- [verified] Recent Sources sanitization and backward compatibility:
+  - Sanitizes display names (`StorageSources.sanitizeSourceName`) removing ugly `primary:` prefix (e.g. `primary:mindustry-data-export.zip` -> `mindustry-data-export.zip`).
+  - `RecentSources.add` and `RecentSources.load` automatically resolve virtual SAF paths to physical files and re-persist clean entries.
+  - Clicking Recent Sources cards now resolves via `StorageSources.resolveFi`, eliminating the "Path not found: /document/primary:..." error popup and preventing unwarranted deletion from history.
+- [verified] Performance and zero-copy ZipFile scanning:
+  - `PackLoaderDialog.scanAsync` resolves virtual SAF inputs to physical files before starting the worker thread.
+  - `PackScanner.resolveZip` uses the resolved physical file directly with `java.util.zip.ZipFile`, avoiding copying 40MB+ archives into temporary cache files.
 - [verified] Automated Test Suite:
-  - Added unit test `testFormatDuration()` and `testSolidBackgroundNotNull()` in `UIUtilsTest`.
-  - Added responsive test `testMobileBottomBarFitsWithin360p()` in `ListRowAndBottomBarTest`.
-  - Added responsive test `testMobileStackedSearchAndConflictLayout()` in `ReviewHeaderDensityTest`.
-  - All 244 tests passing via `./gradlew test`.
-  - Desktop jar build & bundle packaging verified via `./gradlew jar verifyJar`.
+  - Added unit tests `testIsVirtualSafPath()`, `testTranslateVirtualPath()`, `testSanitizeSourceName()` in `StorageSourcesTest`.
+  - Added unit tests `testVirtualSafNameSanitizedOnAdd()`, `testLegacyVirtualSafEntryMigrationOnLoad()` in `RecentSourcesTest`.
+  - Total 249 tests passing via `./gradlew test`.
+- [verified] Universal & Desktop JAR builds:
+  - `./gradlew jar verifyJar` -> BUILD SUCCESSFUL.
+  - `./gradlew deploy` -> BUILD SUCCESSFUL; copied to `/sdcard/Download/MindustryPackLoader.jar` for direct on-device testing.
 
 ## Remaining
 
@@ -37,10 +34,11 @@
 
 ## Next steps
 
-- Test live in Mindustry runtime on Android device and PC.
-- Prepare upcoming release `v1.1.0` when ready.
+- Test live in Mindustry on Android device using the deployed `/sdcard/Download/MindustryPackLoader.jar`.
+- Merge `fix/android-saf-recent-sources` into `dev` when approved.
 
 ## Verification
 
-- `./gradlew test` -> 244 tests completed, 0 failures.
+- `./gradlew test` -> 249 tests completed, 0 failures.
 - `./gradlew jar verifyJar` -> BUILD SUCCESSFUL; JAR verification passed.
+- `./gradlew deploy` -> BUILD SUCCESSFUL; `classes.dex` verified for Android.
